@@ -1,0 +1,12 @@
+mdbmaster: 
+  - address: gros-15.nancy.grid5000.fr
+  - port: 5000
+mdbworker0: 
+  - address: gros-16.nancy.grid5000.fr
+  - port: 5006
+kst0:
+  - address: gros-42.nancy.grid5000.fr
+  - port: 5008
+glance0:
+  - address: gros-42.nancy.grid5000.fr
+  - port: 5008

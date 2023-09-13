@@ -1,0 +1,22 @@
+sites: 1
+components:
+  mdbmaster:
+    type: 'MariaDB_master'
+    active: 'deployed'
+  ${{ each site in range(0,sites)}}:
+    mdbworker${{ site }}:
+      type: 'MariaDB_worker'
+      active: 'running'
+    kst${{ site }}:
+      type: 'Keystone'
+      active: 'deployed'
+    glance${{ site }}:
+      type: 'Glance'
+      active: 'initial'
+
+connections:
+  ${{ each site in range(0,sites)}}:
+    - mdbmaster,service,mdbworker${{ site }},master_service
+    - mdbworker${{ site }},service,kst${{ site }},mariadb_service
+    - mdbworker${{ site }},service,glance${{ site }},mariadb_service
+    - kst${{ site }},service,glance${{ site }},keystone_service

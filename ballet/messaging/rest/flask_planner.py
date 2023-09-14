@@ -93,14 +93,14 @@ class FlaskMessaging (RemoteMessaging):
 
     def __init__(self, local_components: list[CInstance], addresses: dict[str, str], port: str, verbose=False):
         self._ips = {}
+        toPing = set()
         for comp in addresses.keys():
             comp_host = addresses[comp]["address"]
             comp_port = addresses[comp]["port"]
-            self._ips[comp] = comp_host + ":" + comp_port
+            full_address = comp_host + ":" + str(comp_port)
+            self._ips[comp] = full_address
+            toPing.add(full_address)
         self._server = FlaskServer(port=port, components=local_components)
-        toPing = set()
-        for comp in addresses.keys():
-            toPing.add(addresses[comp])
         self.__verbose = verbose
         self.__pingAll(toPing)
         self._remote_send = 0

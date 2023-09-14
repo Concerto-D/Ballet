@@ -62,18 +62,18 @@ class gRPCMessaging (RemoteMessaging):
 
     def __init__(self, local_components: list[CInstance], addresses: dict[str, dict[str, str]], port: str, verbose=False):
         self._ips = {}
+        toPing = set()
         for comp in addresses.keys():
             comp_host = addresses[comp]["address"]
             comp_port = addresses[comp]["port"]
-            self._ips[comp] = comp_host + ":" + comp_port
+            full_address = comp_host + ":" + str(comp_port)
+            self._ips[comp] = full_address
+            toPing.add(full_address)
         self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self._servicer = MyServicer(local_components)
         message_pb2_grpc.add_MessagingServicer_to_server(self._servicer, self._server)
         self._server.add_insecure_port(f'[::]:{port}')
         self._server.start()
-        toPing = set()
-        for comp in addresses.keys():
-            toPing.add(addresses[comp])
         self.__verbose = verbose
         self.__pingAll(toPing)
         self._remote_send = 0

@@ -4,7 +4,8 @@ from ballet.assembly.assembly import CInstance
 from ballet.assembly.plan import Plan
 from ballet.gateway.dispatcher import Dispatcher
 from ballet.gateway.parser import AssemblyParser, InventoryParser, GoalParser
-from ballet.messaging.constraint_message import MailboxMessaging
+from ballet.messaging.constraint_message import MailboxMessaging, HybridMessaging
+from ballet.messaging.grpc.grpc_planner import gRPCMessaging
 from ballet.planner.resolve import resolve
 
 
@@ -37,8 +38,9 @@ def execute(plans: dict[CInstance, Plan]):
 def main(address, port, assembly_filename: str, inventory_filename: str, goal_filename: str):
     instances, active, inventory, goals, goals_state = parse(assembly_filename, inventory_filename, goal_filename)
     instances, active, goals, place_goals = dispatch(address, port, instances, active, inventory, goals, goals_state)
-    messaging = MailboxMessaging(instances)
-    # TODO here, instantiate a RemoteMessaging using inventory. Then use an HybridMessaging for messaging, instead of full local
+    messaging = HybridMessaging(local_messaging=MailboxMessaging(instances),
+                                remote_messaging=gRPCMessaging(instances, inventory, port, verbose=True),
+                                local_comps=instances)
     plans = plan(instances, active, goals, place_goals, messaging)
 
     execute(plans)

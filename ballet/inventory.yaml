@@ -1,0 +1,12 @@
+mdbmaster:
+  - address: localhost
+  - port: 5000
+mdbworker0:
+  - address: localhost
+  - port: 5000
+kst0:
+  - address: localhost
+  - port: 5000
+glance0:
+  - address: localhost
+  - port: 5000

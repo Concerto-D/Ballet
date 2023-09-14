@@ -7,7 +7,7 @@ from ballet.planner.minizinc.mzn_regular import MiniZincModelComponent, MiniZinc
 from ballet.utils.io_utils import makeDir
 from ballet.utils.list_utils import flatmap
 from ballet.planner.goal import ReconfigurationGoal, Goal, PortConstraint, StateReconfigurationGoal, \
-    PortReconfigurationGoal, BehaviorReconfigurationGoal
+    PortReconfigurationGoal, BehaviorReconfigurationGoal, PlaceReconfigurationGoal
 
 
 class ComponentNode:
@@ -35,8 +35,8 @@ class ComponentNode:
 
     def addInstructionContent(self, instruction, source="anon", round: int = None):
         if instruction.isGoal():
-            if instruction.isStateGoal():
-                self._addStateGoal(instruction)
+            if instruction.isPlaceGoal():
+                self._addPlaceGoal(instruction)
             if instruction.isPortGoal():
                 self._addPortGoal(instruction)
             if instruction.isBehaviorGoal():
@@ -51,8 +51,8 @@ class ComponentNode:
     def _get_constraint_messages(self) -> list[PortConstraint]:
         return flatmap(lambda src: self._rcv_messages[src], self._rcv_messages.keys())
 
-    def _addStateGoal(self, message: StateReconfigurationGoal):
-        constraint = MiniZincStateRegularConstraint(message.state(), final=message.final())
+    def _addPlaceGoal(self, message: PlaceReconfigurationGoal):
+        constraint = MiniZincStateRegularConstraint(message.place(), final=message.final())
         self._regular.add_constraint(constraint)
 
     def _addPortGoal(self, message: PortReconfigurationGoal):

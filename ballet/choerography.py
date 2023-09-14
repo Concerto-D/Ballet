@@ -1,3 +1,5 @@
+import argparse
+
 from ballet.assembly.assembly import CInstance
 from ballet.assembly.plan import Plan
 from ballet.gateway.dispatcher import Dispatcher
@@ -27,7 +29,9 @@ def plan(instances, active, goals, goals_place, messaging):
 
 
 def execute(plans: dict[CInstance, Plan]):
-    pass #TODO
+    # TODO call Concerto-D (i.e., executor)
+    for cinstance, plan in plans.items():
+        print(f"{plan}\n")
 
 
 def main(address, port, assembly_filename: str, inventory_filename: str, goal_filename: str):
@@ -38,3 +42,23 @@ def main(address, port, assembly_filename: str, inventory_filename: str, goal_fi
     plans = plan(instances, active, goals, place_goals, messaging)
 
     execute(plans)
+
+if __name__ == "__main__":
+    # Setup arguments
+    parser = argparse.ArgumentParser(prog='Ballet',
+                                     description='',
+                                     epilog='')
+    parser.add_argument('-hs', '--host', default="localhost")
+    parser.add_argument('-p', '--port', type=int, default=5000)
+    parser.add_argument('-a', '--assembly', default="assembly.yaml")
+    parser.add_argument('-i', '--inventory', default="inventory.yaml")
+    parser.add_argument('-g', '--goal', default="goal.yaml")
+
+    args = parser.parse_args()
+    host = args.host
+    port = args.port
+    assembly = args.assembly
+    inventory = args.inventory
+    goal = args.goal
+
+    main(host, port, assembly, inventory, goal)

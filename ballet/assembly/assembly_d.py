@@ -1,6 +1,7 @@
 from ballet.assembly.assembly import ComponentInstance, ComponentType, Port, CInstance, IAssembly
 from typing import Dict, Iterable, Tuple, Set, Union
 
+
 class DecentralizedComponentInstance (CInstance):
 
     def __init__(self, identifier: str, t: ComponentType):
@@ -91,7 +92,7 @@ class DecentralizedAssembly(IAssembly):
                           provider: DecentralizedComponentInstance,
                           provide_port: Port,
                           user: DecentralizedComponentInstance,
-                          use_port: Port):
+                          use_port: Port) -> None:
         assert provider in self._instances.values()
         assert provide_port.is_provide_port()
         assert user in self._instances.values()
@@ -103,7 +104,7 @@ class DecentralizedAssembly(IAssembly):
                              provider_id: str,
                              provide_port_name: str,
                              user_id: str,
-                             use_port_name: str):
+                             use_port_name: str) -> None:
         provider = self.get_instance(provider_id)
         user = self.get_instance(user_id)
         provide_port = provider.type().get_provide_port(provide_port_name)

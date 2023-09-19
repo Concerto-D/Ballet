@@ -42,8 +42,8 @@ def main(address, port, assembly_filename: str, inventory_filename: str, goal_fi
                                 remote_messaging=gRPCMessaging(instances, inventory, port, verbose=True),
                                 local_comps=instances)
     plans = plan(instances, active, goals, place_goals, messaging)
-
     execute(plans)
+
 
 if __name__ == "__main__":
     # Setup arguments

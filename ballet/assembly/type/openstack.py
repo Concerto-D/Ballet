@@ -1,6 +1,7 @@
 from ballet.assembly.assembly import ComponentType
 from ballet.assembly.type.tagging import classtag
 
+
 @classtag.tag("MariaDB_master")
 def mariadb_master_type() -> ComponentType:
     t = ComponentType("mariadb_master")

@@ -61,12 +61,14 @@ def reverse(it: Iterable[A]):
         res.insert(0, a)
     return res
 
+
 def count(p: Callable[[A], bool], lst: Iterable[A]) -> int:
     res = 0
     for a in lst:
         if p(a):
             res = res + 1
     return res
+
 
 def split(p: Callable[[A], bool], lst: Iterable[A]) -> tuple[list[A], list[A]]:
     l1: list[A] = []
@@ -81,3 +83,10 @@ def split(p: Callable[[A], bool], lst: Iterable[A]) -> tuple[list[A], list[A]]:
 
 def sum_lists(l1: list[A], l2: list[A]) -> list[A]:
     return l1 + l2
+
+
+def indexOf(v: A, l: list[A], default: int = -1) -> int:
+    for i in range(len(l)):
+        if l[i] == v:
+            return i
+    return default

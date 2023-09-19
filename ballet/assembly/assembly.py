@@ -296,6 +296,7 @@ class CInstance(ABC):
     def external_port_connection(self, comp: Union[CInstance, str], port: Union[Port, str]) -> str:
         pass
 
+
 class ComponentInstance(CInstance):
 
     def __init__(self, identifier: str, t: ComponentType):
@@ -319,13 +320,13 @@ class ComponentInstance(CInstance):
         assert p in self._type.ports()
         return len(self._connections[p]) > 0
 
-    def connect_provide_port(self, provide_port: Port, user: ComponentInstance, use_port: Port):
+    def connect_provide_port(self, provide_port: Port, user: ComponentInstance, use_port: Port) -> None:
         assert provide_port in self._type.provide_ports()
         assert use_port in user._type.use_ports()
         self._connections[provide_port].add((user, use_port))
         self._external_port_connections[(user.id(), use_port.name())] = provide_port
 
-    def connect_use_port(self, use_port: Port, provider: ComponentInstance, provide_port: Port):
+    def connect_use_port(self, use_port: Port, provider: ComponentInstance, provide_port: Port) -> None:
         assert use_port in self._type.use_ports()
         assert provide_port in provider._type.provide_ports()
         # a use port should only be connected to one provider
@@ -387,7 +388,7 @@ class Assembly(IAssembly):
                           provider: ComponentInstance,
                           provide_port: Port,
                           user: ComponentInstance,
-                          use_port: Port):
+                          use_port: Port) -> None:
         assert provider in self._instances.values()
         assert provide_port.is_provide_port()
         assert user in self._instances.values()
@@ -399,7 +400,7 @@ class Assembly(IAssembly):
                              provider_id: str,
                              provide_port_name: str,
                              user_id: str,
-                             use_port_name: str):
+                             use_port_name: str) -> None:
         provider = self.get_instance(provider_id)
         user = self.get_instance(user_id)
         provide_port = provider.type().get_provide_port(provide_port_name)

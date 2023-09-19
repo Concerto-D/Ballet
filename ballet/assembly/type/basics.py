@@ -1,0 +1,80 @@
+from ballet.assembly.assembly import ComponentType
+from ballet.assembly.type.tagging import classtag
+
+
+@classtag.tag("basic_parallel_user")
+def parallel_user_type(n: int) -> ComponentType:
+    t = ComponentType("parallel_user")
+    pl_uninstalled = t.add_place("uninstalled")
+    pl_allocated = t.add_place("allocated")
+    pl_configured = t.add_place("configured")
+    pl_running = t.add_place("running")
+    t.set_initial_place(pl_uninstalled)
+    t.set_running_place(pl_running)
+    t.add_provide_port("config", {pl_configured, pl_running})
+    t.add_provide_port("service", {pl_running})
+    bhv_deploy = t.add_behavior("deploy")
+    bhv_deploy.add_transition("deploy1", pl_uninstalled, pl_allocated)
+    bhv_deploy.add_transition("deploy4", pl_configured, pl_running)
+    bhv_suspend = t.add_behavior("suspend")
+    bhv_stop = t.add_behavior("stop")
+    bhv_stop.add_transition("stop1", pl_configured, pl_uninstalled)
+    for i in range(n):
+        pl_sconf = t.add_place("sconf" + str(i))
+        pl_suspended = t.add_place("suspended" + str(i))
+        bhv_deploy.add_transition("deploy2" + str(i), pl_allocated, pl_sconf)
+        bhv_deploy.add_transition("deploy3" + str(i), pl_sconf, pl_configured)
+        bhv_suspend.add_transition("suspend1" + str(i), pl_running, pl_suspended)
+        bhv_suspend.add_transition("suspend2" + str(i), pl_suspended, pl_configured)
+        t.add_use_port("service" + str(i), {pl_running, pl_suspended})
+        t.add_use_port("config" + str(i), {pl_sconf, pl_configured, pl_running, pl_suspended})
+    return t
+
+
+@classtag.tag("basic_provider")
+def provider_type() -> ComponentType:
+    t = ComponentType("provider")
+    pl_uninstalled = t.add_place("uninstalled")
+    pl_installed = t.add_place("installed")
+    pl_running = t.add_place("running")
+    t.set_initial_place(pl_uninstalled)
+    t.set_running_place(pl_running)
+    t.add_provide_port("config", {pl_installed, pl_running})
+    t.add_provide_port("service", {pl_running})
+    bhv_install = t.add_behavior("install")
+    bhv_install.add_transition("install1", pl_uninstalled, pl_installed)
+    bhv_install.add_transition("install2", pl_installed, pl_running)
+    bhv_update = t.add_behavior("update")
+    bhv_update.add_transition("update1", pl_running, pl_installed)
+    bhv_stop = t.add_behavior("stop")
+    bhv_stop.add_transition("stop1", pl_running, pl_uninstalled, 0)
+    bhv_stop.add_transition("stop2", pl_installed, pl_uninstalled, 0)
+    return t
+
+
+@classtag.tag("basic_transformer")
+def transformer_type() -> ComponentType:
+    t = ComponentType("transformer")
+    pl_uninstalled = t.add_place("uninstalled")
+    pl_installed = t.add_place("installed")
+    pl_configured = t.add_place("configured")
+    pl_running = t.add_place("running")
+    t.set_initial_place(pl_uninstalled)
+    t.set_running_place(pl_running)
+    t.add_use_port("config_in", {pl_installed, pl_configured, pl_running})
+    t.add_provide_port("config_out", {pl_configured, pl_running})
+    t.add_use_port("service_in", {pl_running})
+    t.add_provide_port("service_out", {pl_running})
+    bhv_install = t.add_behavior("install")
+    bhv_install.add_transition("install1", pl_uninstalled, pl_installed)
+    bhv_install.add_transition("install2", pl_installed, pl_configured)
+    bhv_install.add_transition("install3", pl_configured, pl_running)
+    bhv_update = t.add_behavior("update")
+    bhv_update.add_transition("update1", pl_running, pl_configured)
+    bhv_suspend = t.add_behavior("suspend")
+    bhv_suspend.add_transition("suspend1", pl_running, pl_installed)
+    bhv_stop = t.add_behavior("stop")
+    bhv_stop.add_transition("stop1", pl_running, pl_uninstalled, 0)
+    bhv_stop.add_transition("stop2", pl_installed, pl_uninstalled, 1)
+    bhv_stop.add_transition("stop3", pl_configured, pl_uninstalled, 2)
+    return t

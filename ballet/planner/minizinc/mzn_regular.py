@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from ballet.assembly.assembly import CInstance
+from ballet.assembly.simplified.assembly import CInstance
 from ballet.planner.automata import matrix_from_component
 from ballet.planner.minizinc.mzn_app import MiniZincApp
 from ballet.utils.list_utils import add_if_no_exist, intersection, difference, map_index

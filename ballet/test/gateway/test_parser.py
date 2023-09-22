@@ -1,7 +1,7 @@
 import unittest
 
-from ballet.assembly.assembly_d import DecentralizedComponentInstance
-from ballet.assembly.type import openstack
+from ballet.assembly.simplified.assembly_d import DecentralizedComponentInstance
+from ballet.assembly.simplified.type import openstack
 from ballet.gateway.parser import GoalParser, InventoryParser, AssemblyParser
 from ballet.planner.goal import BehaviorReconfigurationGoal, PortReconfigurationGoal
 
@@ -26,7 +26,7 @@ class TestParser(unittest.TestCase):
 
     def test_assembly_parser(self):
         parser = AssemblyParser()
-        res, active = parser.parse("assembly.yaml")
+        res, active, _, _ = parser.parse("assembly.yaml")
         master = DecentralizedComponentInstance("mdbmaster", openstack.mariadb_master_type())
         worker = DecentralizedComponentInstance("mdbworker0", openstack.mariadb_worker_type())
         glance = DecentralizedComponentInstance("glance0", openstack.glance_type())
@@ -48,7 +48,7 @@ class TestParser(unittest.TestCase):
         assert (res == exp)
 
     def test_goal_parser(self):
-        assembly, active = AssemblyParser().parse("assembly.yaml")
+        assembly, active, _, _ = AssemblyParser().parse("assembly.yaml")
 
         parser = GoalParser(assembly, active)
         res_goals, res_goals_state = parser.parse("goal.yaml")

@@ -1,5 +1,5 @@
-from ballet.assembly.assembly import ComponentType
-from ballet.assembly.type.tagging import classtag
+from ballet.assembly.simplified.assembly import ComponentType
+from ballet.assembly.simplified.type.tagging import classtag
 
 
 @classtag.tag("basic_parallel_user")

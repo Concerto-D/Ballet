@@ -1,7 +1,8 @@
 from typing import Set, Iterable
 
-from ballet.assembly.assembly import IAssembly, CInstance, Place
-from ballet.assembly.assembly_d import DecentralizedComponentInstance
+from ballet.assembly.simplified.assembly import CInstance, Place
+from ballet.assembly.simplified.assembly_d import DecentralizedComponentInstance
+from ballet.assembly.simplified.type.tagging import classtag
 from ballet.planner.goal import ReconfigurationGoal, PortReconfigurationGoal, BehaviorReconfigurationGoal, \
     StateReconfigurationGoal
 from ballet.utils.dict_utils import sum_dicts
@@ -9,7 +10,6 @@ from ballet.utils.iterable_utils import find_in_iterable
 from ballet.utils.list_utils import sum_lists
 from ballet.utils.set_utils import find_in_set, remove_in_set
 from ballet.utils.yaml_utils import addYamlExtension, replace_variables, extract_loop_values
-from ballet.assembly.type.openstack import *
 
 import yaml
 import re
@@ -48,7 +48,7 @@ class AssemblyParser:
         variables[variable] = None
         return connects
 
-    def simple_parse(self, filename) -> (dict[str, str], list[(str, str, str, str)]):
+    def simple_parse(self, filename) -> (dict[str, str], list[(str, str, str, str)], dict[str, str]):
         components: dict[str, str] = {}
         active: dict[str, str] = {}
         connections: list[(str, str, str, str)] = []
@@ -121,7 +121,7 @@ class AssemblyParser:
                 except AssertionError:
                     raise ValueError(f"{str_place} is not a valide place for {str_comp}. It must be either an existing place or running | initial.")
             active[my_comp] = my_place
-        return instances, active
+        return instances, active, components, connections
 
 
 class InventoryParser:

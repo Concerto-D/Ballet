@@ -1,4 +1,5 @@
-from ballet.assembly.assembly import CInstance, Place
+from ballet.assembly.plan.plan import Instruction, Disconnect, Add, Delete, Connect
+from ballet.assembly.simplified.assembly import CInstance, Place
 from ballet.messaging.constraint_message import PortConstraintMessage, ConstraintMessage, Messaging
 from ballet.planner.component_plan_node import ComponentNode
 from ballet.planner.goal import ReconfigurationGoal, PortConstraint, Goal
@@ -137,3 +138,25 @@ def resolve(components: Iterable[CInstance], active: dict[CInstance, Place], goa
         plans[comp] = nodes[comp].local_plan()
 
     return plans
+
+
+def diff_assembly(comp_in: dict[str, str], conn_in: list[(str, str, str, str)],
+                  comp_out: dict[str, str], conn_out: list[(str, str, str, str)]) -> \
+        (list[Instruction], list[Instruction], list[Instruction], list[Instruction]):
+    to_add: list[Add] = []
+    to_del: list[Delete] = []
+    to_con: list[Connect] = []
+    to_disc: list[Disconnect] = []
+    for comp_name, comp_type in comp_in.items():
+        if comp_name not in comp_out.keys():
+            to_del.append(Delete(comp_name))
+    for comp_name, comp_type in comp_out.items():
+        if comp_name not in comp_in.keys():
+            to_add.append(Add(comp_name, comp_type))
+    for c1, p1, c2, p2 in conn_in:
+        if (c1, p1, c2, p2) not in conn_out:
+            to_disc.append(Disconnect(c1, p1, c2, p2))
+    for c1, p1, c2, p2 in conn_out:
+        if (c1, p1, c2, p2) not in conn_in:
+            to_con.append(Connect(c1, p1, c2, p2))
+    return to_add, to_del, to_con, to_disc

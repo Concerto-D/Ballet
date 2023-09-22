@@ -1,5 +1,5 @@
 from typing import Tuple
-from ballet.assembly.assembly import ComponentInstance
+from ballet.assembly.simplified.assembly import ComponentInstance
 from ballet.utils.list_utils import findAll, difference, add_if_no_exist
 
 

@@ -1,7 +1,7 @@
 from abc import ABC
-from typing import Dict, Set, Iterable
+from typing import Set, Iterable
 
-from ballet.assembly.assembly import CInstance
+from ballet.assembly.simplified.assembly import CInstance
 from ballet.utils.list_utils import split
 
 

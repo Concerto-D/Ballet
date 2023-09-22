@@ -1,7 +1,7 @@
 from typing import Set
 from concurrent import futures
 
-from ballet.assembly.assembly import CInstance
+from ballet.assembly.simplified.assembly import CInstance
 from ballet.messaging.constraint_message import PortConstraintMessage, RemoteMessaging, ConstraintMessage
 from ballet.messaging.grpc import message_pb2, message_pb2_grpc
 from ballet.messaging.grpc.message_pb2_grpc import MessagingServicer

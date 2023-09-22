@@ -1,7 +1,7 @@
 from typing import Set
 from flask import Flask, request, jsonify, app
 
-from ballet.assembly.assembly import CInstance
+from ballet.assembly.simplified.assembly import CInstance
 from ballet.messaging.constraint_message import PortConstraintMessage, RemoteMessaging, ConstraintMessage
 
 import multiprocessing

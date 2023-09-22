@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Union
 
-from ballet.assembly.assembly import Place, Port, Behavior, ComponentInstance
+from ballet.assembly.simplified.assembly import Place, Port, Behavior, ComponentInstance
 
 """
 List of goals that can be set:

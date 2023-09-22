@@ -1,13 +1,12 @@
 from typing import Any, Set, Iterable, Union
 
-from ballet.assembly.assembly import Place, CInstance
-from ballet.assembly.plan import Plan, Wait, PushB
+from ballet.assembly.simplified.assembly import Place, CInstance
+from ballet.assembly.plan.plan import Plan, Wait, PushB
 from ballet.planner.minizinc.mzn_regular import MiniZincModelComponent, MiniZincStateRegularConstraint, \
     MiniZincPortRegularConstraint, MiniZincBehaviorRegularConstraint, MiniZincWaitRegularConstraint
 from ballet.utils.io_utils import makeDir
 from ballet.utils.list_utils import flatmap
-from ballet.planner.goal import ReconfigurationGoal, Goal, PortConstraint, StateReconfigurationGoal, \
-    PortReconfigurationGoal, BehaviorReconfigurationGoal, PlaceReconfigurationGoal
+from ballet.planner.goal import ReconfigurationGoal, Goal, PortConstraint, PortReconfigurationGoal, BehaviorReconfigurationGoal, PlaceReconfigurationGoal
 
 
 class ComponentNode:

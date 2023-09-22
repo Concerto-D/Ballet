@@ -1,4 +1,4 @@
-from ballet.assembly.assembly import ComponentInstance, ComponentType, Port, CInstance, IAssembly
+from ballet.assembly.simplified.assembly import ComponentInstance, ComponentType, Port, CInstance, IAssembly
 from typing import Dict, Iterable, Tuple, Set, Union
 
 

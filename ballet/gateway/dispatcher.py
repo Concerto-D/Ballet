@@ -1,6 +1,6 @@
-from typing import Set, Iterable
+from typing import Set
 
-from ballet.assembly.assembly import CInstance, Place, ComponentType
+from ballet.assembly.simplified.assembly import CInstance, Place
 from ballet.planner.goal import ReconfigurationGoal, StateReconfigurationGoal, PlaceReconfigurationGoal
 
 

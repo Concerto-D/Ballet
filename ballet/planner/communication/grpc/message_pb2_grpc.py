@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import ballet.planner.messaging.grpc.message_pb2 as message__pb2
+import ballet.planner.communication.grpc.message_pb2 as message__pb2
 
 
 class MessagingStub(object):

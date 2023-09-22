@@ -10,10 +10,10 @@ import time
 from os.path import exists
 from typing import Dict, List, Set, Optional
 
-from ballet.executor.messaging import communication_handler
-from ballet.executor.messaging.communication_handler import INACTIVE
+from ballet.executor.communication import communication_handler
+from ballet.executor.communication.communication_handler import INACTIVE
 
-from ballet.executor.messaging.rest import rest_communication, exposed_api
+from ballet.executor.communication.rest import rest_communication, exposed_api
 from ballet.assembly.concertod.component import Component
 from ballet.assembly.concertod.dependency import DepType
 from ballet.assembly.concertod.transition import Transition

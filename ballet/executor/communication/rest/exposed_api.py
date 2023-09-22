@@ -7,7 +7,7 @@ from threading import Thread
 
 from ballet.executor import global_variables
 from ballet.executor.logger.debug_logger import log, log_once
-from ballet.executor.messaging.rest.rest_communication import ACTIVE, INACTIVE
+from ballet.executor.communication.rest.rest_communication import ACTIVE, INACTIVE
 import logging
 
 # TODO: refacto with rest_communication

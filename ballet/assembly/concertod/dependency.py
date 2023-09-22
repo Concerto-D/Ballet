@@ -8,7 +8,7 @@
 from enum import Enum
 from typing import Set
 
-from ballet.executor.messaging import communication_handler
+from ballet.executor.communication import communication_handler
 
 
 class DepMandatory(Enum):

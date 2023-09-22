@@ -14,8 +14,8 @@ from typing import Dict, Tuple, List, Set, Callable, Optional
 from ballet.executor.logger import time_logger
 from ballet.executor.logger.time_logger import TimestampType, TimestampPeriod
 from ballet.executor import global_variables
-from ballet.executor.messaging import communication_handler
-from ballet.executor.messaging.communication_handler import INACTIVE, ACTIVE
+from ballet.executor.communication import communication_handler
+from ballet.executor.communication.communication_handler import INACTIVE, ACTIVE
 from ballet.executor.logger.debug_logger import log, log_once
 from ballet.assembly.concertod.place import Dock, Place
 from ballet.assembly.concertod.dependency import DepType, Dependency

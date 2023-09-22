@@ -4,7 +4,7 @@
 .. module:: remote_dependency
    :synopsis: this file contains the RemoteDependency class.
 """
-from ballet.executor.messaging import communication_handler
+from ballet.executor.communication import communication_handler
 from ballet.assembly.concertod.dependency import Dependency, DepType
 
 

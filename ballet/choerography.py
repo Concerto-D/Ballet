@@ -3,8 +3,8 @@ import argparse
 from ballet.assembly.plan.plan import merge_plans, Plan
 from ballet.gateway.dispatcher import Dispatcher
 from ballet.gateway.parser import AssemblyParser, InventoryParser, GoalParser
-from ballet.planner.messaging.constraint_message import MailboxMessaging, HybridMessaging
-from ballet.planner.messaging.grpc.grpc_planner import gRPCMessaging
+from ballet.planner.communication.constraint_message import MailboxMessaging, HybridMessaging
+from ballet.planner.communication.grpc.grpc_planner import gRPCMessaging
 from ballet.planner.resolve import resolve, diff_assembly
 
 

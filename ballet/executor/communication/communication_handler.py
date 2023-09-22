@@ -1,7 +1,7 @@
 from typing import List
 
-from ballet.executor.messaging.zenoh import zenoh_communication
-from ballet.executor.messaging.rest import rest_communication
+from ballet.executor.communication.zenoh import zenoh_communication
+from ballet.executor.communication.rest import rest_communication
 from ballet.executor import global_variables
 
 config = {}

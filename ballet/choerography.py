@@ -1,13 +1,11 @@
 import argparse
 
 from ballet.assembly.plan.plan import merge_plans, Plan
-from ballet.assembly.simplified.assembly import CInstance
 from ballet.gateway.dispatcher import Dispatcher
 from ballet.gateway.parser import AssemblyParser, InventoryParser, GoalParser
-from ballet.messaging.constraint_message import MailboxMessaging, HybridMessaging
-from ballet.messaging.grpc.grpc_planner import gRPCMessaging
+from ballet.planner.messaging.constraint_message import MailboxMessaging, HybridMessaging
+from ballet.planner.messaging.grpc.grpc_planner import gRPCMessaging
 from ballet.planner.resolve import resolve, diff_assembly
-from ballet.assembly.simplified.type.openstack import *
 
 
 def parse(assembly_in_filename: str, assembly_out_filename: str, inventory_filename: str, goal_filename: str):

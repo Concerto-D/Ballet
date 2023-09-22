@@ -10,6 +10,7 @@ from ballet.utils.iterable_utils import find_in_iterable
 from ballet.utils.list_utils import sum_lists
 from ballet.utils.set_utils import find_in_set, remove_in_set
 from ballet.utils.yaml_utils import addYamlExtension, replace_variables, extract_loop_values
+import ballet.assembly.simplified.type.all
 
 import yaml
 import re

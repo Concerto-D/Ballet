@@ -1,6 +1,6 @@
 from ballet.assembly.plan.plan import Instruction, Disconnect, Add, Delete, Connect
 from ballet.assembly.simplified.assembly import CInstance, Place
-from ballet.messaging.constraint_message import PortConstraintMessage, ConstraintMessage, Messaging
+from ballet.planner.messaging.constraint_message import PortConstraintMessage, ConstraintMessage, Messaging
 from ballet.planner.component_plan_node import ComponentNode
 from ballet.planner.goal import ReconfigurationGoal, PortConstraint, Goal
 from ballet.utils.list_utils import findAll, difference

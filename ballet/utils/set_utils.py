@@ -21,3 +21,4 @@ def findAll_in_set(f: Callable[[A], bool], s: Set[A]) -> List[A]:
 def remove_in_set(f: Callable[[A], bool], s: Set[A]) -> Set[A]:
     elements_to_remove = set(findAll_in_set(f, s))
     s.difference_update(elements_to_remove)
+    return s

@@ -15,6 +15,7 @@ class TestPlan(unittest.TestCase):
         plan3 = Plan("comp3", pl3)
         input = [plan1, plan2, plan3]
         res = merge_plans(input).instructions()
+        print(Plan("plan", res))
         def idx(instr):
             return list_utils.indexOf(instr, res)
         for plan in input:  # Check partial orders
@@ -25,6 +26,7 @@ class TestPlan(unittest.TestCase):
                 if instr.isWait():
                     wait: Wait = instr
                     assert idx(wait) > idx(PushB(wait.component(), wait.behavior()))
+
 
 
 if __name__ == '__main__':

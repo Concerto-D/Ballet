@@ -254,27 +254,33 @@ def build_graph(plans: list[Plan]):
         instructions: list[Instruction] = plan.instructions()
         for i in range(0, len(instructions)):
             instr1: Instruction = instructions[i]
+            if i < len(instructions) - 1:
+                instr2: Instruction = instructions[i + 1]
+                graph.add_edge(instr1, instr2)
             if instr1.isPushB():
                 pushb: PushB = instr1
                 potential_wait = list_utils.find(lambda wait: wait.behavior() == pushb.behavior() and
                                                               wait.component() == pushb.component(), waits)
                 if potential_wait is not None:
                     graph.add_edge(instr1, potential_wait)
-            if i < len(instructions) - 1:
-                instr2: Instruction = instructions[i + 1]
-                if not instr2.isWait():
-                    graph.add_edge(instr1, instr2)
     return graph
 
 
 def find_order(graph, roots):
+    def pop_a_vertex(to_explore, explored, in_edges):
+        for v in to_explore:
+            if list_utils.forall(lambda u: u in explored, in_edges[v]):
+                to_explore.remove(v)
+                return v
+        return to_explore.pop(0)
+
     simple_graph = graph.graph()
     to_explore = []
     for root in roots:
         to_explore.append(root)
     order = []
     while to_explore:
-        vertex = to_explore.pop(0)
+        vertex = pop_a_vertex(to_explore, order, graph.in_edges())
         if vertex not in order:
             order.append(vertex)
             for neighbor in simple_graph[vertex]:

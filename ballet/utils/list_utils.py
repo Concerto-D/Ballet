@@ -90,3 +90,7 @@ def indexOf(v: A, l: list[A], default: int = -1) -> int:
         if l[i] == v:
             return i
     return default
+
+
+def forall(p: Callable[[A], bool], l: list[A]) -> bool:
+    return not exists(lambda a: not p(a), l)

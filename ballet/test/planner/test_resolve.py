@@ -1,6 +1,5 @@
 import unittest
 
-from ballet.assembly.plan.plan import Delete, Add, Connect, Disconnect
 from ballet.planner.resolve import diff_assembly
 
 

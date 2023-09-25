@@ -130,6 +130,9 @@ class Behavior:
     def transitions(self) -> Iterable[Transition]:
         return self._transitions.values()
 
+    def transitions_has_dict(self) -> Dict[str, Transition]:
+        return self._transitions
+
     def get_transition(self, name: str) -> Transition:
         if name in self._transitions.keys:
             return self._transitions[name]

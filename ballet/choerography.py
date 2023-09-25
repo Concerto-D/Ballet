@@ -1,6 +1,7 @@
 import argparse
 
-from ballet.assembly.plan.plan import merge_plans, Plan
+from ballet.assembly.concertod.assembly import Assembly
+from ballet.assembly.plan.plan import merge_plans, Plan, Add, Delete, Disconnect, Wait, PushB, Connect
 from ballet.gateway.dispatcher import Dispatcher
 from ballet.gateway.parser import AssemblyParser, InventoryParser, GoalParser
 from ballet.planner.communication.constraint_message import MailboxMessaging, HybridMessaging
@@ -31,9 +32,28 @@ def plan(instances, active, goals, goals_place, messaging, comp_in, conn_in, com
     return Plan("Final plan", to_add + to_con + unified_plan.instructions() + to_disc + to_del)
 
 
-def execute(plan: Plan):
-    # TODO call Concerto-D (i.e., executor)
-    print(f"{plan}\n")
+def execute(assembly: Assembly, plan: Plan):
+    for instruction in plan.instructions():
+        print(f"{plan}\n")
+        if instruction.isAdd():
+            add: Add = instruction
+            assembly.add_component(add.component(), add.type())
+        elif instruction.isCon():
+            connect: Connect = instruction
+            assembly.connect(connect.provider(), connect.providing_port(), connect.user(), connect.using_port())
+        elif instruction.isPushB():
+            pushb: PushB = instruction
+            assembly.push_b(pushb.component(), pushb.behavior())
+        elif instruction.isWait():
+            wait: Wait = instruction
+            assembly.wait(wait.component())
+        elif instruction.isDiscon():
+            disconnect: Disconnect = instruction
+            assembly.disconnect(disconnect.provider(), disconnect.providing_port(), disconnect.user(), disconnect.using_port())
+        elif instruction.isDel():
+            delete: Delete = instruction
+            assembly.del_component(delete.component())
+    # TODO: What is assembly.synchronize()? It appears in some example but never defined
 
 
 def main(address, port, assembly_in_filename: str, assembly_out_filename: str, inventory_filename: str, goal_filename: str):
@@ -44,7 +64,8 @@ def main(address, port, assembly_in_filename: str, assembly_out_filename: str, i
                                 remote_messaging=gRPCMessaging(instances, inventory, port, verbose=True),
                                 local_comps=instances)
     my_plan = plan(instances, active, goals, place_goals, messaging, components_in, connections_in, components_out, connections_out)
-    execute(my_plan)
+    assembly = None # TODO get concrete assembly
+    execute(assembly, my_plan)
 
 
 if __name__ == "__main__":

@@ -1,12 +1,20 @@
 mdbmaster: 
   - address: gros-15.nancy.grid5000.fr
-  - port: 5000
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
 mdbworker0: 
   - address: gros-16.nancy.grid5000.fr
-  - port: 5006
+  - port_front: 5006
+  - port_planner: 5003
+  - port_executor: 5004
 kst0:
   - address: gros-42.nancy.grid5000.fr
-  - port: 5008
+  - port_front: 5008
+  - port_planner: 5005
+  - port_executor: 5006
 glance0:
   - address: gros-42.nancy.grid5000.fr
-  - port: 5008
+  - port_front: 5008
+  - port_planner: 5005
+  - port_executor: 5006

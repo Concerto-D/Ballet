@@ -4,7 +4,7 @@ from ballet.gateway.parser import AssemblyParser, InventoryParser, GoalParser
 def parse(assembly_filename: str, inventory_filename: str, goal_filename: str):
     assembly_parser = AssemblyParser()
     inventory_parser = InventoryParser()
-    instances, active = assembly_parser.parse(assembly_filename)
+    instances, active, _, _ = assembly_parser.parse(assembly_filename)
     inventory = inventory_parser.parse(inventory_filename)
     goal_parser = GoalParser(instances, active)
     res_goals, res_goals_state = goal_parser.parse(goal_filename)

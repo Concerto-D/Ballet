@@ -138,7 +138,8 @@ class InventoryParser:
         # Iterate through the data and create the dictionary
         for key, values in data.items():
             # Assuming each component has two elements: address and port
-            result[key] = {'address': values[0]['address'], 'port': values[1]['port']}
+            result[key] = {'address': values[0]['address'], 'port_front': values[1]['port_front'],
+                           'port_planner': values[2]['port_planner'], 'port_executor': values[3]['port_executor']}
         return result
 
 

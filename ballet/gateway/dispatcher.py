@@ -13,7 +13,7 @@ class Dispatcher:
         # Removed unneeded instances
         local_compIDs = set()
         for instance in instances:
-            if inventory[instance.id()]["address"] == address and inventory[instance.id()]["port"] == port:
+            if inventory[instance.id()]["address"] == address and inventory[instance.id()]["port_front"] == port:
                 self._local_instances.add(instance)
                 local_compIDs.add(instance.id())
         # Cleaned active places dictionary
@@ -39,6 +39,7 @@ class Dispatcher:
                         else:
                             place = state_goal.state()
                         self._place_goals[instance].add(PlaceReconfigurationGoal(place, final=state_goal.final()))
+        # TODO exchange all goals with the other nodes
         # The inventory remains global
         self._inventory = inventory
 

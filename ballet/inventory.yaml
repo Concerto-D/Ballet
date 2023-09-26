@@ -1,12 +1,20 @@
 mdbmaster:
   - address: localhost
-  - port: 5000
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
 mdbworker0:
   - address: localhost
-  - port: 5000
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
 kst0:
   - address: localhost
-  - port: 5000
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
 glance0:
   - address: localhost
-  - port: 5000
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002

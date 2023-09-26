@@ -65,7 +65,7 @@ class gRPCMessaging (RemoteMessaging):
         toPing = set()
         for comp in addresses.keys():
             comp_host = addresses[comp]["address"]
-            comp_port = addresses[comp]["port"]
+            comp_port = addresses[comp]["port_planner"]
             full_address = comp_host + ":" + str(comp_port)
             self._ips[comp] = full_address
             toPing.add(full_address)

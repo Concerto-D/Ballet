@@ -1,6 +1,7 @@
 from typing import Set
 
 from ballet.assembly.simplified.assembly import CInstance, Place
+from ballet.gateway.communication.rest.flask_dispatcher import FlaskDispatcher, ClientDispatcher
 from ballet.planner.goal import ReconfigurationGoal, StateReconfigurationGoal, PlaceReconfigurationGoal
 
 
@@ -8,7 +9,7 @@ class Dispatcher:
 
     def __init__(self, address: str, port: int, instances: Set[CInstance], active: dict[CInstance, Place],
                  inventory: dict[str, [str, int]],
-                 goals: dict[str, ReconfigurationGoal], goal_states: dict[CInstance, Set[ReconfigurationGoal]]):
+                 goals: dict[str, Set[ReconfigurationGoal]], goal_states: dict[CInstance, Set[ReconfigurationGoal]]):
         self._local_instances = set()
         # Removed unneeded instances
         local_compIDs = set()
@@ -23,6 +24,9 @@ class Dispatcher:
                 self._active_places[instance] = place
         # The behavior and port goals are shared between all nodes
         self._goals = goals
+        server = FlaskDispatcher(port, instances)
+        client = ClientDispatcher(goals, inventory)
+        # TODO client send to all servers
         # The state goals are local, and become place goals
         self._place_goals = {}
         for (instance, state_goals) in goal_states.items():
@@ -39,7 +43,7 @@ class Dispatcher:
                         else:
                             place = state_goal.state()
                         self._place_goals[instance].add(PlaceReconfigurationGoal(place, final=state_goal.final()))
-        # TODO exchange all goals with the other nodes
+
         # The inventory remains global
         self._inventory = inventory
 

@@ -10,7 +10,7 @@ import time
 import grpc
 
 
-class MyServicer(MessagingServicer):
+class PlannerServicer(MessagingServicer):
 
     def __init__(self, components):
         self._mailbox = {comp.id(): set() for comp in components}
@@ -58,7 +58,7 @@ class MyServicer(MessagingServicer):
             self.reset_mailbox(compId)
         return res
 
-class gRPCMessaging (RemoteMessaging):
+class gRPCMessagingPlanner (RemoteMessaging):
 
     def __init__(self, local_components: list[CInstance], addresses: dict[str, dict[str, str]], port: str, verbose=False):
         self._ips = {}
@@ -70,7 +70,7 @@ class gRPCMessaging (RemoteMessaging):
             self._ips[comp] = full_address
             toPing.add(full_address)
         self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        self._servicer = MyServicer(local_components)
+        self._servicer = PlannerServicer(local_components)
         message_pb2_grpc.add_MessagingServicer_to_server(self._servicer, self._server)
         self._server.add_insecure_port(f'[::]:{port}')
         self._server.start()

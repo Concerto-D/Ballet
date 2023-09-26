@@ -9,7 +9,7 @@ import requests
 import time
 
 
-class FlaskServer:
+class FlaskPlanner:
 
     def __init__(self, port, components):
         self._mailbox = {comp.id(): set() for comp in components}
@@ -101,7 +101,7 @@ class FlaskMessaging (RemoteMessaging):
             full_address = comp_host + ":" + str(comp_port)
             self._ips[comp] = full_address
             toPing.add(full_address)
-        self._server = FlaskServer(port=port, components=local_components)
+        self._server = FlaskPlanner(port=port, components=local_components)
         self.__verbose = verbose
         self.__pingAll(toPing)
         self._remote_send = 0

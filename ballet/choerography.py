@@ -5,7 +5,7 @@ from ballet.assembly.plan.plan import merge_plans, Plan, Add, Delete, Disconnect
 from ballet.gateway.dispatcher import Dispatcher
 from ballet.gateway.parser import AssemblyParser, InventoryParser, GoalParser
 from ballet.planner.communication.constraint_message import MailboxMessaging, HybridMessaging
-from ballet.planner.communication.grpc.grpc_planner import gRPCMessaging
+from ballet.planner.communication.grpc.grpc_planner import gRPCMessagingPlanner
 from ballet.planner.resolve import resolve, diff_assembly
 
 
@@ -30,7 +30,7 @@ def dispatch(address, port, instances, active, inventory, goals, state_goals):
 
 def plan(instances, active, inventory, port, goals, goals_place, comp_in, conn_in, comp_out, conn_out):
     messaging = HybridMessaging(local_messaging=MailboxMessaging(instances),
-                                remote_messaging=gRPCMessaging(instances, inventory, port, verbose=True),
+                                remote_messaging=gRPCMessagingPlanner(instances, inventory, port, verbose=True),
                                 local_comps=instances)
     plans = resolve(instances, active, goals, goals_place, messaging)
     unified_plan: Plan = merge_plans(list(plans.values()))

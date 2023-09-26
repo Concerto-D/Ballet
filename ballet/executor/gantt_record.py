@@ -44,7 +44,7 @@ class GanttRecord:
 
         max_time = 0.0
 
-        if len(self.log) is 0:
+        if len(self.log) == 0:
             print("Not exporting Gnuplot: empty log.")
             return
 

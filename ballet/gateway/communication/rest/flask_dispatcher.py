@@ -17,6 +17,8 @@ class FlaskDispatcher:
         app = Flask(__name__)
         self._server_process = multiprocessing.Process(target=app.run,
                                                        kwargs={"host": self.__host, "port": self.__port})
+
+    def start(self):
         self._server_process.start()
 
     def __parseBool(self, input: str):

@@ -25,8 +25,9 @@ class Dispatcher:
         # The behavior and port goals are shared between all nodes
         self._goals = goals
         server = FlaskDispatcher(port, instances)
-        client = ClientDispatcher(goals, inventory)
-        # TODO client send to all servers
+        server.start()
+        client = ClientDispatcher(inventory)
+        client.sendGoals(goals)
         # The state goals are local, and become place goals
         self._place_goals = {}
         for (instance, state_goals) in goal_states.items():

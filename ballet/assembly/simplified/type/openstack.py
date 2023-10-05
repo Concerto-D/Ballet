@@ -2,6 +2,38 @@ from ballet.assembly.simplified.assembly import ComponentType
 from ballet.assembly.simplified.type.tagging import classtag
 
 
+@classtag.tag("MariaDB")
+def mariadb_master_type() -> ComponentType:
+    t = ComponentType("mariadb")
+    pl_initiated = t.add_place("initiated")
+    pl_configured = t.add_place("configured")
+    pl_bootstrapped = t.add_place("bootstrapped")
+    pl_restarted = t.add_place("restarted")
+    pl_registered = t.add_place("registered")
+    pl_deployed = t.add_place("deployed")
+    pl_interrupted = t.add_place("interrupted")
+    t.set_initial_place(pl_initiated)
+    t.set_running_place(pl_deployed)
+    bhv_deploy = t.add_behavior("deploy")
+    bhv_deploy.add_transition("configure0", pl_initiated, pl_configured, cost=3)
+    bhv_deploy.add_transition("configure1", pl_initiated, pl_configured, cost=5)
+    bhv_deploy.add_transition("bootstrap", pl_configured, pl_bootstrapped, cost=26)
+    bhv_deploy.add_transition("start", pl_bootstrapped, pl_restarted, cost=13)
+    bhv_deploy.add_transition("register", pl_restarted, pl_registered, cost=3)
+    bhv_deploy.add_transition("deploy", pl_registered, pl_deployed, cost=13)
+    bhv_interrupt = t.add_behavior("interrupt")
+    bhv_interrupt.add_transition("interrupt", pl_deployed, pl_interrupted, cost=1)
+    bhv_pause = t.add_behavior("pause")
+    bhv_pause.add_transition("pause", pl_interrupted, pl_bootstrapped, cost=1)
+    bhv_stop = t.add_behavior("update")
+    bhv_stop.add_transition("update", pl_interrupted, pl_configured, cost=2)
+    bhv_uninstall = t.add_behavior("uninstall")
+    bhv_uninstall.add_transition("uninstall", pl_interrupted, pl_initiated, cost=5)
+    t.add_use_port("haproxy_service", {pl_bootstrapped, pl_restarted})
+    t.add_use_port("common_service", {pl_restarted, pl_registered, pl_deployed, pl_interrupted})
+    t.add_provide_port("service", {pl_deployed})
+    return t
+
 @classtag.tag("MariaDB_master")
 def mariadb_master_type() -> ComponentType:
     t = ComponentType("mariadb_master")

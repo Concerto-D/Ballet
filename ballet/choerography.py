@@ -13,7 +13,7 @@ def parse(assembly_in_filename: str, assembly_out_filename: str, inventory_filen
     assembly_parser = AssemblyParser()
     inventory_parser = InventoryParser()
     instances, active, components_in, connections_in = assembly_parser.parse(assembly_in_filename)
-    additional_instances, _, components_out, connections_out= assembly_parser.parse(assembly_out_filename)
+    additional_instances, _, components_out, connections_out = assembly_parser.parse(assembly_out_filename)
     for inst in additional_instances:
         active[inst] = inst.type().initial_place()
         instances.add(inst)
@@ -65,7 +65,7 @@ def execute(assembly: Assembly, plan: Plan, running=False):
     # TODO: What is assembly.synchronize()? It appears in some example but never defined
 
 
-def main(address, ports, assembly_in_filename: str, assembly_out_filename: str, inventory_filename: str, goal_filename: str):
+def choerography(address, ports, assembly_in_filename: str, assembly_out_filename: str, inventory_filename: str, goal_filename: str):
     (port_front, port_planner, port_executor) = ports
     instances, active, inventory, goals, goals_state, components_in, connections_in, components_out, connections_out \
         = parse(assembly_in_filename, assembly_out_filename, inventory_filename, goal_filename)
@@ -73,30 +73,3 @@ def main(address, ports, assembly_in_filename: str, assembly_out_filename: str, 
     my_plan = plan(instances, active, inventory, port_planner, goals, place_goals, components_in, connections_in, components_out, connections_out)
     assembly = None # TODO get concrete assembly
     execute(assembly, my_plan)
-
-
-if __name__ == "__main__":
-    # Setup arguments
-    parser = argparse.ArgumentParser(prog='Ballet',
-                                     description='',
-                                     epilog='')
-    parser.add_argument('-hs', '--host', default="localhost")
-    parser.add_argument('-pf', '--port_front', type=int, default=5000)
-    parser.add_argument('-pp', '--port_planner', type=int, default=5001)
-    parser.add_argument('-pe', '--port_executor', type=int, default=5002)
-    parser.add_argument('-ain', '-a', '--assembly_in', default="assembly.yaml")
-    parser.add_argument('-aout', '--assembly_out', default=None)
-    parser.add_argument('-i', '--inventory', default="inventory.yaml")
-    parser.add_argument('-g', '--goal', default="goal.yaml")
-
-    args = parser.parse_args()
-    host = args.host
-    ports = (args.port_front, args.port_planner, args.port_executor)
-    assembly_in = args.assembly_in
-    assembly_out = args.assembly_out
-    if assembly_out is None:
-        assembly_out = assembly_in
-    inventory = args.inventory
-    goal = args.goal
-
-    main(host, ports, assembly_in, assembly_out, inventory, goal)

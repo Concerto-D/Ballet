@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+message Empty {}
+
+message AckID {
+    string sourceID = 1;
+    string targetID = 2;
+}
+
+message globalAckID {
+    string id = 1;
+}
+
+message portConstraint {
+    string sourceID = 1;
+    string targetID = 2;
+    string round = 3;
+    string port = 4;
+    string status = 5;
+    string behavior = 6;
+}
+
+service Messaging {
+    rpc AddAckByID(AckID) returns (Empty) {}
+    rpc AddPortConstraint(portConstraint) returns (Empty) {}
+    rpc AddGlobalAck(globalAckID) returns (Empty) {}
+    rpc ping(Empty) returns (Empty) {}
+}
+
+

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+message Empty {}
+
+message Pong {
+  string message = 1;
+}
+
+message Done {
+  string address = 1;
+}
+
+message PortGoal {
+    string component = 1;
+    string port = 2;
+    bool status = 3;
+    bool final = 4;
+}
+
+message BehaviorGoal {
+    string component = 1;
+    string behavior = 2;
+    bool final = 3;
+}
+
+service Messaging {
+    rpc ping(Empty) returns (Pong) {}
+    rpc addPortGoals(stream PortGoal) returns (Empty) {}
+    rpc addBehaviorGoals(stream BehaviorGoal) returns (Empty) {}
+    rpc validate(Done) returns (Empty) {}
+}
+
+

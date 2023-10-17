@@ -1,5 +1,0 @@
-behaviors:
-  - component : mdbmaster
-    behavior : update
-components:
-  - forall : running

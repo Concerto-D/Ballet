@@ -1,10 +1,11 @@
+import threading
 from typing import Set
 from concurrent import futures
 
 from ballet.assembly.simplified.assembly import CInstance
 from ballet.planner.communication.constraint_message import PortConstraintMessage, RemoteMessaging, ConstraintMessage
-from ballet.planner.communication.grpc import message_pb2_grpc, message_pb2
-from ballet.planner.communication.grpc.message_pb2_grpc import MessagingServicer
+from ballet.planner.communication.grpc import planner_pb2_grpc, planner_pb2
+from ballet.planner.communication.grpc.planner_pb2_grpc import MessagingServicer
 
 import time
 import grpc
@@ -12,27 +13,41 @@ import grpc
 
 class PlannerServicer(MessagingServicer):
 
-    def __init__(self, components):
-        self._mailbox = {comp.id(): set() for comp in components}
-        self._acks = {comp.id(): set() for comp in components}
+    def __init__(self):
+        self._mailbox = {}
+        self._acks = {}
         self._global_acks = set()
+        self._lock_new_mailbox = threading.Lock()
+        self._lock_add_constraint = threading.Lock()
+        self._lock_new_global_ack = threading.Lock()
+        self._lock_new_acks = threading.Lock()
+        self._lock_add_ack = threading.Lock()
 
     def AddAckByID(self, request, context):
-        self._acks[request.targetID].add(request.sourceID)
-        return message_pb2.Empty()
+        with self._lock_new_acks:
+            if request.targetID not in self._acks:
+                self._acks[request.targetID] = set()
+        with self._lock_add_ack:
+            self._acks[request.targetID].add(request.sourceID)
+        return planner_pb2.Empty()
 
     def AddPortConstraint(self, request, context):
         bhv = request.behavior if request.behavior not in ["NONE", "None", "none", ""] else None
         constr = PortConstraintMessage(request.sourceID, request.port, request.status, bhv)
-        self._mailbox[request.targetID].add((request.sourceID, request.round, constr))
-        return message_pb2.Empty()
+        with self._lock_new_mailbox:
+            if request.targetID not in self._mailbox:
+                self._mailbox[request.targetID] = set()
+        with self._lock_add_constraint:
+            self._mailbox[request.targetID].add((request.sourceID, request.round, constr))
+        return planner_pb2.Empty()
 
     def AddGlobalAck(self, request, context):
-        self._global_acks.add(request.id)
-        return message_pb2.Empty()
+        with self._lock_new_global_ack:
+            self._global_acks.add(request.id)
+        return planner_pb2.Empty()
 
     def ping(self, request, context):
-        return message_pb2.Empty()
+        return planner_pb2.Empty()
 
     def mailbox(self):
         return self._mailbox
@@ -44,7 +59,8 @@ class PlannerServicer(MessagingServicer):
         return self._global_acks
 
     def reset_mailbox(self, compId):
-        self._mailbox[compId] = set()
+        with self._lock_new_mailbox:
+            self._mailbox[compId] = set()
 
     def get_mailbox(self, compId, reset=True):
         received = set()
@@ -58,9 +74,9 @@ class PlannerServicer(MessagingServicer):
             self.reset_mailbox(compId)
         return res
 
-class gRPCMessagingPlanner (RemoteMessaging):
+class ClientGrpcPlanner(RemoteMessaging):
 
-    def __init__(self, local_components: list[CInstance], addresses: dict[str, dict[str, str]], port: str, verbose=False):
+    def __init__(self, addresses: dict[str, dict[str, str]], port: str, verbose=False):
         self._ips = {}
         toPing = set()
         for comp in addresses.keys():
@@ -69,9 +85,9 @@ class gRPCMessagingPlanner (RemoteMessaging):
             full_address = comp_host + ":" + str(comp_port)
             self._ips[comp] = full_address
             toPing.add(full_address)
-        self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        self._servicer = PlannerServicer(local_components)
-        message_pb2_grpc.add_MessagingServicer_to_server(self._servicer, self._server)
+        self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=16))
+        self._servicer = PlannerServicer()
+        planner_pb2_grpc.add_MessagingServicer_to_server(self._servicer, self._server)
         self._server.add_insecure_port(f'[::]:{port}')
         self._server.start()
         self.__verbose = verbose
@@ -81,8 +97,8 @@ class gRPCMessagingPlanner (RemoteMessaging):
 
     def __ping(self, address):
         with grpc.insecure_channel(address) as channel:
-            stub = message_pb2_grpc.MessagingStub(channel)
-            msg = message_pb2.Empty()
+            stub = planner_pb2_grpc.MessagingStub(channel)
+            msg = planner_pb2.Empty()
             stub.ping(msg)
 
     def __pingAll(self, addresses: list[str]):
@@ -114,8 +130,8 @@ class gRPCMessagingPlanner (RemoteMessaging):
             print(f"[REMOTE] {source.id()} send to {target}: ({constr.source()},{constr.port()},{constr.status()},{constr.behavior()})")
             if isinstance(constr, PortConstraintMessage):
                 with grpc.insecure_channel(self._ips[target]) as channel:
-                    stub = message_pb2_grpc.MessagingStub(channel)
-                    msg = message_pb2.portConstraint(sourceID=source.id(), targetID=target, round=str(round), port=constr.port(), status=constr.status(), behavior=constr.behavior())
+                    stub = planner_pb2_grpc.MessagingStub(channel)
+                    msg = planner_pb2.portConstraint(sourceID=source.id(), targetID=target, round=str(round), port=constr.port(), status=constr.status(), behavior=constr.behavior())
                     stub.AddPortConstraint(msg)
 
     def get_acks(self, comp: CInstance) -> Set[str]:
@@ -128,15 +144,15 @@ class gRPCMessagingPlanner (RemoteMessaging):
         for target in targets:
             print(f"[REMOTE] {source.id()} send ack to {target} (at {self._ips[target]})")
             with grpc.insecure_channel(self._ips[target]) as channel:
-                stub = message_pb2_grpc.MessagingStub(channel)
-                msg = message_pb2.AckID(sourceID=source.id(), targetID=target)
+                stub = planner_pb2_grpc.MessagingStub(channel)
+                msg = planner_pb2.AckID(sourceID=source.id(), targetID=target)
                 stub.AddAckByID(msg)
 
     def bcast_root_acks(self, source: CInstance):
         for ip in self._ips.values():
             with grpc.insecure_channel(ip) as channel:
-                stub = message_pb2_grpc.MessagingStub(channel)
-                msg = message_pb2.globalAckID(id=source.id())
+                stub = planner_pb2_grpc.MessagingStub(channel)
+                msg = planner_pb2.globalAckID(id=source.id())
                 stub.AddGlobalAck(msg)
 
     def get_global_acks(self):

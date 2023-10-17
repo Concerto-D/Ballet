@@ -23,10 +23,9 @@ class Dispatcher:
             if instance.id() in local_compIDs:
                 self._active_places[instance] = place
         # The behavior and port goals are shared between all nodes
-        self._goals = goals
+        # sel   f._goals = goals
         client = ClientDispatcher(address, port, inventory, goals)
-        client.global_goal_synchronization()
-        # TODO Get new goals from client
+        self._goals = client.global_goal_synchronization()
         # The state goals are local, and become place goals
         self._place_goals = {}
         for (instance, state_goals) in goal_states.items():

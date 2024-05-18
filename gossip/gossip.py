@@ -33,9 +33,12 @@ class AckRefuse(Acknowledgement):
 
 class Node (ABC):
     
-    def __init__(self):
+    def __init__(self, message_client, message_server):
         self.__global_acks = {}
-        self.__messages = {}
+        self.__out_message = {} # pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
+        self.__in_message = {}  # pour chaque message recu, a-t-il deja validé via un ack?
+        # self.__client = message_client
+        self.__server = message_server
         
     @property   
     def global_acks(self):
@@ -46,11 +49,9 @@ class Node (ABC):
         pass
     
     def new_received_messages(self):
+        # Get messages from mailbox ()
         new_messages = []
-        for message in self.__messages.keys():
-            if self.__messages[message]:
-                new_messages.append(message)
-                self.__messages[message] = False
+        # TODO considering we have a hosting __server
         return new_messages
     
     def send_messages(self, target, messages):
@@ -104,7 +105,7 @@ def check_global_acks(node: Node, roots: list[Node]):
 
 def gossip (node: Node, roots: list[Node],
             f_init: Callable[[Node], Model], 
-            f_local: Callable[[Model], (list[Message], Optional[Acknowledgement])], 
+            f_local: Callable[[Model], tuple[list[Message], Optional[Acknowledgement]]], 
             f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
             f_enrich: Callable[[Model, list[Message]], Model],
             f_ack: Callable[[Node, Acknowledgement], dict[Node, Acknowledgement]],
@@ -140,6 +141,7 @@ def gossip (node: Node, roots: list[Node],
             model = f_enrich(model, received_messages)
             node.add_received_message(received_messages)
         if must_solve:
+            must_solve = False
             (out_messages, ack_refuse) = f_local(model)
             if ack_refuse != None:
                 # We face a failure... there is no solution? 

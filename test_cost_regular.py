@@ -11,12 +11,12 @@ cr = CostRegular(["initiated","configured","deployed"],
                  "initiated",
                  {"service":["deployed"], "facts_service":["configured", "deployed"]},
                  {StateConstraint("deployed", final=True),
-                  PortConstraint("service", "disabled", final=True),
                   TransitionConstraint("deploy")
                   })
 
 
-cr.solve_choco(print_model=True)
+# cr.solve_minizinc(print_model=True, write_file=True)
+cr.solve_choco(print_model=True, write_file=True)
 
 # try:
 #     res = cr.solve(mode="minizinc", print_model=False, write_file=True)

@@ -240,8 +240,8 @@ class CostRegular(Model):
         
     def __make_choco_transitions_matrix(self):
         lines = map(lambda state: self.__make_choco_transitions_line(state), self.__states)
-        ll = '\n'.join(map(lambda l: f"\t{l}",lines))
-        return '\n'.join(f"""
+        ll = '\n'.join(map(lambda l: f"\t\t{l}",lines))
+        return ',\n'.join(f"""
 {ll}""".split('\n')[1:])
         
     def __make_mzn_costs_line(self, state):
@@ -249,6 +249,10 @@ class CostRegular(Model):
         for transition in self.__transitions:
             if state in self.__costs.keys() and transition in self.__costs[state].keys(): # the transition has a cost
                 targets.append(str(self.__costs[state][transition]))
+            else:
+                targets.append(str(1000000))
+        return "|" + ','.join(targets)  
+
         
     def __make_choco_costs_line(self, state):
         targets = []
@@ -267,7 +271,7 @@ class CostRegular(Model):
 
     def __make_choco_costs_matrix(self):        
         lines = map(lambda state: self.__make_choco_costs_line(state), self.__states)
-        ll = '\n'.join(map(lambda l: f"\t{l}",lines))
+        ll = ',\n'.join(map(lambda l: f"\t\t{l}",lines))
         return '\n'.join(f"""
 {ll}""".split('\n')[1:])
         
@@ -277,9 +281,27 @@ class CostRegular(Model):
         disjunction = ' \/ '.join(map(lambda place: f"states[i] = {place}", places))
         constr = f"constraint forall (i in 1..seq_length+1) ({port}_status[i] = enabled <-> {disjunction});"
         return [decl, constr]
+        
+    def __make_choco_port_line(self, port, places):
+        decl = f"\t\tIntVar[] {port}_status = model.intVarArray(\"{port}_status\", seq_length + 1, 0, 1);"
+        forloop = "\t\tfor(int i = 0; i < seq_length + 1; i++) {"
+        bool_b0 = f"\t\t\tBoolVar b0 = model.arithm({port}_status[i], \"=\", enabled).reify();"
+        res = [decl, forloop, bool_b0]
+        bool_var_names = []
+        for place in places:
+            bool_var_name = f"b_{port}_{place}"
+            bool_var_names.append(bool_var_name)
+            res.append(f"\t\t\tBoolVar {bool_var_name} = model.arithm(states[i], \"=\", {place}).reify();")
+        bool_clause = f"\t\t\tmodel.addClausesBoolOrArrayEqVar(new BoolVar[]{{{','.join(bool_var_names)}}}, b0);"
+        endfor = "\t\t}"
+        return res + [bool_clause, endfor]
     
     def __make_mzn_ports_status_constraints(self):
         lines = flatmap(lambda port: self.__make_mzn_port_line(port, self.__ports[port]), self.__ports.keys())
+        return '\n'.join(lines)
+    
+    def __make_choco_ports_status_constraints(self):
+        lines = flatmap(lambda port: self.__make_choco_port_line(port, self.__ports[port]), self.__ports.keys())
         return '\n'.join(lines)
     
     def __make_mzn_port_constraint_line(self, constraint: PortConstraint):
@@ -309,6 +331,37 @@ class CostRegular(Model):
         res.append(f"constraint count_{constraint.state} > 0; {suffix}")
         return res
     
+    def __make_choco_port_constraint_line(self, constraint: PortConstraint):
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        res = []
+        if constraint.final:
+            res.append(f"\t\tmodel.arithm({constraint.port}_status[seq_length], \"=\", {constraint.status}).post(); {suffix}")
+        res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
+        res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
+        res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
+        
+        
+        res.append("\n")
+        return res
+    
+    def __make_choco_transition_constraint_line(self, constraint: TransitionConstraint):
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        decl = f"\t\tIntVar count_{constraint.transition} = model.intVar(\"count_{constraint.transition}\", 0, seq_length); {suffix}"
+        model_sum = f"\t\tmodel.sum(Arrays.stream(sequence).map(s -> s.eq({constraint.transition}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.transition}).post(); {suffix}"
+        model_arith = f"\t\tmodel.arithm(count_{constraint.transition}, \">\", 0).post(); {suffix}"         
+        return [decl, model_sum, model_arith,"\n"]
+    
+    def __make_choco_state_constraint_line(self, constraint: StateConstraint):
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        res = []
+        if constraint.final:
+            res.append(f"\t\tmodel.arithm(states[seq_length], \"=\", {constraint.state}).post(); {suffix}") 
+        res.append(f"\t\tIntVar count_{constraint.state} = model.intVar(\"count_{constraint.state}\", 0, seq_length); {suffix}")
+        res.append(f"\t\tmodel.sum(Arrays.stream(states).map(s -> s.eq({constraint.state}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.state}).post(); {suffix}")
+        res.append(f"\t\tmodel.arithm(count_{constraint.state}, \">\", 0).post(); {suffix}")
+        res.append("\n")
+        return res
+    
     def __make_mzn_constraint_line(self, constraint):
         if constraint.isPortConstraint():
             return self.__make_mzn_port_constraint_line(constraint)
@@ -317,14 +370,26 @@ class CostRegular(Model):
         if constraint.isTransitionConstraint():
             return self.__make_mzn_transition_constraint_line(constraint)
     
+    def __make_choco_constraint_line(self, constraint):
+        if constraint.isPortConstraint():
+            return self.__make_choco_port_constraint_line(constraint)
+        if constraint.isStateConstraint():
+            return self.__make_choco_state_constraint_line(constraint)
+        if constraint.isTransitionConstraint():
+            return self.__make_choco_transition_constraint_line(constraint)
+    
     def __make_mzn_goal_constraints(self):
         lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), self.__constraints)
         return '\n'.join(lines)
     
+    def __make_choco_goal_constraints(self):
+        lines = flatmap(lambda constraint: self.__make_choco_constraint_line(constraint), self.__constraints)
+        return '\n'.join(lines)
     
-    def __make_choco_model(self):
-        int_states = '\n'.join(map(lambda p: "    int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.states)))
-        int_behaviors = '\n'.join(map(lambda p: "    int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.transitions)))
+    
+    def __make_choco_model(self, classname="TestModel"):
+        int_states = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.states)))
+        int_behaviors = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.transitions)))
         content = f"""
 import java.util.Arrays;
 import java.util.List;
@@ -336,49 +401,72 @@ import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 
-public class CRModel {{
-    Model model = new Model();
-    int seq_length = {self.__seq_length};
-    // STATE
+public class {classname} {{
+    
+    public static void main(String[] args) {{
+
+        Model model = new Model();
+        int seq_length = {self.__seq_length};
+        // STATE
 {int_states}
-    int any = -1;
-    // BEHAVIOR
+        int any = -1;
+        // BEHAVIOR
 {int_behaviors}
-    // STATUS
-    int enabled = 0;
-    int disabled = 1;
-    
-    // TRANSITIONS
-    int[][] transitions = {{
+        // STATUS
+        int enabled = 0;
+        int disabled = 1;
+        
+        // TRANSITIONS
+        int[][] transitions = {{
 {self.__make_choco_transitions_matrix()}
-    }};
+        }};
 
-    // COSTS
-    int[][] costs =  {{
+        // COSTS
+        int[][] costs =  {{
 {self.__make_choco_costs_matrix()}
-    }};  
+        }};  
 
 
-    // Captured variables
-    IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, 4);
-    IntVar[] states = model.intVarArray("states", seq_length + 1, 0, 2);
-    IntVar[] cost = model.intVarArray("cost", seq_length, 0, 1000000);
+        // Captured variables
+        IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, 4);
+        IntVar[] states = model.intVarArray("states", seq_length + 1, 0, 2);
+        IntVar[] cost = model.intVarArray("cost", seq_length, 0, 1000000);
 
-    // Constraints
-    for (int i = 0; i < seq_length; i++) {{
-        model.element(states[i + 1], transitions, states[i], 0, sequence[i], 0);
-    }}
-    for (int i = 0; i < seq_length - 1; i++) {{
-        BoolVar bi = model.arithm(sequence[i], "=", skip).reify();
-        BoolVar bi1 = model.arithm(sequence[i+1], "=", skip).reify();
-        bi.imp(bi1).post();;
-    }}
-    for (int i = 0; i < seq_length; i++) {{
-        model.element(cost[i], costs, states[i], 0, sequence[i], 0);
-    }}
+        for (int i = 0; i < seq_length; i++) {{
+            model.element(states[i + 1], transitions, states[i], 0, sequence[i], 0);
+        }}
+        for (int i = 0; i < seq_length - 1; i++) {{
+            BoolVar bi = model.arithm(sequence[i], "=", skip).reify();
+            BoolVar bi1 = model.arithm(sequence[i+1], "=", skip).reify();
+            bi.imp(bi1).post();;
+        }}
+        for (int i = 0; i < seq_length; i++) {{
+            model.element(cost[i], costs, states[i], 0, sequence[i], 0);
+        }}
+        
+        // Ports' statuses
+{self.__make_choco_ports_status_constraints()}
     
+        // Init state
+        model.arithm(states[0], "=", {self.__init_state}).post();
+        
+        // Reconfiguration goals as constraints
+{self.__make_choco_goal_constraints()}
 
+        // Goal
+        IntVar scost = model.intVar("scost", 0, 1000000);
+        model.sum(cost, "=", scost).post();
 
+        Solver solver = model.getSolver();
+        Solution best = solver.findOptimalSolution(scost, false);
+        if(best != null) {{
+            solver.printShortStatistics();
+        }} else {{
+            solver.reset();
+            List<Constraint> mus = solver.findMinimumConflictingSet(Arrays.asList(model.getCstrs()));
+            System.out.println(mus);
+        }}
+    }}
 }}
 
 
@@ -454,13 +542,19 @@ solve minimize scost;
             return result
         
     def solve_choco(self,findmus=False, write_file=False, print_model=False):
-        modelfile = "model.java"
-        choco_str_model = self.__make_choco_model()
+        wf = write_file
+        modelfile = "TestModel.java"
+        choco_str_model = self.__make_choco_model(classname="TestModel")
         if print_model:
             print(choco_str_model)
+        if wf:
+            with open(modelfile, 'w') as f:
+                f.write(choco_str_model)
+                f.close()
+        return None
     
     def solve(self, mode="minizinc", findmus=False, write_file=False, print_model=False, solve_with="gecode"):
         if mode == "minizinc":
-            self.solve_minizinc(findmus, write_file, print_model, solve_with)
+            return self.solve_minizinc(findmus, write_file, print_model, solve_with)
         if mode == "choco":
-            self.solve_choco(findmus=False, write_file=False, print_model=False)
+            return self.solve_choco(findmus=False, write_file=False, print_model=False)

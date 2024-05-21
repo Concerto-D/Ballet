@@ -15,14 +15,17 @@ cr = CostRegular(["initiated","configured","deployed"],
                   TransitionConstraint("deploy")
                   })
 
-try:
-    res = cr.solve(print_model=False, write_file=True)
-    print("states = ", res.solution.states)
-    print("sequence = ", res.solution.sequence)
-    print("service = ", res.solution.service_status)
-    print("facts_service = ", res.solution.facts_service_status)
-except FindMUSException as e:
-    # print(e)
-    print("MUS:",e.mus)
-    print("Brief:",e.brief)
-    print('\n'.join(e.traces.split(";")))
+
+cr.solve_choco(print_model=True)
+
+# try:
+#     res = cr.solve(mode="minizinc", print_model=False, write_file=True)
+#     print("states = ", res.solution.states)
+#     print("sequence = ", res.solution.sequence)
+#     print("service = ", res.solution.service_status)
+#     print("facts_service = ", res.solution.facts_service_status)
+# except FindMUSException as e:
+#     # print(e)
+#     print("MUS:",e.mus)
+#     print("Brief:",e.brief)
+#     print('\n'.join(e.traces.split(";")))

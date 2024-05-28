@@ -11,6 +11,7 @@ import org.chocosolver.solver.variables.IntVar;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class TestJsonModel {
 
@@ -23,14 +24,20 @@ public class TestJsonModel {
         Solver solver = choco_model.getSolver();
         Solution best = solver.findOptimalSolution(scost, false);
 
-        if(best != null) {
+        if (best != null) {
             solver.printShortStatistics();
             System.out.println(solver.defaultSolution().toString());
         } else {
             solver.reset();
             List<Constraint> mus = solver.findMinimumConflictingSet(Arrays.asList(choco_model.getCstrs()));
-            System.out.println(mus);
+            System.out.println("Minimum Conflicting Set of Constraints:");
+            Map<Object, List<String>> tracker = (Map<Object, List<String>>) choco_model.getHook("tracker");
+            mus.forEach(c -> {
+                if (tracker.containsKey(c)) {
+                    System.out.println(tracker.get(c));
+                }
+            });
         }
     }
-
 }
+

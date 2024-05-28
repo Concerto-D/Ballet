@@ -8,20 +8,21 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.chocosolver.solver.Model;
+import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.constraints.ReificationConstraint;
+import org.chocosolver.solver.exception.SolverException;
+import org.chocosolver.solver.search.SearchState;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 
 public class Model2Choco {
 
-    private static int maxInt = 1000000;
+    private static final int maxInt = 1000000;
 
     private static int[] makeline_automata(CostRegularModel cr_model,
                                            String state, Map<String, String> transitions,
                                            Map<String, Integer> states_as_int) {
-        List<String> transitions_with_skip = new ArrayList<>();
-        for (String item : cr_model.getTransitions()) {
-            transitions_with_skip.add(item);
-        }
+        List<String> transitions_with_skip = new ArrayList<>(cr_model.getTransitions());
 
         int[] result = transitions_with_skip.stream().map(
                 transition -> {
@@ -37,43 +38,40 @@ public class Model2Choco {
     private static int[][] make_automata(CostRegularModel cr_model,
                                          Map<String, Map<String, String>> automata,
                                          Map<String, Integer> states_as_int) {
-        List<int[]> list = cr_model.getStates().stream()
-                .map(state -> makeline_automata(cr_model, state, automata.get(state), states_as_int))
-                .collect(Collectors.toList());
-        return list.toArray(new int[list.size()][]);
+        return cr_model.getStates().stream()
+                .map(state -> makeline_automata(cr_model, state, automata.get(state), states_as_int)).toArray(int[][]::new);
     }
 
     private static int[] makeline_cost(CostRegularModel cr_model,
-                                       String state, Map<String, Integer> costs,
-                                       Map<String, Integer> states_as_int) {
-        List<String> transitions_with_skip = new ArrayList<>();
-        for (String item : cr_model.getTransitions()) {
-            transitions_with_skip.add(item);
-        }
+                                       Map<String, Integer> costs) {
+        List<String> transitions_with_skip = new ArrayList<>(cr_model.getTransitions());
         transitions_with_skip.add("skip");
 
-        int[] result = transitions_with_skip.stream().map(
+        return transitions_with_skip.stream().map(
                 transition -> {
                     if (transition.equals("skip")) {
                         return 0;
                     } else return costs.getOrDefault(transition, maxInt);
                 }
-        ).collect(Collectors.toList()).stream().mapToInt(Integer::intValue).toArray();;
-
-        return result;
+        ).collect(Collectors.toList()).stream().mapToInt(Integer::intValue).toArray();
     }
 
     private static int[][] make_cost(CostRegularModel cr_model,
-                                     Map<String, Map<String, Integer>> costs,
-                                     Map<String, Integer> states_as_int) {
-        List<int[]> list = cr_model.getStates().stream()
-                .map(state -> makeline_cost(cr_model, state, costs.get(state), states_as_int))
-                .collect(Collectors.toList());
-        return list.toArray(new int[list.size()][]);
+                                     Map<String, Map<String, Integer>> costs) {
+        return cr_model.getStates().stream()
+                .map(state -> makeline_cost(cr_model, costs.get(state))).toArray(int[][]::new);
+    }
+
+    private static void addTracker(Object cstr, String cause, Map<Object, List<String>> tracker) {
+        if (!tracker.containsKey(cstr))
+            tracker.put(cstr, new ArrayList<>());
+        tracker.get(cstr).add(cause);
     }
 
     public static Model toChocoModel(CostRegularModel cr_model) {
+
         Model model = new Model();
+        Map<Object, List<String>> tracker = new HashMap<>();
         // STATE
         int seq_length = cr_model.getStates().size() * cr_model.getTransitions().size();
         Map<String, Integer> states_as_int = new HashMap<>();
@@ -95,18 +93,15 @@ public class Model2Choco {
 
         // STATUS
         Map<String, Integer> status_as_int = new HashMap<>();
-        Map<Integer, String> int_as_status = new HashMap<>();
         int enabled = 1;
         int disabled = 0;
-        status_as_int.put("disabled", 0);
-        int_as_status.put(0, "disabled");
-        status_as_int.put("enabled", 1);
-        int_as_status.put(1, "enabled");
+        status_as_int.put("disabled", disabled);
+        status_as_int.put("enabled", enabled);
 
         // TRANSITION
         int[][] transitions = make_automata(cr_model, cr_model.getAutomata(), states_as_int);
         // COSTS
-        int[][] costs = make_cost(cr_model, cr_model.getCosts(), states_as_int);
+        int[][] costs = make_cost(cr_model, cr_model.getCosts());
 
         // Captured variables
         IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, it_n_behavior-1);
@@ -136,7 +131,13 @@ public class Model2Choco {
                     tmp_list.add(port_place_boolvar);
                 }
                 BoolVar[] states_bool_var = tmp_list.toArray(new BoolVar[tmp_list.size()]);
-                model.addClausesBoolOrArrayEqVar(states_bool_var, port_boolvar);
+                // Charle's style to add this clause:  model.addClausesBoolOrArrayEqVar(states_bool_var, port_boolvar);
+                    BoolVar orVar = model.or(states_bool_var).reify();
+                    Constraint c = model.arithm(orVar, "=", port_boolvar);
+                    String at = (i == seq_length) ? "the end of the reconfiguration" : "i="+i;
+                    addTracker(c, port + " is enabled iff state in "+
+                            cr_model.getPorts().get(port) +" (not satisfiable at " + at + "), caused by : [MODEL] component lifecycle", tracker);
+                    c.post();
             }
             model.addHook(name_var, status_var);
         });
@@ -150,10 +151,14 @@ public class Model2Choco {
             IntVar count_status_port = model.intVar(intvar_name, 0, seq_length);
             model.sum((BoolVar[]) model.getHook(constraint.getPort() +"_status"),
                     "=", count_status_port).post();
-            model.arithm(count_status_port, ">", 0).post();
+            Constraint c0 = model.arithm(count_status_port, ">", 0);
+            addTracker(c0, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " during the reconfiguration, caused by: " + constraint.getSource(), tracker);
+            c0.post();
             if (constraint.isFinal()) {
-                model.arithm(((BoolVar[])model.getHook(constraint.getPort() +"_status"))[seq_length],
-                        "=", status_as_int.get(constraint.getStatus())).post();
+                Constraint c1 = model.arithm(((BoolVar[])model.getHook(constraint.getPort() +"_status"))[seq_length],
+                        "=", status_as_int.get(constraint.getStatus()));
+                addTracker(c1, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " at the end of the reconfiguration, caused by: " + constraint.getSource(), tracker);
+                c1.post();
             }
         }
 
@@ -163,25 +168,34 @@ public class Model2Choco {
             model.sum(
                     Arrays.stream(states).map(s -> s.eq(states_as_int.get(constraint.getState())).boolVar())
                             .toArray(BoolVar[]::new), "=", count_state).post();
-            model.arithm(count_state, ">", 0).post();
+            Constraint c0 = model.arithm(count_state, ">", 0);
+            addTracker(c0, "The component must be " + constraint.getState() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
+            c0.post();
             if (constraint.isFinal()) {
-                model.arithm(states[seq_length], "=", states_as_int.get(constraint.getState())).post();
+                Constraint c1 = model.arithm(states[seq_length], "=", states_as_int.get(constraint.getState()));
+                addTracker(c1, "The component must be " + constraint.getState() + " at the end of the reconfiguration, caused by : " + constraint.getSource(), tracker);
+                c1.post();
             }
         }
 
         for (CostRegularModel.TransitionConstraint constraint: cr_model.getTransitionConstraints()) {
             IntVar count_transition = model.intVar("count_"+constraint.getTransition(), 0, seq_length);
-            model.sum(
+            Constraint c0 = model.sum(
                     Arrays.stream(sequence).map(s -> s.eq(behaviors_as_int.get(constraint.getTransition())).boolVar())
-                            .toArray(BoolVar[]::new), "=", count_transition).post();
-            model.arithm(count_transition, ">", 0).post();
+                            .toArray(BoolVar[]::new), "=", count_transition);
+            c0.post();
+            Constraint c1 = model.arithm(count_transition, ">", 0);
+            addTracker(c0, "The behavior must execute " + constraint.getTransition() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
+            c1.post();
         }
+
         IntVar scost = model.intVar("scost", 0, maxInt);
         model.sum(cost, "=", scost).post();
         // Hooks
         model.addHook("objective", scost);
         model.addHook("places", states);
         model.addHook("sequence", sequence);
+        model.addHook("tracker", tracker);
         return model;
     }
 }

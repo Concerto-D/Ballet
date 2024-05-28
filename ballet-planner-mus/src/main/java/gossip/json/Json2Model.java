@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 
-public class JSON2Model {
+public class Json2Model {
 
     public static CostRegularModel readJsonFile(String filePath) {
         ObjectMapper objectMapper = new ObjectMapper();

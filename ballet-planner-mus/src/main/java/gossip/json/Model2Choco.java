@@ -132,12 +132,12 @@ public class Model2Choco {
                 }
                 BoolVar[] states_bool_var = tmp_list.toArray(new BoolVar[tmp_list.size()]);
                 // Charle's style to add this clause:  model.addClausesBoolOrArrayEqVar(states_bool_var, port_boolvar);
-                    BoolVar orVar = model.or(states_bool_var).reify();
-                    Constraint c = model.arithm(orVar, "=", port_boolvar);
-                    String at = (i == seq_length) ? "the end of the reconfiguration" : "i="+i;
-                    addTracker(c, port + " is enabled iff state in "+
-                            cr_model.getPorts().get(port) +" (not satisfiable at " + at + "), caused by : [MODEL] component lifecycle", tracker);
-                    c.post();
+                BoolVar orVar = model.or(states_bool_var).reify();
+                Constraint c = model.arithm(orVar, "=", port_boolvar);
+                String at = (i == seq_length) ? "the end of the reconfiguration" : "i="+i;
+                addTracker(c, port + " is enabled iff state in "+
+                        cr_model.getPorts().get(port) +" (not satisfiable at " + at + "), caused by : [MODEL] component lifecycle", tracker);
+                c.post();
             }
             model.addHook(name_var, status_var);
         });

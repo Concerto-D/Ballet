@@ -139,6 +139,10 @@ public class CostRegularModel {
         private String state;
         private int isFinal;
         private int goal;
+        private String source;
+
+        public String getSource(){ return source; }
+        public void setSource(String source) { this.source = source; }
 
         // Getters and Setters
         public String getState() {
@@ -184,11 +188,13 @@ public class CostRegularModel {
         private String status;
         private int isFinal;
         private int goal;
+        private String source;
+
+        public String getSource(){ return source; }
+        public void setSource(String source) { this.source = source; }
 
         // Getters and Setters
-        public String getPort() {
-            return port;
-        }
+        public String getPort() { return port; }
 
         public void setPort(String port) {
             this.port = port;
@@ -237,6 +243,10 @@ public class CostRegularModel {
     public static class TransitionConstraint {
         private String transition;
         private int goal;
+        private String source;
+
+        public String getSource(){ return source; }
+        public void setSource(String source) { this.source = source; }
 
         // Getters and Setters
         public String getTransition() {

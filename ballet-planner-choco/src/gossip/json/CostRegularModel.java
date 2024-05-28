@@ -66,6 +66,18 @@ public class CostRegularModel {
         return constraints;
     }
 
+    public List<PortConstraint> getPortConstraints() {
+        return constraints.getPort_constraint();
+    }
+
+    public List<StateConstraint> getStateConstraints() {
+        return constraints.getState_constraint();
+    }
+
+    public List<TransitionConstraint> getTransitionConstraints() {
+        return constraints.getTransition_constraint();
+    }
+
     public void setConstraints(Constraints constraints) {
         this.constraints = constraints;
     }
@@ -125,7 +137,7 @@ public class CostRegularModel {
 
     public static class StateConstraint {
         private String state;
-        private int final_;
+        private int isFinal;
         private int goal;
 
         // Getters and Setters
@@ -137,12 +149,16 @@ public class CostRegularModel {
             this.state = state;
         }
 
-        public int getFinal_() {
-            return final_;
+        public boolean isFinal() {
+            return isFinal == 1;
         }
 
-        public void setFinal_(int final_) {
-            this.final_ = final_;
+        public int getIsFinal() {
+            return isFinal;
+        }
+
+        public void setIsFinal(int isFinal) {
+            this.isFinal = isFinal;
         }
 
         public int getGoal() {
@@ -157,7 +173,7 @@ public class CostRegularModel {
         public String toString() {
             return "StateConstraint{" +
                     "state='" + state + '\'' +
-                    ", final_=" + final_ +
+                    ", final_=" + isFinal +
                     ", goal=" + goal +
                     '}';
         }
@@ -166,7 +182,7 @@ public class CostRegularModel {
     public static class PortConstraint {
         private String port;
         private String status;
-        private int final_;
+        private int isFinal;
         private int goal;
 
         // Getters and Setters
@@ -186,12 +202,17 @@ public class CostRegularModel {
             this.status = status;
         }
 
-        public int getFinal_() {
-            return final_;
+        public int getIsFinal() {
+            return isFinal;
         }
 
-        public void setFinal_(int final_) {
-            this.final_ = final_;
+        public boolean isFinal() {
+            return isFinal == 1;
+        }
+
+
+        public void setIsFinal(int isFinal) {
+            this.isFinal = isFinal;
         }
 
         public int getGoal() {
@@ -207,7 +228,7 @@ public class CostRegularModel {
             return "PortConstraint{" +
                     "port='" + port + '\'' +
                     ", status='" + status + '\'' +
-                    ", final_=" + final_ +
+                    ", final=" + isFinal +
                     ", goal=" + goal +
                     '}';
         }

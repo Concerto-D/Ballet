@@ -1,46 +1,12 @@
 from minizinc import Instance, Model as mznModel, Solver, Status
-import subprocess, re
 from ballet.utils.list_utils import flatmap, indexify
 from gossip.gossip import Model
+import subprocess, re, json
 
 class FindMUSException(Exception):
     
-    def __init__(self, message, out):            
+    def __init__(self, message):            
         super().__init__(message)
-        # Extracting MUS
-        mus_match = re.search(r'MUS: (\d+)', out)
-        # self.__mus_value = None
-        self.__mus_value = int(mus_match.group(1))
-        # Extracting Brief
-        brief_match = re.search(r'Brief: (.+)', out)
-        self.__brief_value = brief_match.group(1)
-        # self.__brief_value = None
-        # Extracting Traces
-        traces_match = re.search(r'Traces:(.+?)%%%mzn-progress', out, re.DOTALL)
-        # self.__traces_value = None
-        self.__traces_value = traces_match.group(1).strip()
-        # self.__lines_of_mzn = FindMUSException._extract_lines(self.__traces_value)
-    
-    # def _extract_lines(traces):
-    #     splitted = traces.split(";")
-    #     file = splitted[0]
-    #     return splitted[1:]
-        
-    @property
-    def mus(self):
-        return self.__mus_value
-    
-    @property
-    def lines(self):
-        return self.__lines_of_mzn
-    
-    @property
-    def brief(self):
-        return self.__brief_value
-    
-    @property
-    def traces(self):
-        return self.__traces_value
 
 class CRConstraint:
     
@@ -62,10 +28,11 @@ class CRConstraint:
 
 class StateConstraint(CRConstraint):
     
-    def __init__(self, state, final=False, goal=False):
+    def __init__(self, state, source="NO SOURCE IS SPECIFIED", final=False, goal=False):
         super().__init__(goal)
         self.__state = state
         self.__final = final
+        self.__source = source
         
     def isStateConstraint(self):
         return True
@@ -78,15 +45,20 @@ class StateConstraint(CRConstraint):
     def state(self):
         return self.__state
         
+    @property
+    def source(self):
+        return self.__source
+        
         
 class PortConstraint(CRConstraint):
     
-    def __init__(self, port, status, final=False, goal=False):
+    def __init__(self, port, status, source="NO SOURCE IS SPECIFIED", final=False, goal=False):
         super().__init__(goal)
         assert status == "enabled" or status == "disabled"
         self.__port = port
         self.__status = status
         self.__final = final
+        self.__source = source
         
     def isPortConstraint(self):
         return True
@@ -102,13 +74,18 @@ class PortConstraint(CRConstraint):
     @property
     def final(self):
         return self.__final
+        
+    @property
+    def source(self):
+        return self.__source
     
 
 class TransitionConstraint(CRConstraint):
     
-    def __init__(self, transition, goal=False):
+    def __init__(self, transition, source="NO SOURCE IS SPECIFIED", goal=False):
         super().__init__(goal)
         self.__transition = transition
+        self.__source = source
     
     def isTransitionConstraint(self):
         return True
@@ -116,6 +93,10 @@ class TransitionConstraint(CRConstraint):
     @property
     def transition(self):
         return self.__transition
+        
+    @property
+    def source(self):
+        return self.__source
 
 
 class CostRegular(Model):
@@ -337,7 +318,7 @@ class CostRegular(Model):
         if constraint.final:
             res.append(f"\t\tmodel.arithm({constraint.port}_status[seq_length], \"=\", {constraint.status}).post(); {suffix}")
         res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
-        res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
+        res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
         res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
         
         
@@ -386,11 +367,62 @@ class CostRegular(Model):
         lines = flatmap(lambda constraint: self.__make_choco_constraint_line(constraint), self.__constraints)
         return '\n'.join(lines)
     
+    def make_json_model(self, print_model=True, write_file=True, filepath="model.json"):
+        bool2int = lambda b: 1 if b else 0
+        # State constraints format
+        state_constraints = filter(lambda c: c.isStateConstraint() , self.constraints)
+        json_state_constraints = list(map(lambda constraint: {"state": constraint.state, "isFinal": bool2int(constraint.final), "goal": bool2int(constraint.isGoal()), "source": constraint.source}, state_constraints))    
+        # Port constraints format
+        port_constraints = filter(lambda c: c.isPortConstraint() , self.constraints)
+        json_port_constraints = list(map(lambda constraint: {"port": constraint.port, "status": constraint.status,"isFinal": bool2int(constraint.final), "goal": bool2int(constraint.isGoal()), "source": constraint.source}, port_constraints))    
+        
+        # Transition constraints format
+        transition_constraints = filter(lambda c: c.isTransitionConstraint() , self.constraints)
+        json_transition_constraints = list(map(lambda constraint: {"transition": constraint.transition, "goal": bool2int(constraint.isGoal()), "source": constraint.source}, transition_constraints))  
+        
+        content = {
+            "states": self.states,
+            "transitions": self.transitions,
+            "automata": self.automata,
+            "costs": self.costs,
+            "init_state": self.init_state,
+            "ports": self.ports,
+            "constraints":
+                {
+                    "state_constraint": json_state_constraints,
+                    "port_constraint": json_port_constraints,
+                    "transition_constraint": json_transition_constraints
+                }
+        }
+        json_content = json.dumps(content)
+        if print_model:
+            print(json_content)
+        if write_file:
+            with open(filepath, 'w') as f:
+                json.dump(content, f)
+     
+    
+    # cr = CostRegular(["initiated","configured","deployed"], 
+    #              ["deploy","stop","uninstall"], 
+    #              {"initiated" : {"deploy":"deployed"},
+    #               "configured": {"deploy":"deployed"},
+    #               "deployed": {"stop":"configured", "uninstall":"initiated"}}, 
+    #              {"initiated" : {"deploy":2},
+    #               "configured": {"deploy":1},
+    #               "deployed": {"stop":1, "uninstall":1}}, 
+    #              "initiated",
+    #              {"service":["deployed"], "facts_service":["configured", "deployed"]},
+    #              {StateConstraint("deployed", final=True),
+    #               TransitionConstraint("deploy")
+    #               })
+    
     
     def __make_choco_model(self, classname="TestModel"):
         int_states = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.states)))
         int_behaviors = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.transitions)))
         content = f"""
+package gossip;        
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -428,8 +460,8 @@ public class {classname} {{
 
 
         // Captured variables
-        IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, 4);
-        IntVar[] states = model.intVarArray("states", seq_length + 1, 0, 2);
+        IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, {len(self.__transitions) - 1});
+        IntVar[] states = model.intVarArray("states", seq_length + 1, 0, {len(self.__states) - 1});
         IntVar[] cost = model.intVarArray("cost", seq_length, 0, 1000000);
 
         for (int i = 0; i < seq_length; i++) {{
@@ -535,26 +567,35 @@ solve minimize scost;
         result = instance.solve()
 
         if result.status == Status.UNSATISFIABLE or findmus:
-            command = f"minizinc --solver findMUS -a {modelfile}"
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
-            raise FindMUSException(result.stdout,result.stdout)
+            raise FindMUSException("UNSAT model")
         else:
             return result
         
     def solve_choco(self,findmus=False, write_file=False, print_model=False):
-        wf = write_file
-        modelfile = "TestModel.java"
-        choco_str_model = self.__make_choco_model(classname="TestModel")
-        if print_model:
-            print(choco_str_model)
-        if wf:
-            with open(modelfile, 'w') as f:
-                f.write(choco_str_model)
-                f.close()
-        return None
+        if findmus:
+            self.make_json_model(print_model=False, write_file=True, filepath="model.json")
+            try:
+                cmd = "java -jar ballet-planner-mus-1.0-SNAPSHOT-shaded.jar model.json"
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                return result.stdout, result.stderr
+            except subprocess.CalledProcessError as e:
+                print(f"An error occurred: {e}")
+                print("Output:\n", e.stdout)
+                print("Error:\n", e.stderr)
+        else:
+            wf = write_file
+            modelfile = "TestModel.java"
+            choco_str_model = self.__make_choco_model(classname="TestModel")
+            if print_model:
+                print(choco_str_model)
+            if wf:
+                with open(modelfile, 'w') as f:
+                    f.write(choco_str_model)
+                    f.close()
+            return None, None
     
     def solve(self, mode="minizinc", findmus=False, write_file=False, print_model=False, solve_with="gecode"):
         if mode == "minizinc":
             return self.solve_minizinc(findmus, write_file, print_model, solve_with)
         if mode == "choco":
-            return self.solve_choco(findmus=False, write_file=False, print_model=False)
+            return self.solve_choco(findmus, write_file, print_model)

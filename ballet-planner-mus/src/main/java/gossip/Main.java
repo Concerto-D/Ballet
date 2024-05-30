@@ -16,11 +16,15 @@ import java.util.Map;
 public class Main {
 
     public static void main(String[] args) {
+        String filepath = "";
         if (args.length == 0) {
+//            filepath = "/home/jolan/Documents/Projects/SeMaFor/Ballet/model.json";
             throw new IllegalArgumentException("No filepath argument provided.");
+        } else {
+            filepath = args[0];
         }
 
-        String filepath = args[0];
+//        String filepath = args[0];
 
         CostRegularModel cr_model = Json2Model.readJsonFile(filepath);
         Model choco_model = Model2Choco.toChocoModel(cr_model);

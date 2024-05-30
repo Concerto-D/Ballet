@@ -136,7 +136,7 @@ public class Model2Choco {
                 Constraint c = model.arithm(orVar, "=", port_boolvar);
                 String at = (i == seq_length) ? "the end of the reconfiguration" : "i="+i;
                 addTracker(c, port + " is enabled iff state in "+
-                        cr_model.getPorts().get(port) +" (not satisfiable at " + at + "), caused by : [MODEL] component lifecycle", tracker);
+                        cr_model.getPorts().get(port) +" (not satisfiable at " + at + "), caused by : [MODEL] lifecycle", tracker);
                 c.post();
             }
             model.addHook(name_var, status_var);
@@ -152,12 +152,13 @@ public class Model2Choco {
             model.sum((BoolVar[]) model.getHook(constraint.getPort() +"_status"),
                     "=", count_status_port).post();
             Constraint c0 = model.arithm(count_status_port, ">", 0);
-            addTracker(c0, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " during the reconfiguration, caused by: " + constraint.getSource(), tracker);
+            String tag = constraint.getGoal() == 1 ? "[GOAL]" : "[EXTERNAL]" ;
+            addTracker(c0, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " during the reconfiguration, caused by: " + tag + " " + constraint.getSource(), tracker);
             c0.post();
             if (constraint.isFinal()) {
                 Constraint c1 = model.arithm(((BoolVar[])model.getHook(constraint.getPort() +"_status"))[seq_length],
                         "=", status_as_int.get(constraint.getStatus()));
-                addTracker(c1, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " at the end of the reconfiguration, caused by: " + constraint.getSource(), tracker);
+                addTracker(c1, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " at the end of the reconfiguration, caused by: "+ tag + " " + constraint.getSource(), tracker);
                 c1.post();
             }
         }
@@ -169,11 +170,12 @@ public class Model2Choco {
                     Arrays.stream(states).map(s -> s.eq(states_as_int.get(constraint.getState())).boolVar())
                             .toArray(BoolVar[]::new), "=", count_state).post();
             Constraint c0 = model.arithm(count_state, ">", 0);
-            addTracker(c0, "The component must be " + constraint.getState() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
+            String tag = constraint.getGoal() == 1 ? "[GOAL]" : "[EXTERNAL]" ;
+            addTracker(c0, "The component must be " + constraint.getState() + " during the reconfiguration, caused by : "+ tag + " " + constraint.getSource(), tracker);
             c0.post();
             if (constraint.isFinal()) {
                 Constraint c1 = model.arithm(states[seq_length], "=", states_as_int.get(constraint.getState()));
-                addTracker(c1, "The component must be " + constraint.getState() + " at the end of the reconfiguration, caused by : " + constraint.getSource(), tracker);
+                addTracker(c1, "The component must be " + constraint.getState() + " at the end of the reconfiguration, caused by : " + tag + " "+ constraint.getSource(), tracker);
                 c1.post();
             }
         }

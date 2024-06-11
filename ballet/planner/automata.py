@@ -1,5 +1,6 @@
 from typing import Tuple
 from ballet.assembly.simplified.assembly import ComponentInstance
+from ballet.assembly.concertod.component import Component
 from ballet.utils.list_utils import findAll, difference, add_if_no_exist
 
 
@@ -85,24 +86,72 @@ def reduce_automata(automata: dict[str, dict[str, list[str]]], label_in: dict[st
 
 def fill_automata(states: list[str], input: list[str], transitions: dict[str, dict[str, str]],
                   cost: dict[tuple[str, str], int], skip: str) \
-        -> tuple[list[str], list[str], dict[str, dict[str, str]], dict[tuple[str, str], int]]:
+        -> tuple[list[str], list[str], dict[str, dict[str, str]], dict[str, dict[str, int]]]:
     result_states = states
-    result_input = input + [skip]
+    result_input = input
+    if skip not in input:
+        result_input = result_input + [skip]
     result_cost = {}
     result_transit = {place: {input: "<>" for input in result_input} for place in result_states}
     for state in transitions.keys():
-        for input in transitions[state]:
+        for input in transitions[state].keys():
             result_transit[state][input] = transitions[state][input]
             if transitions[state][input] not in ["<>", state]:
-                result_cost[(state, input)] = cost[(state, input)]
+                if state not in result_cost.keys():
+                    result_cost[state] = {}
+                result_cost[state][input] = cost[(state, input)]
     for state in result_states:
         result_transit[state][skip] = state
-        result_cost[(state, skip)] = 0
+        if state not in result_cost.keys():
+            result_cost[state] = {}
+        result_cost[state][skip] = 0
     return result_states, result_input, result_transit, result_cost
 
 
 def matrix_from_component(comp: ComponentInstance, skip: str = "pass") \
         -> tuple[list[str], list[str], dict[str, dict[str, str]], dict[tuple[str, str], int]]:
     (automata, bhv_in, bhv_out, cost) = automata_from_component(comp)
+    (result_vertices, result_input, result_transit, result_cost) = reduce_automata(automata, bhv_in, bhv_out, cost)
+    return fill_automata(result_vertices, result_input, result_transit, result_cost, skip)
+
+
+
+
+def automata_from_concerto_component(comp: Component):
+    automata, bhv_in, bhv_out, cost = {}, {}, {}, {}
+    comp_places, comp_bhvs = comp.get_places(), comp.get_behaviors()
+    for (name_place, place) in comp_places.items():
+        automata[name_place] = {}
+        bhv_in[place.get_name()], bhv_out[place.get_name()] = [], []
+
+    transitions = {}
+    for transition in comp.transitions.values():
+        if len(transition) == 6:
+            src_name, dst_name, behavior, _, _, _ = transition
+        else:  # len = 5
+            src_name, dst_name, behavior, _, _ = transition
+        if behavior not in transitions.keys():
+            transitions[behavior] = []
+        # TODO here I would like to have an estimation of the real costs... 
+        # but 1 is acceptable in a first time
+        transitions[behavior].append((src_name, dst_name, 1))
+    costs = {}
+    for behavior in comp_bhvs:
+        for (name_place, place) in comp_places.items():
+            automata[name_place][behavior] = []
+        for (source, target, cost) in transitions[behavior]:
+            automata[source][behavior].append(target)
+            if (source, target) not in costs.keys():
+                costs[(source, behavior)] = 0
+            prev = costs[(source, behavior)]
+            costs[(source, behavior)] = max(prev, cost)
+            bhv_in[target].append(behavior)
+            bhv_out[source].append(behavior)
+
+    return (automata, bhv_in, bhv_out, costs)
+
+
+def matrix_from_concerto_component(comp: Component, skip="skip"):
+    (automata, bhv_in, bhv_out, cost) = automata_from_concerto_component(comp)
     (result_vertices, result_input, result_transit, result_cost) = reduce_automata(automata, bhv_in, bhv_out, cost)
     return fill_automata(result_vertices, result_input, result_transit, result_cost, skip)

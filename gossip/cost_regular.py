@@ -1,12 +1,33 @@
 from minizinc import Instance, Model as mznModel, Solver, Status
-from ballet.utils.list_utils import flatmap, indexify
-from gossip.gossip import Model
+from ballet.utils.list_utils import flatmap, indexify, indexOf
+from gossip.gossip import Model, Solution
+from ballet.planner.goal import *
+from ballet.assembly.concertod.component import Component
 import subprocess, re, json
 
 class FindMUSException(Exception):
     
     def __init__(self, message):            
         super().__init__(message)
+        
+        
+class CRSolution(Solution):
+    
+    def __init__(self, result, sat=True):
+        self.__result = result
+        self.__is_sat = sat
+    
+    @property    
+    def is_sat(self):
+        return self.__is_sat
+    
+    @property
+    def result(self):
+        return self.__result
+    
+    def get(self, key):
+        return getattr(self.__result, key)
+            
 
 class CRConstraint:
     
@@ -98,7 +119,7 @@ class TransitionConstraint(CRConstraint):
     def source(self):
         return self.__source
 
-
+ 
 class CostRegular(Model):
     
     def __init__(self, states: list[str], transitions: list[str], 
@@ -111,14 +132,19 @@ class CostRegular(Model):
         assert init_state in states
         self.__states = states
         self.__transitions = transitions
-        self.__transitions.append("skip")
+        added_skip = False
+        if "skip" not in self.__transitions:
+            added_skip = True
+            self.__transitions.append("skip")
         self.__automata = automata
         self.__init_state = init_state
-        for state in self.__states:
-            self.__automata[state]["skip"] = state
+        if added_skip:
+            for state in self.__states:
+                self.__automata[state]["skip"] = state
         self.__costs = costs
-        for state in self.__states:
-            self.__costs[state]["skip"] = 0
+        if added_skip:
+            for state in self.__states:
+                self.__costs[state]["skip"] = 0
         self.__constraints = constraints
         self.__ports = ports
         self.__seq_length = len(states) * len(transitions)
@@ -128,7 +154,7 @@ class CostRegular(Model):
             assert source in states # assert source is declared
             for label in automata[source].keys():
                 assert label in transitions # assert the label of transition is declared
-                assert automata[source][label] in states # assert target is declared
+                assert automata[source][label] in states or automata[source][label] == "<>" # assert target is declared, or the transition does not exist
         
     def __assert_conform_costs(states: list[str], transitions: list[str], costs: dict[str,dict[str,int]], automata:dict[str,dict[str,str]]):
         for source in costs.keys():
@@ -150,6 +176,23 @@ class CostRegular(Model):
                 assert constraint.transition in transitions
             if constraint.isStateConstraint():
                 assert constraint.state in states
+    
+    @staticmethod
+    def constraint_from_goal(goal: Goal, cause="goal", component:Component=None, active=None):
+        if goal.isBehaviorGoal():
+            return TransitionConstraint(transition = goal.behavior(), source=cause, goal=True)
+        elif goal.isPlaceGoal():
+            return StateConstraint(state=goal.place(), source=cause, final=goal.final(), goal=True)
+        elif goal.isPortGoal():
+            return PortConstraint(port=goal.port(), status="enabled" if goal.isEnable() else "disabled", source=cause, final=goal.final(), goal=True) # TODO status ????
+        elif goal.isStateGoal():
+            if goal.state() == "deployed" or goal.state() == "running":
+                to_reach = component.get_places[-1] # TODO add this concept to Component definition
+            elif goal.state() == "destroyed":
+                to_reach = component.get_places[0] # TODO add this concept to Component definition
+            else:
+                to_reach = active
+            return StateConstraint(state=to_reach, source=cause, final=goal.final(), goal=True)    
     
     @property
     def states(self):
@@ -400,22 +443,7 @@ class CostRegular(Model):
         if write_file:
             with open(filepath, 'w') as f:
                 json.dump(content, f)
-     
-    
-    # cr = CostRegular(["initiated","configured","deployed"], 
-    #              ["deploy","stop","uninstall"], 
-    #              {"initiated" : {"deploy":"deployed"},
-    #               "configured": {"deploy":"deployed"},
-    #               "deployed": {"stop":"configured", "uninstall":"initiated"}}, 
-    #              {"initiated" : {"deploy":2},
-    #               "configured": {"deploy":1},
-    #               "deployed": {"stop":1, "uninstall":1}}, 
-    #              "initiated",
-    #              {"service":["deployed"], "facts_service":["configured", "deployed"]},
-    #              {StateConstraint("deployed", final=True),
-    #               TransitionConstraint("deploy")
-    #               })
-    
+
     
     def __make_choco_model(self, classname="TestModel"):
         int_states = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.states)))
@@ -565,11 +593,11 @@ solve minimize scost;
         solver = Solver.lookup(solve_with)
         instance = Instance(solver, model)
         result = instance.solve()
-
         if result.status == Status.UNSATISFIABLE or findmus:
             raise FindMUSException("UNSAT model")
         else:
-            return result
+            r = result.solution
+            return CRSolution(r, sat=True)
         
     def solve_choco(self,findmus=False, write_file=False, print_model=False):
         if findmus:
@@ -577,7 +605,7 @@ solve minimize scost;
             try:
                 cmd = "java -jar ballet-planner-mus-1.0-SNAPSHOT-shaded.jar model.json"
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                return result.stdout, result.stderr
+                return CRSolution(result.stdout, sat=False)
             except subprocess.CalledProcessError as e:
                 print(f"An error occurred: {e}")
                 print("Output:\n", e.stdout)
@@ -599,3 +627,48 @@ solve minimize scost;
             return self.solve_minizinc(findmus, write_file, print_model, solve_with)
         if mode == "choco":
             return self.solve_choco(findmus, write_file, print_model)
+        
+        
+class MultiCostRegular(Model):
+    
+    def __init__(self, models: dict[str, CostRegular], node):
+        self._models = models
+        self._node = node
+        self._solutions = {k: None for k in models.keys()}
+        self._port_status = {k: None for k in models.keys()}
+        self.__first_skip = {k: -1 for k in models.keys()}
+        
+    def solve(self, mode="minizinc", print_model=False, write_file=False):
+        for (key, model) in self._models.items():
+            try:
+                solution =  model.solve(mode, print_model, write_file)
+                self._solutions[key] = solution
+                self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+                self.__first_skip[key] = indexOf('skip', solution.get("sequence"))
+            except FindMUSException:
+                self._solutions[key] = model.solve(mode="choco", findmus=True, print_model=False, write_file=False)
+        return self._solutions
+
+    def get_node(self):
+        return self._node
+
+    def get_components(self):
+        return list(self._solutions.keys())
+
+    def get_solution(self, key):
+        return self._solutions[key]
+    
+    def get_port_status(self, component, port):
+        return self._port_status[component][port][:self.__first_skip[component]+1]
+    
+    def get_port_statuses(self, component):
+        result = {}
+        for port in self._port_status[component].keys():
+            result[port] = self._port_status[component][port][:self.__first_skip[component]+1]
+        return result
+    
+    def get_sequence(self, component):
+        return self._solutions[component].get("sequence")[:self.__first_skip[component]]
+    
+    def get_states(self, component):
+        return self._solutions[component].get("states")[:self.__first_skip[component]+1]

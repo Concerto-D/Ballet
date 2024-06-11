@@ -8,7 +8,10 @@ from flask import Flask, request, jsonify, make_response
 from ballet.planner.goal import BehaviorReconfigurationGoal, PortReconfigurationGoal, ReconfigurationGoal
 from ballet.utils import set_utils
 
+global waits
 waits = {}
+global goals
+goals = {}
 
 class FlaskDispatcher:
     global app
@@ -16,7 +19,6 @@ class FlaskDispatcher:
     instance = None
 
     def __init__(self, address, port, torcv: set[str]):
-        self._goals = {}
         self._host = address
         self._port = port
         self._address = f"{address}:{port}"
@@ -24,10 +26,17 @@ class FlaskDispatcher:
                                                        kwargs={"host": self._host, "port": self._port})
         # FlaskDispatcher.wait = torcv
         waits[self._address] = torcv
+        goals[self._address] = {}
         FlaskDispatcher.instance = self
 
     def start(self):
         self._server_process.start()
+
+    def goals(self):
+        return goals[self._address]
+
+    def address(self):
+        return self._address
 
     def __parseBool(self, input: str):
         return input in ["True","true","TRUE","OUI","Oui","oui","T","t","Yes","yes","YES","1"]
@@ -59,44 +68,52 @@ class FlaskDispatcher:
         # behaviors = "[(bhv,false),(bhv,false),(bhv,false)]"
         res = set()
         cleaned = input.replace('[','').replace(']','').replace('(','').replace(')','').split(',')
-        for i in range(0, len(cleaned), 2):
-            bhv = cleaned[i]
-            final = self.__parseBool(cleaned[i + 1]) if i + 1 < len(cleaned) else False
-            res.add(BehaviorReconfigurationGoal(bhv, final))
+        if len(cleaned) >= 2:
+            for i in range(0, len(cleaned), 2):
+                bhv = cleaned[i]
+                final = self.__parseBool(cleaned[i + 1]) if i + 1 < len(cleaned) else False
+                res.add(BehaviorReconfigurationGoal(bhv, final))
         return res
 
     def _parse_port_goals(self, input: str) -> Set[PortReconfigurationGoal]:
         # ports == "[(port,status,false),(port,status,false),(port,status,false)]"
         res = set()
         cleaned = input.replace('[','').replace(']','').replace('(','').replace(')','').split(',')
-        for i in range(0, len(cleaned), 3):
-            bhv = cleaned[i]
-            status = self.__parseBool(cleaned[i + 1]) if i + 1 < len(cleaned) else True
-            final = self.__parseBool(cleaned[i + 2]) if i + 2 < len(cleaned) else False
-            res.add(PortReconfigurationGoal(bhv, status, final))
+        if len(cleaned) >= 3:
+            for i in range(0, len(cleaned), 3):
+                port = cleaned[i]
+                status = self.__parseBool(cleaned[i + 1]) if i + 1 < len(cleaned) else True
+                final = self.__parseBool(cleaned[i + 2]) if i + 2 < len(cleaned) else False
+                res.add(PortReconfigurationGoal(port, status, final))
         return res
 
     @staticmethod
     @app.route("/addGoals", methods=['POST'])
     def addGoals():
+        # goals = FlaskDispatcher.instance.goals()
         data = request.get_json()
         if 'compid' in data and 'behavior' in data and 'port' in data:
+            print(f"received: {data}")
             compid, behaviors, ports = data['compid'], data['behavior'], data['port']
             for goal in FlaskDispatcher.instance._parse_bhv_goals(behaviors):
-                if compid not in FlaskDispatcher.instance._goals:
+                print(f"Add goal: {compid}:{goal}")
+                if compid not in goals[FlaskDispatcher.instance.address()]:
                     # TODO add lock1
-                    FlaskDispatcher.instance._goals[compid] = set()
+                    goals[FlaskDispatcher.instance.address()][compid] = set()
                     # TODO add unlock1
                 # TODO add lock2
-                FlaskDispatcher.instance._goals[compid].add(goal)
+                print(f"before adding {goals[FlaskDispatcher.instance.address()][compid]} ({id(goals)})")
+                goals[FlaskDispatcher.instance.address()][compid].add(goal)
+                print(f"after adding {goals[FlaskDispatcher.instance.address()][compid]}  ({id(goals)})")
                 # TODO add unlock2
             for goal in FlaskDispatcher.instance._parse_port_goals(ports):
-                if compid not in FlaskDispatcher.instance._goals:
+                print(f"Add goal: {compid}:{goal}  ({id(goals)})")
+                if compid not in goals[FlaskDispatcher.instance.address()]:
                     # TODO add lock3
-                    FlaskDispatcher.instance._goals[compid] = set()
+                    goals[FlaskDispatcher.instance.address()][compid] = set()
                     # TODO add unlock3
                 # TODO add lock4
-                FlaskDispatcher.instance._goals[compid].add(goal)
+                goals[FlaskDispatcher.instance.address()][compid].add(goal)
                 # TODO add unlock4
             return make_response(jsonify({"message": f"The goals has been shared"}), 200)
         else:
@@ -114,25 +131,26 @@ class ClientDispatcher:
             self._tosend.add(f"{address}:{port}")
         self._address = myaddress
         self._port = myport
-        self._serveur = FlaskDispatcher(myaddress, myport, self._torcv)
-        self._serveur.start()
+        self._server = FlaskDispatcher(myaddress, myport, self._torcv)
+        self._server.start()
         self._goals = goals
 
     def global_goal_synchronization(self):
+        print(f"Initially: {goals}, {waits}")
         for address in self._tosend:
             ok = False
             while not ok:
                 try:
-                    print(f"Trying to ping {address}")
                     ok = self.ping(address)
                 except Exception:
                     time.sleep(1)
             self.sendGoals(self._goals, address)
             self.done(address)
-        while self._serveur.has_wait():
+            print(f"my goals: {self._goals}")
+        while self._server.has_wait():
             pass
-            time.sleep(1)
-        print("Goals are synchronized")
+        print(f"Goals have been synchronized, here there are: {self._server.goals()}  ({id(self._server.goals())}, {id(goals)})")
+        return goals
 
     def ping(self, address: str) -> bool:
         rep = requests.get(f"http://{address}/ping")
@@ -146,7 +164,6 @@ class ClientDispatcher:
         return rep
 
     def sendGoals(self, goals: dict[str, Set[ReconfigurationGoal]], address: str):
-        print(f"Sending goals to {address}")
         for (compId, compGoals) in goals.items():
             behavior_goals = set_utils.findAll_in_set(lambda g: g.isBehaviorGoal(), goals[compId])
             port_goals = set_utils.findAll_in_set(lambda g: g.isPortGoal(), goals[compId])

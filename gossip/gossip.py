@@ -169,19 +169,6 @@ node:
         Une liste de global_acks reçu
         A function to send a message to a component
 
-f_init:
-    Construit un automate depuis le composant et les goals
-    
-f_local:
-    Trouve un mot, et en deduis l'etat des ports. Pour chaque port qui change:
-        provide_port:   on -> off           at the end, the related use ports must be deactivated
-                        on -> off -> on     at a moment, the related use ports must be deactivated
-        use_port:       off -> on           at the end, the related provide ports must be actived
-                        off -> on -> off    at a moment, the related provide ports must be actived
-    Faire un message en consequence (port: Port, status: bool, final: bool, wait_behavior: Option[Behavior])
-           
-f_msg:
-    Pour chaque message:  Envoyer le message à chaque composant connecté à ce port.
 
 f_enrich:
     Ajouter 

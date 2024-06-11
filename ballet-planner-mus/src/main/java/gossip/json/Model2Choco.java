@@ -23,7 +23,12 @@ public class Model2Choco {
                                            String state, Map<String, String> transitions,
                                            Map<String, Integer> states_as_int) {
         List<String> transitions_with_skip = new ArrayList<>(cr_model.getTransitions());
-
+        // replace '<>' by 'any'
+        for (Map.Entry<String, String> entry : transitions.entrySet()) {
+            if ("<>".equals(entry.getValue())) {
+                entry.setValue("any");
+            }
+        }
         int[] result = transitions_with_skip.stream().map(
                 transition -> {
                     if (transition.equals("skip")) {

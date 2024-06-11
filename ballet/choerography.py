@@ -1,11 +1,12 @@
 import argparse
+import time
 
 from ballet.assembly.concertod.assembly import Assembly
 from ballet.assembly.plan.plan import merge_plans, Plan, Add, Delete, Disconnect, Wait, PushB, Connect
 from ballet.gateway.dispatcher import Dispatcher
 from ballet.gateway.parser import AssemblyParser, InventoryParser, GoalParser
 from ballet.planner.communication.constraint_message import MailboxMessaging, HybridMessaging
-from ballet.planner.communication.grpc.grpc_planner import gRPCMessagingPlanner
+from ballet.planner.communication.grpc.grpc_planner import ClientGrpcPlanner
 from ballet.planner.resolve import resolve, diff_assembly
 
 
@@ -30,7 +31,7 @@ def dispatch(address, port, instances, active, inventory, goals, state_goals):
 
 def plan(instances, active, inventory, port, goals, goals_place, comp_in, conn_in, comp_out, conn_out):
     messaging = HybridMessaging(local_messaging=MailboxMessaging(instances),
-                                remote_messaging=gRPCMessagingPlanner(instances, inventory, port, verbose=True),
+                                remote_messaging=ClientGrpcPlanner(inventory, port, verbose=True),
                                 local_comps=instances)
     plans = resolve(instances, active, goals, goals_place, messaging)
     unified_plan: Plan = merge_plans(list(plans.values()))
@@ -70,6 +71,10 @@ def choerography(address, ports, assembly_in_filename: str, assembly_out_filenam
     instances, active, inventory, goals, goals_state, components_in, connections_in, components_out, connections_out \
         = parse(assembly_in_filename, assembly_out_filename, inventory_filename, goal_filename)
     instances, active, goals, place_goals = dispatch(address, port_front, instances, active, inventory, goals, goals_state)
-    my_plan = plan(instances, active, inventory, port_planner, goals, place_goals, components_in, connections_in, components_out, connections_out)
-    assembly = None # TODO get concrete assembly
-    execute(assembly, my_plan)
+    print("----------------------------")
+    for compid in goals:
+        print(f"{compid}: {goals[compid]}")
+    # time.sleep(10)
+    # my_plan = plan(instances, active, inventory, port_planner, goals, place_goals, components_in, connections_in, components_out, connections_out)
+    # assembly = None # TODO get concrete assembly
+    # execute(assembly, my_plan)

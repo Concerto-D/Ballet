@@ -45,6 +45,9 @@ class CRConstraint:
     
     def isPortConstraint(self):
         return False
+        
+    def isMultiPortConstraint(self):
+        return False
 
 
 class StateConstraint(CRConstraint):
@@ -87,6 +90,36 @@ class PortConstraint(CRConstraint):
     @property
     def port(self):
         return self.__port
+    
+    @property
+    def status(self):
+        return self.__status
+    
+    @property
+    def final(self):
+        return self.__final
+        
+    @property
+    def source(self):
+        return self.__source
+    
+
+class MultiPortConstraint(CRConstraint):
+    
+    def __init__(self, ports, status, source="NO SOURCE IS SPECIFIED", final=False, goal=False):
+        super().__init__(goal)
+        assert status == "enabled" or status == "disabled"
+        self.__ports = ports
+        self.__status = status
+        self.__final = final
+        self.__source = source
+        
+    def isMultiPortConstraint(self):
+        return True
+    
+    @property
+    def ports(self):
+        return self.__ports
     
     @property
     def status(self):
@@ -218,12 +251,10 @@ class CostRegular(Model):
     def constraints(self):
         return self.__constraints
       
-    @property
-    def add_constraints(self, constraint):
+    def add_constraint(self, constraint):
         self.__constraints.add(constraint)
       
-    @property
-    def add_transition(self, label, source, target, cost):
+    def add_transition(self, label, source, target, cost=0):
         if label not in self.__transitions:
             self.__transitions.append(label)
         self.__automata[source][label] = target
@@ -338,6 +369,19 @@ class CostRegular(Model):
         res.append(f"constraint count_{constraint.port}_status_{constraint.status} > 0; {suffix}")
         return res
     
+    def __make_mzn_multiport_constraint_line(self, constraint: PortConstraint):
+        suffix = "% goal" if constraint.isGoal() else "% inferred"
+        res = []
+        name_count = "count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        if constraint.final:
+            for port in constraint.ports:
+                res.append(f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}")
+        res.append(f"var int: {name_count}; {suffix}")
+        and_condition = ' /\ '.join(map(lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports))
+        res.append(f"constraint {name_count} = sum (i in 1..seq_length+1) ({and_condition});")
+        res.append(f"constraint {name_count} > 0; {suffix}")
+        return res
+    
     def __make_mzn_transition_constraint_line(self, constraint: TransitionConstraint):
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         decl1 = f"var int: count_{constraint.transition}; {suffix}"
@@ -363,9 +407,19 @@ class CostRegular(Model):
         res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
         res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
         res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
-        
-        
         res.append("\n")
+        return res
+    
+    def __make_choco_multiport_constraint_line(self, constraint: PortConstraint):
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        res = []
+        # TODO 
+        # if constraint.final:
+        #     res.append(f"\t\tmodel.arithm({constraint.port}_status[seq_length], \"=\", {constraint.status}).post(); {suffix}")
+        # res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
+        # res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
+        # res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
+        # res.append("\n")
         return res
     
     def __make_choco_transition_constraint_line(self, constraint: TransitionConstraint):
@@ -393,6 +447,8 @@ class CostRegular(Model):
             return self.__make_mzn_state_constraint_line(constraint)
         if constraint.isTransitionConstraint():
             return self.__make_mzn_transition_constraint_line(constraint)
+        if constraint.isMultiPortConstraint():
+            return self.__make_mzn_multiport_constraint_line(constraint)
     
     def __make_choco_constraint_line(self, constraint):
         if constraint.isPortConstraint():
@@ -401,6 +457,8 @@ class CostRegular(Model):
             return self.__make_choco_state_constraint_line(constraint)
         if constraint.isTransitionConstraint():
             return self.__make_choco_transition_constraint_line(constraint)
+        if constraint.isMultiPortConstraint():
+            return self.__make_choco_multiport_constraint_line(constraint)
     
     def __make_mzn_goal_constraints(self):
         lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), self.__constraints)
@@ -418,7 +476,9 @@ class CostRegular(Model):
         # Port constraints format
         port_constraints = filter(lambda c: c.isPortConstraint() , self.constraints)
         json_port_constraints = list(map(lambda constraint: {"port": constraint.port, "status": constraint.status,"isFinal": bool2int(constraint.final), "goal": bool2int(constraint.isGoal()), "source": constraint.source}, port_constraints))    
-        
+        # Multiport constraints format
+        multiport_constraints = filter(lambda c: c.isMultiPortConstraint() , self.constraints)
+        json_multiport_constraints = list(map(lambda constraint: {"ports": constraint.ports, "status": constraint.status,"isFinal": bool2int(constraint.final), "goal": bool2int(constraint.isGoal()), "source": constraint.source}, multiport_constraints))    
         # Transition constraints format
         transition_constraints = filter(lambda c: c.isTransitionConstraint() , self.constraints)
         json_transition_constraints = list(map(lambda constraint: {"transition": constraint.transition, "goal": bool2int(constraint.isGoal()), "source": constraint.source}, transition_constraints))  
@@ -434,6 +494,7 @@ class CostRegular(Model):
                 {
                     "state_constraint": json_state_constraints,
                     "port_constraint": json_port_constraints,
+                    "multiport_constraint": json_multiport_constraints,
                     "transition_constraint": json_transition_constraints
                 }
         }
@@ -576,9 +637,9 @@ solve minimize scost;
         return content
     
     
-    def solve_minizinc(self, findmus=False, write_file=False, print_model=False, solve_with="gecode"):
+    def solve_minizinc(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
         wf = write_file if not findmus else True
-        modelfile = "model.mzn"
+        modelfile = file_name
         model = mznModel()
         mzn_str_model = self.__make_mzn_model()
         if print_model:
@@ -622,9 +683,9 @@ solve minimize scost;
                     f.close()
             return None, None
     
-    def solve(self, mode="minizinc", findmus=False, write_file=False, print_model=False, solve_with="gecode"):
+    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
         if mode == "minizinc":
-            return self.solve_minizinc(findmus, write_file, print_model, solve_with)
+            return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
         if mode == "choco":
             return self.solve_choco(findmus, write_file, print_model)
         
@@ -641,7 +702,7 @@ class MultiCostRegular(Model):
     def solve(self, mode="minizinc", print_model=False, write_file=False):
         for (key, model) in self._models.items():
             try:
-                solution =  model.solve(mode, print_model, write_file)
+                solution =  model.solve(mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
                 self._solutions[key] = solution
                 self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
                 self.__first_skip[key] = indexOf('skip', solution.get("sequence"))
@@ -672,3 +733,9 @@ class MultiCostRegular(Model):
     
     def get_states(self, component):
         return self._solutions[component].get("states")[:self.__first_skip[component]+1]
+    
+    def add_transition(self, component, _from, _to, label):
+        self._models[component].add_transition(_from, _to, label)
+    
+    def add_constraint(self, component, constraint):
+        self._models[component].add_constraints(constraint)

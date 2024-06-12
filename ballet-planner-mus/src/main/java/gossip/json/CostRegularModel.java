@@ -70,6 +70,10 @@ public class CostRegularModel {
         return constraints.getPort_constraint();
     }
 
+    public List<MultiportConstraint> getMultiPortConstraints() {
+        return constraints.getMultiPort_constraint();
+    }
+
     public List<StateConstraint> getStateConstraints() {
         return constraints.getState_constraint();
     }
@@ -98,6 +102,7 @@ public class CostRegularModel {
     public static class Constraints {
         private List<StateConstraint> state_constraint;
         private List<PortConstraint> port_constraint;
+        private List<MultiportConstraint> multiport_constraint;
         private List<TransitionConstraint> transition_constraint;
 
         // Getters and Setters
@@ -107,6 +112,14 @@ public class CostRegularModel {
 
         public void setState_constraint(List<StateConstraint> state_constraint) {
             this.state_constraint = state_constraint;
+        }
+
+        public List<MultiportConstraint> getMultiPort_constraint() {
+            return multiport_constraint;
+        }
+
+        public void setMultiport_constraint(List<MultiportConstraint> multiport_constraint) {
+            this.multiport_constraint = multiport_constraint;
         }
 
         public List<PortConstraint> getPort_constraint() {
@@ -233,6 +246,63 @@ public class CostRegularModel {
         public String toString() {
             return "PortConstraint{" +
                     "port='" + port + '\'' +
+                    ", status='" + status + '\'' +
+                    ", final=" + isFinal +
+                    ", goal=" + goal +
+                    '}';
+        }
+    }
+
+    public static class MultiportConstraint {
+        private List<String> ports;
+        private String status;
+        private int isFinal;
+        private int goal;
+        private String source;
+
+        public String getSource(){ return source; }
+        public void setSource(String source) { this.source = source; }
+
+        // Getters and Setters
+        public List<String> getPorts() { return ports; }
+
+        public void setPort(List<String> port) {
+            this.ports = ports;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public int getIsFinal() {
+            return isFinal;
+        }
+
+        public boolean isFinal() {
+            return isFinal == 1;
+        }
+
+
+        public void setIsFinal(int isFinal) {
+            this.isFinal = isFinal;
+        }
+
+        public int getGoal() {
+            return goal;
+        }
+
+        public void setGoal(int goal) {
+            this.goal = goal;
+        }
+
+        @Override
+        public String toString() {
+            return "PortConstraint{" +
+                    "ports='" + ports + '\'' +
                     ", status='" + status + '\'' +
                     ", final=" + isFinal +
                     ", goal=" + goal +

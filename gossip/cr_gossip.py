@@ -1,6 +1,6 @@
 from gossip.gossip import Node
 from ballet.planner.automata import matrix_from_concerto_component
-from gossip.cost_regular import CostRegular, MultiCostRegular
+from gossip.cost_regular import CostRegular, MultiCostRegular, MultiPortConstraint, TransitionConstraint
 from ballet.assembly.concertod.component import Component
 from ballet.planner.goal import Goal
 from ballet.utils.list_utils import find
@@ -9,9 +9,6 @@ from ballet.assembly.concertod.dependency import DepType
 
 import abc
 
-# node: Node
-# roots: list[Node],
-# f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
 # f_enrich: Callable[[Model, list[Message]], Model],
 # f_ack: Callable[[Node, Acknowledgement], dict[Node, Acknowledgement]],
 # f_final: Callable[[Model], Solution]
@@ -160,12 +157,27 @@ class CostRegularNode:
                 res.append(_user)
         return res
     
+    def use_by_port(self, provider, provide_port, user):
+        res = []
+        for (_provider, _provide_port, _user, _use_port) in self._connections:
+            if provider == _provider and _provide_port == provide_port and user == _user:
+                res.append(_use_port)
+        return res
+    
     def provide_by(self, user, use_port):
         res = []
         for (_provider, _provide_port, _user, _use_port) in self._connections:
             if user == _user and _use_port == use_port:
                 res.append(_provider)
         return res
+    
+    def provide_by_port(self, user, use_port, provider):
+        res = []
+        for (_provider, _provide_port, _user, _use_port) in self._connections:
+            if user == _user and _use_port == use_port and _provider == provider:
+                res.append(_provide_port)
+        return res
+        
     
     @property
     def id(self):
@@ -267,11 +279,6 @@ def cr_local(cr_model: MultiCostRegular):
 
     return out_messages, opt_ack
 
-def is_provide_port(port, node):
-    pass 
-
-def is_use_port(port, node):
-    pass
 
 def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, list[Message]]
     res = {}
@@ -282,3 +289,31 @@ def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, 
                 res[target] = set()
             res[target].add(ConstraintMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.final))
     return {k: list(v) for (k,v) in res.items()}
+
+
+def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
+    def __get_places(component, port):
+        tmp_ports = reverse_dict(component.get_bindings())
+        return tmp_ports[port]
+    node: CostRegularNode = model.get_node()
+    for message in messages:
+        connected_ports = node.use_by_port(message.source, message.port, message.target) + node.provide_by(message.source, message.port, message.target)
+        multiport_constraint = MultiPortConstraint(connected_ports, message.status, source=message.source, final=message.final, goal=False)
+        model.add_constraint(message.target, multiport_constraint)
+        if (message.behavior != "" and message.behavior != None):
+            transition_name = f"wait_{message.source}_{message.behavior}"
+            validating_states = set()
+            for connected_port in connected_ports:
+                component = node.components_from_str(message.target)
+                if message.status == "enabled":
+                    validating_states = validating_states | __get_places(component, connected_port)
+                elif message.status == "disabled":
+                    invalid_states = __get_places(component, connected_port)
+                    for place in component.get_places():
+                        if place not in invalid_states:
+                            validating_states.add(place)
+            for state in validating_states:
+                model.add_transition(message.target, state, state, transition_name)
+            wait_constraint = TransitionConstraint(transition_name, source=message.source)
+            model.add_constraint(message.target, wait_constraint)
+    return model

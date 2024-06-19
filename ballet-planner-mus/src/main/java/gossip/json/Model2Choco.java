@@ -192,8 +192,36 @@ public class Model2Choco {
                             .toArray(BoolVar[]::new), "=", count_transition);
             c0.post();
             Constraint c1 = model.arithm(count_transition, ">", 0);
-            addTracker(c0, "The behavior must execute " + constraint.getTransition() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
+            addTracker(c1, "The behavior must execute " + constraint.getTransition() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
             c1.post();
+        }
+
+        for (CostRegularModel.MultiportConstraint constraint: cr_model.getMultiPortConstraints()){
+            String name_intvar = "count_" + String.join("_", constraint.getPorts()) + "_" + constraint.getStatus();
+            IntVar count_multiport = model.intVar(name_intvar, 0, seq_length+1);
+
+            IntVar[] count_wanted_status = new IntVar[seq_length];
+            int wanted_status = status_as_int.get(constraint.getStatus());
+            for (int i = 0; i < seq_length; i++) {
+                String name_count_wanted = "count_" + String.join("_", constraint.getPorts()) + "_" + constraint.getStatus() + "i";
+                List<BoolVar> tmp_list = new ArrayList<>();
+                for (String port: constraint.getPorts()){
+                    BoolVar[] port_status = (BoolVar[]) model.getHook(port +"_status");
+                    tmp_list.add(port_status[i]);
+                }
+                // tmp_list at this point is a view of each port_status for a given i
+                count_wanted_status[i] = model.intVar(name_count_wanted, 0, tmp_list.size());
+                Constraint c0 = model.count(wanted_status, tmp_list.toArray(new IntVar[0]), count_wanted_status[i] );
+                // TODO add tacker
+                c0.post();
+            }
+            // count_multiport : number of times count_wanted_status respects "all equals to wanted_status"
+            Constraint c1 = model.count(constraint.getPorts().size(), count_wanted_status, count_multiport);
+            // TODO add tracker on c1
+            c1.post();
+            Constraint c2 = model.arithm(count_multiport, ">", 0);
+            addTracker(c2, "The ports [" + String.join(",", constraint.getPorts()) + "] must be all "+ constraint.getStatus() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
+            c2.post();
         }
 
         IntVar scost = model.intVar("scost", 0, maxInt);

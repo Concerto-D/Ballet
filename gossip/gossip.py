@@ -8,70 +8,43 @@ class Acknowledgement(ABC):
     def accept(): 
         pass
     
-    
-class AckAccept(Acknowledgement):
-    
-    def __int__(self):
-        pass
-    
-    def accept(): 
-        return True
-    
-    
-class AckRefuse(Acknowledgement):
-    
-    def __int__(self, message: str):
-        self.__message = message
-    
-    @property
-    def message(self):
-        return self.__message
-    
-    def accept(): 
-        return False
-    
 
 class Node (ABC):
     
-    def __init__(self, message_client, message_server):
-        self.__global_acks = {}
-        self.__out_message = {} # pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
-        self.__in_message = {}  # pour chaque message recu, a-t-il deja validé via un ack?
-        # self.__client = message_client
-        self.__server = message_server
+    def __init__(self):
+        pass
         
-    @property   
-    def global_acks(self):
-        return self.__global_acks
+    @abstractmethod  
+    def get_global_acks(self):
+        pass
     
     @abstractmethod
     def id(self):
         pass
     
+    @abstractmethod
     def new_received_messages(self):
-        # Get messages from mailbox ()
-        new_messages = []
-        # TODO considering we have a hosting __server
-        return new_messages
+        pass
     
+    @abstractmethod
     def send_messages(self, target, messages):
-        for message in messages:
-            self.send_message(target, message)
+        pass
     
+    @abstractmethod
     def send_message(self, target, message):
-        # (i)   Concretely send the message if the message has never been sent before
-        # (ii)  If sent: record message, to then decide when a ack can be sent
         pass 
     
+    @abstractmethod
     def send_acks(self, target, acks):
-        for ack in acks:
-            self.send_ack(target, ack)
+        pass
     
+    @abstractmethod
     def send_ack(self, target, ack):
-        # (i)   Concretely send the ack
-        # (ii)  If sent: mark it somewhere
         pass 
     
+    @abstractmethod
+    def is_root(self):
+        pass
     
 class Model (ABC):
     
@@ -103,7 +76,7 @@ def check_global_acks(node: Node, roots: list[Node]):
     return True
     
 
-def gossip (node: Node, roots: list[Node],
+def gossip (node: Node, roots: list[str],
             f_init: Callable[[Node], Model], 
             f_local: Callable[[Model], tuple[list[Message], Optional[Acknowledgement]]], 
             f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
@@ -133,13 +106,12 @@ def gossip (node: Node, roots: list[Node],
     model = f_init(node)
     ended_resolution = False
     # Initially, only node considered as roots must process an initial CP solving
-    must_solve = node in roots
+    must_solve = node.is_root()
     while not ended_resolution:
         received_messages = node.new_received_messages() 
         if received_messages != []:
             must_solve = True
             model = f_enrich(model, received_messages)
-            node.add_received_message(received_messages)
         if must_solve:
             must_solve = False
             (out_messages, ack_refuse) = f_local(model)
@@ -149,14 +121,18 @@ def gossip (node: Node, roots: list[Node],
                 target_acks = f_ack(node, ack_refuse)
                 for (target, acks) in target_acks:
                     node.send_acks(target, acks)
+                break
             elif out_messages != []:
                 # A solution is found, leading to new constraint to diffuse
                 target_messages = f_msg(node, out_messages)
                 for (target, messages) in target_messages.items():
                     node.send_messages(target, messages)
         # Now that the process is done, does the node must send accept acks ?
-        target_acks = f_ack(node, AckAccept())
+        target_acks = f_ack(node)
         node.send_acks(target, acks)
+        # Check global acks to send, and received, and end local solve if needed
+        global_acks = node.get_global_acks_to_send()
+        node.send_global_acks(global_acks)
         ended_resolution = check_global_acks(node, roots)
     return f_final(model)
 
@@ -168,12 +144,6 @@ node:
         {in_message: Option[Ack]} , pour chaque message recu, a-t-il deja validé via un ack?
         Une liste de global_acks reçu
         A function to send a message to a component
-
-
-f_enrich:
-    Ajouter 
-        + les contraintes de port_status a la resolution (ie, passer par un etat qui valide ce port status)
-        + les transitions de wait_comp_behavior
 
 f_ack:
     Je dois envoyer un ack:

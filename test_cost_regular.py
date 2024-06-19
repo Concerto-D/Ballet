@@ -1,7 +1,11 @@
-from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg
+from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final
 from ballet.assembly.concertod.components.openstack.mariadb_master import MariadbMaster
+from ballet.assembly.concertod.components.openstack.mariadb_worker import MariadbWorker
 from ballet.assembly.concertod.components.openstack.facts import Facts
 from ballet.planner.goal import *
+from gossip.cost_regular import PortConstraint, CostRegular
+
+from ballet.utils.dict_utils import *
 
 # goals = {StateConstraint("deployed", final=True, goal= True, source="Asked by DevOps team 1"),
 #          TransitionConstraint("update", goal= True, source="Asked by DevOps team 1")
@@ -40,30 +44,45 @@ from ballet.planner.goal import *
 #   print(stdout)
   
 mariadb_master = MariadbMaster()
-mariadb_master_2 = MariadbMaster()
-facts_master = Facts()
 mariadb_master.set_name("master")
-mariadb_master_2.set_name("master2")
+facts_master = Facts()
 facts_master.set_name("facts")
+worker1 = MariadbWorker()
+worker1.set_name("worker1")
+worker2 = MariadbWorker()
+worker2.set_name("worker2")
 
 
 node = CostRegularNode(id="main_node",
-  admin="Dédé", components=[mariadb_master,mariadb_master_2, 
-                            facts_master], 
+  admin="Dédé", components=[mariadb_master, facts_master, worker1, worker2], 
   connections=[('master', 'service', 'worker0', 'master_service'),('master', 'service', 'worker1', 'master_service'),('master', 'service', 'worker2', 'master_service')],
   active={
     mariadb_master: "deployed", 
-    mariadb_master_2: "deployed", 
-    facts_master:"deployed"
+    facts_master:"deployed",
+    worker1: 'deployed',
+    worker2: 'deployed'
     },
   goals={
-    mariadb_master: [StateReconfigurationGoal("initial", final=True), BehaviorReconfigurationGoal("update"), BehaviorReconfigurationGoal("uninstall")], 
-    # mariadb_master_2: [StateReconfigurationGoal("initial", final=True), BehaviorReconfigurationGoal("update"), PortReconfigurationGoal("service", False, final=True)], 
+    mariadb_master: [StateReconfigurationGoal("initial", final=True), BehaviorReconfigurationGoal("update")], 
+    worker1: [StateReconfigurationGoal("initial", final=True)], 
+    worker2: [StateReconfigurationGoal("initial", final=True)], 
     facts_master: [StateReconfigurationGoal("initial", final=True)]
-    }
+    },
+  roots=['master', 'facts', 'worker1', 'worker2']
   )
 
 model = cr_init(node)
 out_messages, ack_fail = cr_local(model)
-targets = cr_msg(node, out_messages)
-print(targets)
+targets = cr_msg(node, out_messages) # -> dict[str, list[Message]]
+set_of_messages = set()
+for (dest, messages) in targets.items():
+  if dest in model.get_components():
+    for message in messages:
+      set_of_messages.add(message)
+for message in set_of_messages:
+  print(f"{message}")
+enriched_model = cr_enrich(model, set_of_messages)
+
+plan = cr_final(enriched_model)
+
+print(plan)

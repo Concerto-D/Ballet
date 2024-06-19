@@ -1,9 +1,10 @@
 from minizinc import Instance, Model as mznModel, Solver, Status
 from ballet.utils.list_utils import flatmap, indexify, indexOf
+from ballet.utils import string_utils
 from gossip.gossip import Model, Solution
 from ballet.planner.goal import *
 from ballet.assembly.concertod.component import Component
-import subprocess, re, json
+import subprocess, json
 
 class FindMUSException(Exception):
     
@@ -258,7 +259,7 @@ class CostRegular(Model):
         if label not in self.__transitions:
             self.__transitions.append(label)
         self.__automata[source][label] = target
-        self.__costs[source][label][target] = cost
+        self.__costs[source][label] = cost
         self.__seq_length = len(self.__states) * len(self.__transitions)
         
     @property
@@ -362,41 +363,56 @@ class CostRegular(Model):
     def __make_mzn_port_constraint_line(self, constraint: PortConstraint):
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
+        count_name = f"count_{constraint.port}_status_{constraint.status}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
         if constraint.final:
             res.append(f"constraint {constraint.port}_status[seq_length+1] = {constraint.status}; {suffix}")
-        res.append(f"var int: count_{constraint.port}_status_{constraint.status}; {suffix}")
-        res.append(f"constraint count_{constraint.port}_status_{constraint.status} = sum(s in {constraint.port}_status) (s = {constraint.status}); {suffix}")
-        res.append(f"constraint count_{constraint.port}_status_{constraint.status} > 0; {suffix}")
+        res.append(f"var int: {count_name}; {suffix}")
+        res.append(f"constraint {count_name} = sum(s in {constraint.port}_status) (s = {constraint.status}); {suffix}")
+        res.append(f"constraint {count_name} > 0; {suffix}")
         return res
     
     def __make_mzn_multiport_constraint_line(self, constraint: PortConstraint):
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
-        name_count = "count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        count_name = f"count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
         if constraint.final:
             for port in constraint.ports:
                 res.append(f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}")
-        res.append(f"var int: {name_count}; {suffix}")
+        res.append(f"var int: {count_name}; {suffix}")
         and_condition = ' /\ '.join(map(lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports))
-        res.append(f"constraint {name_count} = sum (i in 1..seq_length+1) ({and_condition});")
-        res.append(f"constraint {name_count} > 0; {suffix}")
+        res.append(f"constraint {count_name} = sum (i in 1..seq_length+1) ({and_condition});")
+        res.append(f"constraint {count_name} > 0; {suffix}")
         return res
     
     def __make_mzn_transition_constraint_line(self, constraint: TransitionConstraint):
         suffix = "% goal" if constraint.isGoal() else "% inferred"
-        decl1 = f"var int: count_{constraint.transition}; {suffix}"
-        decl2 = f"constraint count_{constraint.transition} = sum(b in sequence) (b = {constraint.transition}); {suffix}"
-        cstr = f"constraint count_{constraint.transition} > 0; {suffix}"
+        count_name = f"count_{constraint.transition}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
+        decl1 = f"var int: {count_name}; {suffix}"
+        decl2 = f"constraint {count_name} = sum(b in sequence) (b = {constraint.transition}); {suffix}"
+        if count_name.startswith("count_wait"):
+            arity = "= 1"
+        else:
+            arity = "> 0"
+        cstr = f"constraint {count_name} {arity}; {suffix}"
         return [decl1, decl2, cstr]
     
     def __make_mzn_state_constraint_line(self, constraint: StateConstraint):
         suffix = "% goal" if constraint.isGoal() else "% inferred"
+        count_name = f"count_{constraint.state}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
         res = []
         if constraint.final:
             res.append(f"constraint states[seq_length+1] = {constraint.state}; {suffix}") 
-        res.append(f"var int: count_{constraint.state}; {suffix}")
-        res.append(f"constraint count_{constraint.state} = sum(s in states) (s = {constraint.state}); {suffix}")
-        res.append(f"constraint count_{constraint.state} > 0; {suffix}")
+        res.append(f"var int: {count_name}; {suffix}")
+        res.append(f"constraint {count_name} = sum(s in states) (s = {constraint.state}); {suffix}")
+        res.append(f"constraint {count_name} > 0; {suffix}")
         return res
     
     def __make_choco_port_constraint_line(self, constraint: PortConstraint):
@@ -461,7 +477,8 @@ class CostRegular(Model):
             return self.__make_choco_multiport_constraint_line(constraint)
     
     def __make_mzn_goal_constraints(self):
-        lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), self.__constraints)
+        set_of_constraints = set(self.__constraints)
+        lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), set_of_constraints)
         return '\n'.join(lines)
     
     def __make_choco_goal_constraints(self):
@@ -683,7 +700,7 @@ solve minimize scost;
                     f.close()
             return None, None
     
-    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
+    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
         if mode == "minizinc":
             return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
         if mode == "choco":
@@ -734,8 +751,11 @@ class MultiCostRegular(Model):
     def get_states(self, component):
         return self._solutions[component].get("states")[:self.__first_skip[component]+1]
     
-    def add_transition(self, component, _from, _to, label):
-        self._models[component].add_transition(_from, _to, label)
+    def add_transition(self, component, label, _from, _to, ):
+        self._models[component].add_transition(label, _from, _to)
     
     def add_constraint(self, component, constraint):
-        self._models[component].add_constraints(constraint)
+        self._models[component].add_constraint(constraint)
+        
+    def get_model(self, key):
+        return self._models[key]

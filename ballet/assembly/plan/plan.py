@@ -299,9 +299,10 @@ def find_valid_root(plans: list[Plan]) -> Instruction:
 def find_roots(plans: list[Plan]) -> list[Instruction]:
     res = []
     for plan in plans:
-        fst_instruction = plan.instructions()[0]
-        if fst_instruction.isPushB():
-            res.append(fst_instruction)
+        if plan.instructions() != []:
+            fst_instruction = plan.instructions()[0]
+            if fst_instruction.isPushB():
+                res.append(fst_instruction)
     return res
 
 

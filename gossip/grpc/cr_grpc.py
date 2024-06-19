@@ -165,8 +165,10 @@ class CRClient:
         address = self.__get_address(ack.target)
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            acked_message = gossip_pb2.SyncSpec(ack.constraint.source, ack.constraint.target, ack.constraint.port, 
+                                                ack.constraint.status, ack.constraint.behavior, ack.constraint.final)
             to_send = gossip_pb2.AckSuccess(component_source = ack.source, component_target = ack.target, 
-                                            to_message = ack.constraint)
+                                            to_message = acked_message)
             stub.add_global_ack_sucess(to_send)
             
     def __send_ack_failure(self, ack: AckFailure):

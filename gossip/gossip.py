@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
+from time import sleep
 
 class Acknowledgement(ABC):
     
-    @abstractmethod
-    def accept(): 
+    def __init__(self):
         pass
     
 
@@ -68,10 +68,16 @@ class Solution(ABC):
     pass
 
 
-def check_global_acks(node: Node, roots: list[Node]):
+def check_global_acks(node: Node, roots: list[str]):
+    """ Check if one root of the gossip diffusion has sent a global ack """
+    def __is_acked(list_of_global_acks, root):
+        for ack in list_of_global_acks:
+            if ack.source == root:
+                return True
+        return False
     """ Check if all roots of the gossip diffusion has sent a global ack """
     for root in roots:
-        if root not in node.global_acks:
+        if not __is_acked(node.get_global_acks(), root):
             return False
     return True
     
@@ -106,12 +112,17 @@ def gossip (node: Node, roots: list[str],
     model = f_init(node)
     ended_resolution = False
     # Initially, only node considered as roots must process an initial CP solving
-    must_solve = node.is_root()
+    must_solve = node.is_root(roots)
+    nloop = 0
     while not ended_resolution:
+        nloop = nloop + 1 
         received_messages = node.new_received_messages() 
         if received_messages != []:
+            print(received_messages)
             must_solve = True
             model = f_enrich(model, received_messages)
+        else:
+            print("NO NEW MESSAGE")
         if must_solve:
             must_solve = False
             (out_messages, ack_refuse) = f_local(model)
@@ -119,7 +130,7 @@ def gossip (node: Node, roots: list[str],
                 # We face a failure... there is no solution? 
                 # We then have a Failure ack to send back to roots
                 target_acks = f_ack(node, ack_refuse)
-                for (target, acks) in target_acks:
+                for (target, acks) in target_acks.items():
                     node.send_acks(target, acks)
                 break
             elif out_messages != []:
@@ -129,22 +140,21 @@ def gossip (node: Node, roots: list[str],
                     node.send_messages(target, messages)
         # Now that the process is done, does the node must send accept acks ?
         target_acks = f_ack(node)
-        node.send_acks(target, acks)
+        for (target, acks) in target_acks.items():
+            node.send_acks(target, acks)
         # Check global acks to send, and received, and end local solve if needed
-        global_acks = node.get_global_acks_to_send()
-        node.send_global_acks(global_acks)
+        global_acks = node.get_global_acks_to_send(roots)
+        if len(global_acks) != 0:
+            print(f"SEND GLOBAL ACKS")
+            node.send_global_acks(global_acks)
         ended_resolution = check_global_acks(node, roots)
+        print(f"At the end of the {nloop}th loop:")
+        node.print_status()
     return f_final(model)
 
 
 """ 
 node:
-    Doit avoir:
-        {out_message: Option[Ack]} , pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
-        {in_message: Option[Ack]} , pour chaque message recu, a-t-il deja validé via un ack?
-        Une liste de global_acks reçu
-        A function to send a message to a component
-
 f_ack:
     Je dois envoyer un ack:
     - soit un failure
@@ -159,8 +169,4 @@ f_ack:
         (1) Garder une liste des messages à envoyer et à qui
         (2) A chque fois qu'on emet un nouveau message, on le garde dans un dict: {message: bool} (dans message on a le destinataire)
         (3) A chaque fois qu'on recoit un ack, on passe à true dans {message: bool}
-        
-f_final:
-    Depuis les messages qui avait wait_behavior ≠ None, ajouter une contraintes pour que la transition aparaisse dans le mot puis resoudre
-    
 """

@@ -7,8 +7,14 @@ from ballet.utils.list_utils import find
 from ballet.utils.dict_utils import reverse_dict
 from ballet.assembly.concertod.dependency import DepType
 from ballet.assembly.plan.plan import Plan, Wait, PushB, merge_plans
-from gossip.grpc.cr_grpc import CRP2P
+from gossip.grpc import gossip_pb2_grpc
+from gossip.grpc import gossip_pb2
 
+from concurrent import futures
+
+import grpc
+import threading
+import time
 import abc
 
 
@@ -52,8 +58,17 @@ class ConstraintMessage:
     def __str__(self):
         return f"(from:{self._source}, to:{self._target}, port:{self._port}, status:{self._status}, "+ (f"bhv:{self._behavior}, " if self._behavior else "") + f"final:{self._final})"
 
-
-class AckMessage (abc.ABC, Acknowledgement):
+    def __eq__(self, value):
+        if isinstance(value, ConstraintMessage):
+            return self.source == value.source and self.target == value.target \
+                and self.port == value.port and self.status == value.status \
+                and self.behavior == value.behavior and self.final == value.final
+                
+    def __hash__(self):
+        return hash(f"({self.source}->{self.target}:{self.port}^{self._status}~{self.behavior}[{self.final}])")
+    
+    
+class AckMessage (Acknowledgement):
     
     def __init__(self):
         pass
@@ -92,6 +107,15 @@ class AckFailure (AckMessage):
     def is_failure(self):
         return True
     
+    def __eq__(self, value):
+        if isinstance(value, AckFailure):
+            return self.source == value.source and self.target == value.target \
+                and self.constraint == value.constraint and self.cause == value.cause
+        return False
+                
+    def __hash__(self):
+        return hash(f"{self.source},{self.target},{self.constraint},{self.cause}")
+    
      
 class AckSuccess (AckMessage):
     
@@ -102,7 +126,7 @@ class AckSuccess (AckMessage):
         
     @property
     def source(self):
-        return self._soource
+        return self._source
     
     @property
     def target(self):
@@ -114,6 +138,15 @@ class AckSuccess (AckMessage):
     
     def is_success(self):
         return True
+    
+    def __eq__(self, value):
+        if isinstance(value, AckSuccess):
+            return self.source == value.source and self.target == value.target \
+                and self.constraint == value.constraint
+        return False
+                
+    def __hash__(self):
+        return hash(f"{self.source},{self.target},{self.constraint}")
     
 
 class GlobalAck(abc.ABC):
@@ -131,6 +164,14 @@ class GlobalAckSuccess(GlobalAck):
     def source(self):
         return self._source
     
+    def __eq__(self, value):
+        if isinstance(value, GlobalAckSuccess):
+            return self.source == value.source 
+        return False
+                
+    def __hash__(self):
+        return hash(f"global-success-{self.source}")
+    
     
 class GlobalAckFailure(GlobalAck):
     
@@ -140,38 +181,317 @@ class GlobalAckFailure(GlobalAck):
     @property
     def source(self):
         return self._source
+    
+    def __eq__(self, value):
+        if isinstance(value, GlobalAckFailure):
+            return self.source == value.source 
+        return False
+                
+    def __hash__(self):
+        return hash(f"global-success-{self.source}")
 
+
+
+class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
+    
+    def __init__(self):
+        self._mailbox = {}
+        self._acks = {}
+        self._global_acks = set()
+        self._lock_new_mailbox = threading.Lock()
+        self._lock_add_message = threading.Lock()
+        self._lock_new_global_ack = threading.Lock()
+        self._lock_new_acks = threading.Lock()
+        self._lock_add_ack = threading.Lock()
+    
+    def add_message(self, request, context):
+        target = request.component_target
+        message = ConstraintMessage(request.component_source, target, request.port, 
+                                    request.status, request.behavior, request.final)
+        with self._lock_new_mailbox:
+            if target not in self._mailbox.keys():
+                self._mailbox[target] = set()
+        with self._lock_add_message:
+            self._mailbox[target].add(message)
+        return gossip_pb2.Empty()
+        
+    def get_messages(self, comp_name):
+        if comp_name not in self._mailbox.keys():
+            return set()
+        messages = self._mailbox[comp_name]
+        with self._lock_add_message:
+            self._mailbox[comp_name] = set()
+        return messages
+
+    def add_ack_success(self, request, context):
+        target = request.component_target
+        message_to_ack = request.to_message 
+        constraint_to_ack = ConstraintMessage(source=message_to_ack.component_source, target=message_to_ack.component_target, 
+                                       port=message_to_ack.port, status=message_to_ack.status, 
+                                       behavior=message_to_ack.behavior, final=message_to_ack.final)
+        ack = AckSuccess(request.component_source, request.component_target, constraint_to_ack)
+        with self._lock_new_acks:
+            if target not in self._acks.keys():
+                self._acks[target] = set()
+        with self._lock_add_ack:
+            self._acks[target].add(ack)
+            print(f"Ack added to {target}")
+        return gossip_pb2.Empty()
+    
+    def get_acks(self, comp_name):
+        if comp_name not in self._acks.keys():
+            return set()
+        acks = self._acks[comp_name]
+        with self._lock_add_ack:
+            self._acks[comp_name] = set()
+        return acks
+    
+    def get_global_acks(self):
+        return self._global_acks
+
+    def add_ack_failure(self, request, context):
+        target = request.component_target
+        ack = AckFailure(request.component_source, request.component_target, request.to_message, request.cause)
+        with self._lock_new_acks:
+            if target not in self._acks.keys():
+                self._acks[target] = set()
+        with self._lock_add_ack:
+            self._acks[target].add(ack)
+        return gossip_pb2.Empty()
+
+    def add_global_ack_success(self, request, context):
+        source = request.component_source
+        ack = GlobalAckSuccess(source)
+        with self._lock_new_global_ack:
+            self._global_acks.add(ack)
+        return gossip_pb2.Empty()
+        
+    def add_global_ack_failure(self, request, context):
+        source = request.component_source
+        ack = GlobalAckFailure(source)
+        with self._lock_new_global_ack:
+            self._global_acks.add(ack)
+        return gossip_pb2.Empty()
+
+    def ping(self, request, context):
+        return gossip_pb2.Empty()
+
+
+class CRServer:
+    
+    def __init__(self, servicer=CRServicer(), port=3000, max_workers=16, inventory: dict[str, dict[str, str]]={}):
+        self.__inventory = inventory
+        self._full_address = {}
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
+        gossip_pb2_grpc.add_CostRegularGossipServiceServicer_to_server(servicer=servicer, server=server)
+        server.add_insecure_port(f'[::]:{port}')
+        server.start()
+        self._server = server
+        self._servicer = servicer
+        self.__wait_for_all()
+        
+    def stop(self):
+        self._server.stop()
+    
+    def __ping(self, address):
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            msg = gossip_pb2.Empty()
+            stub.ping(msg)
+
+    def get_messages(self, component):
+        return self._servicer.get_messages(component)
+    
+    def get_acks(self, component):
+        return self._servicer.get_acks(component)
+    
+    def get_global_acks(self):
+        return self._servicer.get_global_acks()
+
+    def __wait_for_all(self):
+        to_ping = {}
+        n = 0
+        for comp in self.__inventory.keys():
+            comp_host = self.__inventory[comp]["address"]
+            comp_port = self.__inventory[comp]["port_planner"]
+            full_address = comp_host + ":" + str(comp_port)
+            self._full_address[comp] = full_address
+            if full_address not in to_ping.keys():
+                to_ping[full_address] = True
+                n = n+1
+        while n != 0:
+            for (address, has_to_be_pinged) in to_ping.items():
+                if has_to_be_pinged:
+                    try:
+                        self.__ping(address)
+                        to_ping[address] = False
+                        n = n-1
+                    except:
+                        pass
+                time.sleep(1)
+            
+            
+class CRClient:
+    
+    def __init__(self, inventory: dict[str, dict[str, str]]):
+        self.__inventory = inventory
+    
+    def __get_address(self, component):
+        comp_host = self.__inventory[component]["address"]
+        comp_port = self.__inventory[component]["port_planner"]
+        return comp_host + ":" + str(comp_port)
+        
+    def __get_all_addresses(self):
+        addresses = set()
+        for component in self.__inventory.keys():
+            addresses.add(self.__get_address(component))
+        return addresses
+        
+    def send_message(self, message):
+        address = self.__get_address(message.target)
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            to_send = gossip_pb2.SyncSpec(component_source=message.source, component_target=message.target, 
+                                          port=message.port, status=message.status, behavior=message.behavior,
+                                          final=message.final)
+            stub.add_message(to_send)
+    
+    def __send_ack_success(self, ack: AckSuccess):
+        address = self.__get_address(ack.target)
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            acked_message = gossip_pb2.SyncSpec(component_source=ack.constraint.source, component_target=ack.constraint.target, 
+                                                port=ack.constraint.port, status=ack.constraint.status, behavior=ack.constraint.behavior, 
+                                                final=ack.constraint.final)
+            to_send = gossip_pb2.AckSuccess(component_source = ack.source, component_target = ack.target, 
+                                            to_message = acked_message)
+            stub.add_ack_success(to_send)
+            
+    def __send_ack_failure(self, ack: AckFailure):
+        address = self.__get_address(ack.target)
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            to_send = gossip_pb2.AckFailure(component_source = ack.source, component_target = ack.target, 
+                                            to_message = ack.constraint, cause = ack.cause)
+            stub.add_global_ack_failure(to_send)
+    
+    def send_ack(self, ack: AckMessage):
+        if isinstance(ack, AckSuccess):
+            self.__send_ack_success(ack)
+        elif isinstance(ack, AckFailure):
+            self.__send_ack_failure(ack)
+            
+    def __send_global_ack_success(self, address, ack: GlobalAckSuccess):
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            to_send = gossip_pb2.GlobalAckSuccess(component_source=ack.source)
+            stub.add_global_ack_success(to_send)      
+    
+    def __send_all_global_ack_success(self, ack: GlobalAckSuccess):
+        addresses = self.__get_all_addresses()
+        for address in addresses:
+            self.__send_global_ack_success(address, ack)
+            
+    def __send_global_ack_failure(self, address, ack: GlobalAckFailure):
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            to_send = gossip_pb2.GlobalAckFailure(component_source=ack.source)
+            stub.add_global_ack_failure(to_send)          
+        
+    def __send_all_global_ack_failure(self, ack: GlobalAckSuccess):
+        addresses = self.__get_all_addresses()
+        for address in addresses:
+            self.__send_global_ack_failure(address, ack)
+        
+    def send_global_ack(self, ack: GlobalAck):
+        if isinstance(ack, GlobalAckSuccess):
+            self.__send_all_global_ack_success(ack)
+        elif isinstance(ack, GlobalAckFailure):
+            self.__send_all_global_ack_failure(ack)
+    
+    
+class CRP2P:
+    
+    def __init__(self, port, inventory: dict[str, dict[str, str]]):
+        self._server = CRServer(port=port, inventory=inventory)
+        print("SERVER IS STARTED")
+        self._client = CRClient(inventory=inventory)
+        print("CLIENT IS STARTED")
+    
+    def send_message(self, message):
+        self._client.send_message(message)
+    
+    def send_ack(self, ack):
+        self._client.send_ack(ack)
+        return # TODO check if self._server has received
+    
+    def send_global_ack(self, ack):
+        self._client.send_global_ack(ack)
+    
+    def get_messages(self, component):
+        return self._server.get_messages(component)
+    
+    def get_acks(self, component):
+        return self._server.get_acks(component)
+    
+    def get_global_acks(self):
+        return self._server.get_global_acks()
+    
 
 class CostRegularNode(Node):
     
-    def __init__(self, id: str, admin: str, connections: list[(str, str, str, str)], components: list[Component], active: dict[Component, str], goals: dict[Component, list[Goal]], port, inventory, roots):
+    def __init__(self, id: str, admin: str, connections: list[(str, str, str, str)], components: list[Component], active: dict[Component, str], goals: dict[Component, list[Goal]], port, inventory):
         self._id = id
         self._components = components
         self.__dict_components = {component.get_name(): component for component in components}
         self._active = active
         self._goals = goals
         self._connections = connections
-        self._roots = roots
         for comp in components:
             if comp not in goals:
                 goals[comp] = []
         self._admin = admin
         # Communication management
         self.__global_acks = set()
-        self.__out_message = {comp_name: {} for comp_name in self._components} # pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
-        self.__in_message = {comp_name: {} for comp_name in self._components}  # pour chaque message recu, a-t-il deja validé via un ack?
+        self.__out_message = {comp_name: {} for comp_name in self.__dict_components.keys()} # pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
+        self.__in_message = {comp_name: {} for comp_name in self.__dict_components.keys()}  # pour chaque message recu, a-t-il deja validé via un ack?
         self._p2p_service = CRP2P(port, inventory) 
+        
+    def get_out_message(self):
+        return self.__out_message
+        
+    def get_in_message(self):
+        return self.__in_message
+    
+    def print_status(self):
+        print("OUT_MESSAGES:")
+        for comp_name in self.__out_message.keys():
+            print(f"\t- {comp_name}:")
+            for message  in self.__out_message[comp_name].keys():
+                acked = "ACKED" if self.__out_message[comp_name][message] != None else str(self.__out_message[comp_name][message])
+                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, {message.final})"
+                print(f"\t\t* {str_message}: {acked}")
+            
+        print("IN_MESSAGES:")
+        for comp_name in self.__in_message.keys():
+            print(f"\t- {comp_name}")
+            for message  in self.__in_message[comp_name].keys():
+                acked = "ACKED" if self.__in_message[comp_name][message] != None else str(self.__in_message[comp_name][message])
+                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, {message.final})"
+                print(f"\t\t* {str_message}: {acked}")
+        print(str)
         
     def new_received_messages(self):
         all_new_messages = set()
         for component in self._components:
             comp_name = component.name
             messages = self._p2p_service.get_messages(comp_name)
-            all_new_messages = all_new_messages | messages
+            # all_new_messages = all_new_messages | messages
             for message in messages:
                 if not message in self.__in_message[comp_name].keys():
                     self.__in_message[comp_name][message] = None
-        return all_new_messages
+                    all_new_messages.add(message)
+        return list(all_new_messages)
     
     def send_messages(self, target, messages):
         for message in messages:
@@ -209,10 +529,10 @@ class CostRegularNode(Node):
                 result.add(message)
         return list(result)
     
-    def get_global_acks_to_send(self):
+    def get_global_acks_to_send(self, roots):
         result = set()
         for comp_name in self.__out_message.keys():
-            if comp_name in self._roots:
+            if comp_name in roots:
                 ack_to_send = True
                 ack_is_success = True
                 # 3 cases: no ack to send, a neg_ack if exists on message with neg_global_ack, a pos_global_ack if all message have pos_ack
@@ -230,24 +550,23 @@ class CostRegularNode(Node):
                         result.add(GlobalAckFailure(comp_name))
         return result
     
-    def is_root(self):
+    def is_root(self, roots):
         for comp_name in self.__out_message.keys():
-            if comp_name in self._roots:
+            if comp_name in roots:
                 return True
         return False
     
     def send_global_acks(self, acks):
         for ack in acks:
-            self.send_global_acks(ack)
+            self.send_global_ack(ack)
             
     def send_global_ack(self, ack):
         self._p2p_service.send_global_ack(ack)
 
-    def get_global_acks(self):
-        for comp_name in self.__dict_components.keys():
-            acks = self._p2p_service.get_global_acks(comp_name)
-            for ack in acks:
-                self.__global_acks.add(ack)
+    def sync_global_acks(self):
+        acks = self._p2p_service.get_global_acks()
+        for ack in acks:
+            self.__global_acks.add(ack)
         return self.__global_acks
     
     def get_ack_in_message(self, comp_name, message):
@@ -261,7 +580,10 @@ class CostRegularNode(Node):
     
     @property
     def global_acks(self):
-        return self.__global_acks
+        return self.sync_global_acks()
+    
+    def get_global_acks(self):
+        return self.global_acks
     
     @property
     def components(self):
@@ -294,7 +616,6 @@ class CostRegularNode(Node):
             if user == _user and _use_port == use_port and _provider == provider:
                 res.append(_provide_port)
         return res
-        
     
     @property
     def id(self):
@@ -398,6 +719,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False):
 
 
 def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, list[Message]]
+    # TODO do not send an already sent message !
     res = {}
     for msg in msgs:
         targets = node.use_by(msg.source, msg.port) + node.provide_by(msg.source, msg.port)
@@ -461,8 +783,8 @@ def cr_ack(node: CostRegularNode, ack:Acknowledgement=None):
     else:
         for component in node.components:
             comp_name = component.name
-            all_out_messages_of_comp = set()
-            all_in_messages_of_comp = set()
+            all_out_messages_of_comp = set(node.get_out_message()[comp_name].keys())
+            all_in_messages_of_comp = set(node.get_in_message()[comp_name].keys())
             test = True
             for message in all_out_messages_of_comp:
                 got_ack_message = node.get_ack_out_message(comp_name, message)

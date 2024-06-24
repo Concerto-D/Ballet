@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import gossip_pb2 as gossip__pb2
+from gossip.grpc import gossip_pb2 as gossip__pb2
 
 
 class CostRegularGossipServiceStub(object):
@@ -29,9 +29,9 @@ class CostRegularGossipServiceStub(object):
                 request_serializer=gossip__pb2.AckFailure.SerializeToString,
                 response_deserializer=gossip__pb2.Empty.FromString,
                 )
-        self.add_global_ack_sucess = channel.unary_unary(
-                '/CostRegularGossipService/add_global_ack_sucess',
-                request_serializer=gossip__pb2.GlobalAckSucess.SerializeToString,
+        self.add_global_ack_success = channel.unary_unary(
+                '/CostRegularGossipService/add_global_ack_success',
+                request_serializer=gossip__pb2.GlobalAckSuccess.SerializeToString,
                 response_deserializer=gossip__pb2.Empty.FromString,
                 )
         self.add_global_ack_failure = channel.unary_unary(
@@ -67,7 +67,7 @@ class CostRegularGossipServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def add_global_ack_sucess(self, request, context):
+    def add_global_ack_success(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -103,9 +103,9 @@ def add_CostRegularGossipServiceServicer_to_server(servicer, server):
                     request_deserializer=gossip__pb2.AckFailure.FromString,
                     response_serializer=gossip__pb2.Empty.SerializeToString,
             ),
-            'add_global_ack_sucess': grpc.unary_unary_rpc_method_handler(
-                    servicer.add_global_ack_sucess,
-                    request_deserializer=gossip__pb2.GlobalAckSucess.FromString,
+            'add_global_ack_success': grpc.unary_unary_rpc_method_handler(
+                    servicer.add_global_ack_success,
+                    request_deserializer=gossip__pb2.GlobalAckSuccess.FromString,
                     response_serializer=gossip__pb2.Empty.SerializeToString,
             ),
             'add_global_ack_failure': grpc.unary_unary_rpc_method_handler(
@@ -180,7 +180,7 @@ class CostRegularGossipService(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def add_global_ack_sucess(request,
+    def add_global_ack_success(request,
             target,
             options=(),
             channel_credentials=None,
@@ -190,8 +190,8 @@ class CostRegularGossipService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/CostRegularGossipService/add_global_ack_sucess',
-            gossip__pb2.GlobalAckSucess.SerializeToString,
+        return grpc.experimental.unary_unary(request, target, '/CostRegularGossipService/add_global_ack_success',
+            gossip__pb2.GlobalAckSuccess.SerializeToString,
             gossip__pb2.Empty.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

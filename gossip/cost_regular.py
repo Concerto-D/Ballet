@@ -73,7 +73,17 @@ class StateConstraint(CRConstraint):
     @property
     def source(self):
         return self.__source
-        
+    
+    def __eq__(self, value: object):
+        if isinstance(value, StateConstraint):
+            return value.final == self.final and \
+                value.state == self.state and \
+                value.source == self.source and \
+                value.isGoal() == self.isGoal()
+        return False
+    
+    def __hash__(self):
+        return hash(str(self.final)+ self.state + self.source + str(self.isGoal()))
         
 class PortConstraint(CRConstraint):
     
@@ -103,6 +113,18 @@ class PortConstraint(CRConstraint):
     @property
     def source(self):
         return self.__source
+    
+    def __eq__(self, value: object):
+        if isinstance(value, PortConstraint):
+            return value.port == self.port and \
+                value.status == self.status and \
+                value.final == self.final and \
+                value.source == self.source and \
+                value.isGoal() == self.isGoal()
+        return False
+    
+    def __hash__(self):
+        return hash(str(self.final)+ self.port + self.status + self.source + str(self.isGoal()))
     
 
 class MultiPortConstraint(CRConstraint):
@@ -134,6 +156,18 @@ class MultiPortConstraint(CRConstraint):
     def source(self):
         return self.__source
     
+    def __eq__(self, value: object):
+        if isinstance(value, MultiPortConstraint):
+            return value.ports == self.ports and \
+                value.status == self.status and \
+                value.final == self.final and \
+                value.source == self.source and \
+                value.isGoal() == self.isGoal()
+        return False
+    
+    def __hash__(self):
+        return hash(str(self.final)+ '-'.join(self.ports) + self.status + self.source + str(self.isGoal()))
+    
 
 class TransitionConstraint(CRConstraint):
     
@@ -152,6 +186,16 @@ class TransitionConstraint(CRConstraint):
     @property
     def source(self):
         return self.__source
+    
+    def __eq__(self, value: object):
+        if isinstance(value, TransitionConstraint):
+            return value.transition == self.transition and \
+                value.source == self.source and \
+                value.isGoal() == self.isGoal()
+        return False
+    
+    def __hash__(self):
+        return hash(self.transition + self.source + str(self.isGoal()))
 
  
 class CostRegular(Model):
@@ -253,7 +297,8 @@ class CostRegular(Model):
         return self.__constraints
       
     def add_constraint(self, constraint):
-        self.__constraints.add(constraint)
+        if constraint not in self.__constraints:
+            self.__constraints.add(constraint)
       
     def add_transition(self, label, source, target, cost=0):
         if label not in self.__transitions:

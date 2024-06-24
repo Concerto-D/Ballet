@@ -26,7 +26,7 @@ message AckSuccess {
     SyncSpec to_message = 3;
 }
     
-message GlobalAckSucess {
+message GlobalAckSuccess {
     string component_source = 1;
 }
 
@@ -38,7 +38,7 @@ service CostRegularGossipService {
     rpc add_message(SyncSpec) returns (Empty) {}
     rpc add_ack_success(AckSuccess) returns (Empty) {} 
     rpc add_ack_failure(AckFailure) returns (Empty) {}
-    rpc add_global_ack_sucess(GlobalAckSucess) returns (Empty) {}
+    rpc add_global_ack_success(GlobalAckSuccess) returns (Empty) {}
     rpc add_global_ack_failure(GlobalAckFailure) returns (Empty) {}
     rpc ping (Empty) returns (Empty);
 }

@@ -10,7 +10,8 @@ message SyncSpec {
     string port = 3;
     string status = 4;
     string behavior = 5;
-    bool final = 6;
+    string passed_by = 6;
+    bool final = 7;
 }
 
 message AckFailure {

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
-from time import sleep
+import time
 
 class Acknowledgement(ABC):
     
@@ -148,6 +148,8 @@ def gossip (node: Node, roots: list[str],
         if debug:
             print(f"At the end of the {nloop}th loop:")
             node.print_status()
+        if debug:
+            time.sleep(1)
     return f_final(model)
 
 

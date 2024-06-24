@@ -22,3 +22,10 @@ def remove_in_set(f: Callable[[A], bool], s: Set[A]) -> Set[A]:
     elements_to_remove = set(findAll_in_set(f, s))
     s.difference_update(elements_to_remove)
     return s
+
+
+def copy(s: Set[A]) -> Set[A]:
+    res = set()
+    for a in s:
+        res.add(a)
+    return res

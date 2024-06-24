@@ -5,6 +5,7 @@ from ballet.assembly.concertod.component import Component
 from ballet.planner.goal import Goal
 from ballet.utils.list_utils import find
 from ballet.utils.dict_utils import reverse_dict
+from ballet.utils import set_utils
 from ballet.assembly.concertod.dependency import DepType
 from ballet.assembly.plan.plan import Plan, Wait, PushB, merge_plans
 from gossip.grpc import gossip_pb2_grpc
@@ -20,17 +21,24 @@ import abc
 
 class ConstraintMessage:
     
-    def __init__(self, source, target, port, status, behavior, final=False):
+    def __init__(self, source, target, port, status, behavior, passed_by, final=False):
         self._source = source
         self._target = target
         self._port = port
         self._status = status
         self._behavior = behavior
         self._final = final
+        if len(passed_by) == 0:
+            pass
+        self._passed_by = passed_by
 
     @property
     def source(self):
         return self._source
+    
+    @property
+    def passed_by(self):
+        return self._passed_by
 
     @property
     def target(self):
@@ -55,17 +63,23 @@ class ConstraintMessage:
     def has_to_wait(self):
         return not self._behavior == ""
     
+    @property
+    def passed_by(self):
+        return self._passed_by
+    
     def __str__(self):
-        return f"(from:{self._source}, to:{self._target}, port:{self._port}, status:{self._status}, "+ (f"bhv:{self._behavior}, " if self._behavior else "") + f"final:{self._final})"
+        str_passed_by = f"[{','.join(self._passed_by)}]"
+        return f"(from:{self._source}, to:{self._target}, port:{self._port}, status:{self._status}, "+ (f"bhv:{self._behavior}, " if self._behavior else "") + f"passedby: {str_passed_by},"+ f"final:{self._final})"
 
     def __eq__(self, value):
         if isinstance(value, ConstraintMessage):
             return self.source == value.source and self.target == value.target \
                 and self.port == value.port and self.status == value.status \
-                and self.behavior == value.behavior and self.final == value.final
+                and self.behavior == value.behavior \
+                and self.final == value.final
                 
     def __hash__(self):
-        return hash(f"({self.source}->{self.target}:{self.port}^{self._status}~{self.behavior}[{self.final}])")
+        return hash(f"({self.source}->{self.target}:{self.port}^{self._status}~{self.behavior}[{self.final}]||{','.join(self.passed_by)})")
     
     
 class AckMessage (Acknowledgement):
@@ -206,8 +220,10 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
     
     def add_message(self, request, context):
         target = request.component_target
+        passed_by = request.passed_by[1:-1].split(',') 
         message = ConstraintMessage(request.component_source, target, request.port, 
-                                    request.status, request.behavior, request.final)
+                                    request.status, request.behavior, passed_by, 
+                                    request.final)
         with self._lock_new_mailbox:
             if target not in self._mailbox.keys():
                 self._mailbox[target] = set()
@@ -226,9 +242,11 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
     def add_ack_success(self, request, context):
         target = request.component_target
         message_to_ack = request.to_message 
+        passed_by = message_to_ack.passed_by[1:-1].split(',') 
         constraint_to_ack = ConstraintMessage(source=message_to_ack.component_source, target=message_to_ack.component_target, 
                                        port=message_to_ack.port, status=message_to_ack.status, 
-                                       behavior=message_to_ack.behavior, final=message_to_ack.final)
+                                       behavior=message_to_ack.behavior, passed_by=passed_by,
+                                       final=message_to_ack.final)
         ack = AckSuccess(request.component_source, request.component_target, constraint_to_ack)
         with self._lock_new_acks:
             if target not in self._acks.keys():
@@ -350,18 +368,20 @@ class CRClient:
         address = self.__get_address(message.target)
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            passed_by = "["+','.join(message.passed_by)+"]"
             to_send = gossip_pb2.SyncSpec(component_source=message.source, component_target=message.target, 
                                           port=message.port, status=message.status, behavior=message.behavior,
-                                          final=message.final)
+                                          passed_by=passed_by, final=message.final)
             stub.add_message(to_send)
     
     def __send_ack_success(self, ack: AckSuccess):
         address = self.__get_address(ack.target)
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            passed_by = "["+','.join(ack.constraint.passed_by)+"]"
             acked_message = gossip_pb2.SyncSpec(component_source=ack.constraint.source, component_target=ack.constraint.target, 
                                                 port=ack.constraint.port, status=ack.constraint.status, behavior=ack.constraint.behavior, 
-                                                final=ack.constraint.final)
+                                                passed_by=passed_by, final=ack.constraint.final) 
             to_send = gossip_pb2.AckSuccess(component_source = ack.source, component_target = ack.target, 
                                             to_message = acked_message)
             stub.add_ack_success(to_send)
@@ -370,8 +390,12 @@ class CRClient:
         address = self.__get_address(ack.target)
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            passed_by = "["+','.join(ack.constraint.passed_by)+"]"
+            acked_message = gossip_pb2.SyncSpec(component_source=ack.constraint.source, component_target=ack.constraint.target, 
+                                                port=ack.constraint.port, status=ack.constraint.status, behavior=ack.constraint.behavior, 
+                                                passed_by=passed_by, final=ack.constraint.final) 
             to_send = gossip_pb2.AckFailure(component_source = ack.source, component_target = ack.target, 
-                                            to_message = ack.constraint, cause = ack.cause)
+                                            to_message = acked_message, cause = ack.cause)
             stub.add_global_ack_failure(to_send)
     
     def send_ack(self, ack: AckMessage):
@@ -447,6 +471,7 @@ class CostRegularNode(Node):
             if comp not in goals:
                 goals[comp] = []
         self._admin = admin
+        self._passed_by = set()
         # Communication management
         self.__global_acks = set()
         self.__out_message = {comp_name: {} for comp_name in self.__dict_components.keys()} # pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
@@ -460,12 +485,13 @@ class CostRegularNode(Node):
         return self.__in_message
     
     def print_status(self):
+        print(f"PASSED BY: [{','.join(self._passed_by)}]")
         print("OUT_MESSAGES:")
         for comp_name in self.__out_message.keys():
             print(f"\t- {comp_name}:")
-            for message  in self.__out_message[comp_name].keys():
+            for message in self.__out_message[comp_name].keys():
                 acked = "ACKED" if self.__out_message[comp_name][message] != None else str(self.__out_message[comp_name][message])
-                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, {message.final})"
+                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, [{','.join(message.passed_by)}], {message.final})"
                 print(f"\t\t* {str_message}: {acked}")
             
         print("IN_MESSAGES:")
@@ -473,9 +499,8 @@ class CostRegularNode(Node):
             print(f"\t- {comp_name}")
             for message  in self.__in_message[comp_name].keys():
                 acked = "ACKED" if self.__in_message[comp_name][message] != None else str(self.__in_message[comp_name][message])
-                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, {message.final})"
+                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, [{','.join(message.passed_by)}], {message.final})"
                 print(f"\t\t* {str_message}: {acked}")
-        print(str)
         
     def new_received_messages(self):
         all_new_messages = set()
@@ -484,6 +509,9 @@ class CostRegularNode(Node):
             messages = self._p2p_service.get_messages(comp_name)
             # all_new_messages = all_new_messages | messages
             for message in messages:
+                for passed_by in message.passed_by:
+                    if passed_by not in self._passed_by:
+                        self._passed_by.add(passed_by)
                 if not message in self.__in_message[comp_name].keys():
                     self.__in_message[comp_name][message] = None
                     all_new_messages.add(message)
@@ -635,6 +663,10 @@ class CostRegularNode(Node):
     @property
     def connections(self):
         return self._connections
+    
+    @property
+    def passed_by(self):
+        return self._passed_by
 
 
 def refine_status(sequence, port_status):
@@ -646,7 +678,9 @@ def refine_status(sequence, port_status):
             curr_status = port_status[i+1]
     return res
     
-def make_messages(sequence, port_name, port_status, component: Component):
+def make_messages(sequence, port_name, port_status, passed_by, component: Component):
+    curr_passed_by = set_utils.copy(passed_by)
+    curr_passed_by.add(component.get_name())
     result = set()
     port = find(lambda p: p[0] == port_name, component.get_ports())
     port_type = port[1]
@@ -654,21 +688,21 @@ def make_messages(sequence, port_name, port_status, component: Component):
     if port_type == DepType.PROVIDE:
         if port_status[-1] == "disabled":
             # at the end, the related use ports must be deactivated
-            result.add(ConstraintMessage(component.get_name(), None, port_name, "disabled", None, final=True))
+            result.add(ConstraintMessage(component.get_name(), None, port_name, "disabled", None, curr_passed_by, final=True))
         for i in range(len(refined_port_status)-2):
             if refined_port_status[i][1] == "enabled" and refined_port_status[i+1][1] == "disabled" and refined_port_status[i+2][1] == "enabled":
                 # at a moment, the provide port is deactivate by a behavior. It is activate then
                 behavior = refined_port_status[i+1][0]
-                result.add(ConstraintMessage(component.get_name(), None, port_name, "disabled", behavior))       
+                result.add(ConstraintMessage(component.get_name(), None, port_name, "disabled", behavior, curr_passed_by))       
     elif port_type == DepType.USE:
         if port_status[-1] == "enabled":
             # at the end, the related provide ports must be activated
-            result.add(ConstraintMessage(component.get_name(), None, port_name, "enabled", None, final=True))
+            result.add(ConstraintMessage(component.get_name(), None, port_name, "enabled", None, curr_passed_by, final=True))
         for i in range(len(refined_port_status)-2):
             if refined_port_status[i][1] == "disabled" and refined_port_status[i+1][1] == "enabled" and refined_port_status[i+2][1] == "disabled":
                 # at a moment, the use port is activate by a behavior. It is activate then
                 behavior = refined_port_status[i+1][0]
-                result.add(ConstraintMessage(component.get_name(), None, port_name, "enabled", behavior))          
+                result.add(ConstraintMessage(component.get_name(), None, port_name, "enabled", behavior, curr_passed_by))          
     return result
   
 def cr_init(cr_node : CostRegularNode): 
@@ -703,7 +737,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False):
                 component = node.components_from_str(comp_name)
                 port_name = port
                 port_status = cr_model.get_port_status(comp_name, port)
-                msgs = make_messages(sequence, port_name, port_status, component)
+                msgs = make_messages(sequence, port_name, port_status, node.passed_by, component)
                 out_messages = out_messages | msgs
             if debug:
                 print("\n")
@@ -717,14 +751,13 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False):
 
 
 def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, list[Message]]
-    # TODO do not send an already sent message !
     res = {}
     for msg in msgs:
         targets = node.use_by(msg.source, msg.port) + node.provide_by(msg.source, msg.port)
         for target in targets:
             if target not in res.keys():
                 res[target] = set()
-            res[target].add(ConstraintMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.final))
+            res[target].add(ConstraintMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.passed_by, msg.final))
     return {k: list(v) for (k,v) in res.items()}
 
 
@@ -802,20 +835,35 @@ def cr_ack(node: CostRegularNode, ack:Acknowledgement=None):
             If comp_name is waiting acks from A, and comp_name has to validate constraints from A
             then validate all messages received by comp_name from A
             """
-            # 1. Get all sources in node.get_out_message()[comp_name].keys()
+            # TODO instead of checking source in 2., check if it is in node.passed_by
+            # 1. Get all targets in node.get_out_message()[comp_name].keys()
             waiting_ack_from_out_message = set() 
             for message in node.get_out_message()[comp_name].keys():
                 waiting_ack_from_out_message.add(message.target)
-            for source in waiting_ack_from_out_message:
-                messages_from_source = [] 
-                # 2. Find all received messages (that are waiting for ack) from source
-                for message in node.get_in_message()[comp_name].keys():
-                    if message.source == source and node.get_in_message()[comp_name][message] == None:
-                        messages_from_source.append(message)
-                # 3. Validate all these messages
-                for message in messages_from_source:                
-                    to_send_ack = AckSuccess(comp_name, message.source, message)
-                    if message.source not in result.keys():
-                        result[message.source] = set()
-                    result[message.source].add(to_send_ack)
+            # If one of these target is in node.passed_by, then validate all messages received from a source in passed_by
+            for target in waiting_ack_from_out_message:
+                if target in node.passed_by:
+                    messages_to_ack = []
+                    for message in node.get_in_message()[comp_name].keys():
+                        if message.source in node.passed_by and node.get_in_message()[comp_name][message] == None:
+                            messages_to_ack.append(message)
+                    # 3. Validate all these messages
+                    for message in messages_to_ack:                
+                        to_send_ack = AckSuccess(comp_name, message.source, message)
+                        if message.source not in result.keys():
+                            result[message.source] = set()
+                        result[message.source].add(to_send_ack)
+                
+            # for source in waiting_ack_from_out_message:
+            #     messages_from_source = [] 
+            #     # 2. Find all received messages (that are waiting for ack) from source
+            #     for message in node.get_in_message()[comp_name].keys():
+            #         if message.source == source and node.get_in_message()[comp_name][message] == None:
+            #             messages_from_source.append(message)
+            #     # 3. Validate all these messages
+            #     for message in messages_from_source:                
+            #         to_send_ack = AckSuccess(comp_name, message.source, message)
+            #         if message.source not in result.keys():
+            #             result[message.source] = set()
+            #         result[message.source].add(to_send_ack)
     return result

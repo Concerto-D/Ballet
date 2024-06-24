@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cgossip.proto\"\x07\n\x05\x45mpty\"}\n\x08SyncSpec\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\x12\x18\n\x10\x63omponent_target\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\t\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x10\n\x08\x62\x65havior\x18\x05 \x01(\t\x12\r\n\x05\x66inal\x18\x06 \x01(\x08\"n\n\nAckFailure\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\x12\x18\n\x10\x63omponent_target\x18\x02 \x01(\t\x12\x1d\n\nto_message\x18\x03 \x01(\x0b\x32\t.SyncSpec\x12\r\n\x05\x63\x61use\x18\x04 \x01(\t\"_\n\nAckSuccess\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\x12\x18\n\x10\x63omponent_target\x18\x02 \x01(\t\x12\x1d\n\nto_message\x18\x03 \x01(\x0b\x32\t.SyncSpec\",\n\x10GlobalAckSuccess\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\",\n\x10GlobalAckFailure\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t2\x98\x02\n\x18\x43ostRegularGossipService\x12\"\n\x0b\x61\x64\x64_message\x12\t.SyncSpec\x1a\x06.Empty\"\x00\x12(\n\x0f\x61\x64\x64_ack_success\x12\x0b.AckSuccess\x1a\x06.Empty\"\x00\x12(\n\x0f\x61\x64\x64_ack_failure\x12\x0b.AckFailure\x1a\x06.Empty\"\x00\x12\x35\n\x16\x61\x64\x64_global_ack_success\x12\x11.GlobalAckSuccess\x1a\x06.Empty\"\x00\x12\x35\n\x16\x61\x64\x64_global_ack_failure\x12\x11.GlobalAckFailure\x1a\x06.Empty\"\x00\x12\x16\n\x04ping\x12\x06.Empty\x1a\x06.Emptyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cgossip.proto\"\x07\n\x05\x45mpty\"\x90\x01\n\x08SyncSpec\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\x12\x18\n\x10\x63omponent_target\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\t\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x10\n\x08\x62\x65havior\x18\x05 \x01(\t\x12\x11\n\tpassed_by\x18\x06 \x01(\t\x12\r\n\x05\x66inal\x18\x07 \x01(\x08\"n\n\nAckFailure\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\x12\x18\n\x10\x63omponent_target\x18\x02 \x01(\t\x12\x1d\n\nto_message\x18\x03 \x01(\x0b\x32\t.SyncSpec\x12\r\n\x05\x63\x61use\x18\x04 \x01(\t\"_\n\nAckSuccess\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\x12\x18\n\x10\x63omponent_target\x18\x02 \x01(\t\x12\x1d\n\nto_message\x18\x03 \x01(\x0b\x32\t.SyncSpec\",\n\x10GlobalAckSuccess\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t\",\n\x10GlobalAckFailure\x12\x18\n\x10\x63omponent_source\x18\x01 \x01(\t2\x98\x02\n\x18\x43ostRegularGossipService\x12\"\n\x0b\x61\x64\x64_message\x12\t.SyncSpec\x1a\x06.Empty\"\x00\x12(\n\x0f\x61\x64\x64_ack_success\x12\x0b.AckSuccess\x1a\x06.Empty\"\x00\x12(\n\x0f\x61\x64\x64_ack_failure\x12\x0b.AckFailure\x1a\x06.Empty\"\x00\x12\x35\n\x16\x61\x64\x64_global_ack_success\x12\x11.GlobalAckSuccess\x1a\x06.Empty\"\x00\x12\x35\n\x16\x61\x64\x64_global_ack_failure\x12\x11.GlobalAckFailure\x1a\x06.Empty\"\x00\x12\x16\n\x04ping\x12\x06.Empty\x1a\x06.Emptyb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -23,16 +23,16 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
   _globals['_EMPTY']._serialized_start=16
   _globals['_EMPTY']._serialized_end=23
-  _globals['_SYNCSPEC']._serialized_start=25
-  _globals['_SYNCSPEC']._serialized_end=150
-  _globals['_ACKFAILURE']._serialized_start=152
-  _globals['_ACKFAILURE']._serialized_end=262
-  _globals['_ACKSUCCESS']._serialized_start=264
-  _globals['_ACKSUCCESS']._serialized_end=359
-  _globals['_GLOBALACKSUCCESS']._serialized_start=361
-  _globals['_GLOBALACKSUCCESS']._serialized_end=405
-  _globals['_GLOBALACKFAILURE']._serialized_start=407
-  _globals['_GLOBALACKFAILURE']._serialized_end=451
-  _globals['_COSTREGULARGOSSIPSERVICE']._serialized_start=454
-  _globals['_COSTREGULARGOSSIPSERVICE']._serialized_end=734
+  _globals['_SYNCSPEC']._serialized_start=26
+  _globals['_SYNCSPEC']._serialized_end=170
+  _globals['_ACKFAILURE']._serialized_start=172
+  _globals['_ACKFAILURE']._serialized_end=282
+  _globals['_ACKSUCCESS']._serialized_start=284
+  _globals['_ACKSUCCESS']._serialized_end=379
+  _globals['_GLOBALACKSUCCESS']._serialized_start=381
+  _globals['_GLOBALACKSUCCESS']._serialized_end=425
+  _globals['_GLOBALACKFAILURE']._serialized_start=427
+  _globals['_GLOBALACKFAILURE']._serialized_end=471
+  _globals['_COSTREGULARGOSSIPSERVICE']._serialized_start=474
+  _globals['_COSTREGULARGOSSIPSERVICE']._serialized_end=754
 # @@protoc_insertion_point(module_scope)

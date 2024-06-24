@@ -235,7 +235,6 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
                 self._acks[target] = set()
         with self._lock_add_ack:
             self._acks[target].add(ack)
-            print(f"Ack added to {target}")
         return gossip_pb2.Empty()
     
     def get_acks(self, comp_name):
@@ -414,16 +413,13 @@ class CRP2P:
     
     def __init__(self, port, inventory: dict[str, dict[str, str]]):
         self._server = CRServer(port=port, inventory=inventory)
-        print("SERVER IS STARTED")
         self._client = CRClient(inventory=inventory)
-        print("CLIENT IS STARTED")
     
     def send_message(self, message):
         self._client.send_message(message)
     
     def send_ack(self, ack):
         self._client.send_ack(ack)
-        return # TODO check if self._server has received
     
     def send_global_ack(self, ack):
         self._client.send_global_ack(ack)
@@ -655,9 +651,8 @@ def make_messages(sequence, port_name, port_status, component: Component):
     port = find(lambda p: p[0] == port_name, component.get_ports())
     port_type = port[1]
     refined_port_status = refine_status(sequence, port_status)
-    # ConstraintMessage(source, target, port, status, behavior, final)
     if port_type == DepType.PROVIDE:
-        if port_status[-1] == "disabled" and port_status[0] == "enabled":
+        if port_status[-1] == "disabled":
             # at the end, the related use ports must be deactivated
             result.add(ConstraintMessage(component.get_name(), None, port_name, "disabled", None, final=True))
         for i in range(len(refined_port_status)-2):
@@ -666,7 +661,7 @@ def make_messages(sequence, port_name, port_status, component: Component):
                 behavior = refined_port_status[i+1][0]
                 result.add(ConstraintMessage(component.get_name(), None, port_name, "disabled", behavior))       
     elif port_type == DepType.USE:
-        if port_status[-1] == "enabled" and port_status[0] == "disabled":
+        if port_status[-1] == "enabled":
             # at the end, the related provide ports must be activated
             result.add(ConstraintMessage(component.get_name(), None, port_name, "enabled", None, final=True))
         for i in range(len(refined_port_status)-2):
@@ -690,25 +685,28 @@ def cr_init(cr_node : CostRegularNode):
     return MultiCostRegular(models, cr_node)
 
 
-def cr_local(cr_model: MultiCostRegular, write_file=False):
+def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False):
     out_messages = set()
     opt_ack = None
     results = cr_model.solve(write_file=write_file)
     for (comp_name, result) in results.items():
         if result.is_sat:
             sequence = cr_model.get_sequence(comp_name)
-            print(f"{comp_name}:")
-            print("\tstates = ", cr_model.get_states(comp_name))
-            print("\tsequence = ", sequence)
+            if debug:
+                print(f"{comp_name}:")
+                print("\tstates = ", cr_model.get_states(comp_name))
+                print("\tsequence = ", sequence)
             for (port, _) in cr_model.get_port_statuses(comp_name).items():
-                print(f"\t{port}: {cr_model.get_port_status(comp_name, port)}")
+                if debug:
+                    print(f"\t{port}: {cr_model.get_port_status(comp_name, port)}")
                 node = cr_model.get_node()
                 component = node.components_from_str(comp_name)
                 port_name = port
                 port_status = cr_model.get_port_status(comp_name, port)
                 msgs = make_messages(sequence, port_name, port_status, component)
                 out_messages = out_messages | msgs
-            print("\n")
+            if debug:
+                print("\n")
         else:
             constraint = None # TODO find what constraints that are not goals makes it unsat, and list them.
             opt_ack = AckFailure(comp_name, target=None, constraint=constraint, cause=result.result)
@@ -779,7 +777,10 @@ def cr_ack(node: CostRegularNode, ack:Acknowledgement=None):
     node.new_received_ack()
     result: dict[Node, Acknowledgement] = {}
     if ack != None and isinstance(ack, AckFailure):
-        pass # TODO manage ackfailure
+        pass 
+        # TODO manage ackfailure: regarder quelles contraintes. 
+        # Regarder qui (plusieurs ?) a envoyé un message qui ont donné ces contraintes. 
+        # Envoyer le AckFailure à ces noeud.
     else:
         for component in node.components:
             comp_name = component.name
@@ -793,6 +794,26 @@ def cr_ack(node: CostRegularNode, ack:Acknowledgement=None):
                     break
             if test:
                 for message in all_in_messages_of_comp:
+                    to_send_ack = AckSuccess(comp_name, message.source, message)
+                    if message.source not in result.keys():
+                        result[message.source] = set()
+                    result[message.source].add(to_send_ack)
+            """Cyclic constraints ack management:
+            If comp_name is waiting acks from A, and comp_name has to validate constraints from A
+            then validate all messages received by comp_name from A
+            """
+            # 1. Get all sources in node.get_out_message()[comp_name].keys()
+            waiting_ack_from_out_message = set() 
+            for message in node.get_out_message()[comp_name].keys():
+                waiting_ack_from_out_message.add(message.target)
+            for source in waiting_ack_from_out_message:
+                messages_from_source = [] 
+                # 2. Find all received messages (that are waiting for ack) from source
+                for message in node.get_in_message()[comp_name].keys():
+                    if message.source == source and node.get_in_message()[comp_name][message] == None:
+                        messages_from_source.append(message)
+                # 3. Validate all these messages
+                for message in messages_from_source:                
                     to_send_ack = AckSuccess(comp_name, message.source, message)
                     if message.source not in result.keys():
                         result[message.source] = set()

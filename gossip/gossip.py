@@ -84,11 +84,12 @@ def check_global_acks(node: Node, roots: list[str]):
 
 def gossip (node: Node, roots: list[str],
             f_init: Callable[[Node], Model], 
-            f_local: Callable[[Model], tuple[list[Message], Optional[Acknowledgement]]], 
+            f_local: Callable[[Model, Optional[bool]], tuple[list[Message], Optional[Acknowledgement]]], 
             f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
             f_enrich: Callable[[Model, list[Message]], Model],
             f_ack: Callable[[Node, Acknowledgement], dict[Node, Acknowledgement]],
-            f_final: Callable[[Model], Solution]):
+            f_final: Callable[[Model], Solution],
+            debug=False):
     """
     Args:
         node: 
@@ -118,14 +119,11 @@ def gossip (node: Node, roots: list[str],
         nloop = nloop + 1 
         received_messages = node.new_received_messages() 
         if received_messages != []:
-            print(received_messages)
             must_solve = True
             model = f_enrich(model, received_messages)
-        else:
-            print("NO NEW MESSAGE")
         if must_solve:
             must_solve = False
-            (out_messages, ack_refuse) = f_local(model)
+            (out_messages, ack_refuse) = f_local(model, debug)
             if ack_refuse != None:
                 # We face a failure... there is no solution? 
                 # We then have a Failure ack to send back to roots
@@ -145,11 +143,11 @@ def gossip (node: Node, roots: list[str],
         # Check global acks to send, and received, and end local solve if needed
         global_acks = node.get_global_acks_to_send(roots)
         if len(global_acks) != 0:
-            print(f"SEND GLOBAL ACKS")
             node.send_global_acks(global_acks)
         ended_resolution = check_global_acks(node, roots)
-        print(f"At the end of the {nloop}th loop:")
-        node.print_status()
+        if debug:
+            print(f"At the end of the {nloop}th loop:")
+            node.print_status()
     return f_final(model)
 
 
@@ -163,10 +161,4 @@ f_ack:
             * Regarder les messages reçu et comparer
         (2) Envoyer un ack à l'emetteur du message. Ca veut dire qu'a chaque resolution on doit etre capable de dire quels messages j'ai emis,
             et quels messages ont été "neufs" poru cetet resolution
-        
-    - soit un success
-        -> Si je n'ai rien à envoyer de nouveau, et si pour tout message deja envoyé, j'ai deja recu un ack
-        (1) Garder une liste des messages à envoyer et à qui
-        (2) A chque fois qu'on emet un nouveau message, on le garde dans un dict: {message: bool} (dans message on a le destinataire)
-        (3) A chaque fois qu'on recoit un ack, on passe à true dans {message: bool}
 """

@@ -53,4 +53,5 @@ roots=['master']
 # -----------------------------------------------------------------------
 
 plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final)
-print(plan)
+for instruction in plan.instructions():
+  print(instruction)

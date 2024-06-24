@@ -11,36 +11,28 @@ from ballet.utils.dict_utils import *
 # -----------------------------------------------------------------------
 
 ADDRESS = 'localhost'
-PORT = 3000
+PORT = 3001
 
-# instances
-mariadb_master = MariadbMaster()
-mariadb_master.set_name("master")
-facts_master = Facts()
-facts_master.set_name("facts")
+# instancess
 worker1 = MariadbWorker()
 worker1.set_name("worker1")
-worker2 = MariadbWorker()
-worker2.set_name("worker2")
 
 # inventory
-inventory = {comp_name : {'address': ADDRESS, 'port_planner':PORT} for comp_name in ['master', 'facts', 'worker1', 'worker2']}
+inventory = {}
+inventory['master'] = {'address': ADDRESS, 'port_planner': 3000}
+inventory['facts'] = {'address': ADDRESS, 'port_planner': 3000}
+inventory['worker1'] = {'address': ADDRESS, 'port_planner': PORT}
+inventory['worker2'] = {'address': ADDRESS, 'port_planner': 3002}
 
 # node
 node = CostRegularNode(id="main_node",
-  admin="Dédé", components=[mariadb_master, facts_master, worker1, worker2], 
-  connections=[('master', 'service', 'worker1', 'master_service'),('master', 'service', 'worker2', 'master_service')],
+  admin="Dédé", components=[worker1], 
+  connections=[('master', 'service', 'worker1', 'master_service')],
   active={
-    mariadb_master: "deployed", 
-    facts_master:"deployed",
-    worker1: 'deployed',
-    worker2: 'deployed'
+    worker1: 'deployed'
     },
   goals={
-    mariadb_master: [StateReconfigurationGoal("initial", final=True), BehaviorReconfigurationGoal("update")], 
-    worker1: [StateReconfigurationGoal("initial", final=True)], 
-    worker2: [StateReconfigurationGoal("initial", final=True)], 
-    facts_master: [StateReconfigurationGoal("initial", final=True)]
+    worker1: [StateReconfigurationGoal("initial", final=True)]
     },
   port=PORT,
   inventory=inventory)

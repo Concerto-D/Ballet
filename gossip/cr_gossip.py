@@ -6,6 +6,7 @@ from ballet.planner.goal import Goal
 from ballet.utils.list_utils import find
 from ballet.utils.dict_utils import reverse_dict
 from ballet.utils import set_utils
+from ballet.utils import string_utils
 from ballet.assembly.concertod.dependency import DepType
 from ballet.assembly.plan.plan import Plan, Wait, PushB, merge_plans
 from gossip.grpc import gossip_pb2_grpc
@@ -28,8 +29,6 @@ class ConstraintMessage:
         self._status = status
         self._behavior = behavior
         self._final = final
-        if len(passed_by) == 0:
-            pass
         self._passed_by = passed_by
 
     @property
@@ -104,7 +103,7 @@ class AckFailure (AckMessage):
     
     @property
     def source(self):
-        return self._soource
+        return self._source
     
     @property
     def target(self):
@@ -713,15 +712,53 @@ def cr_init(cr_node : CostRegularNode):
         tmp_ports = reverse_dict(component.get_bindings())
         ports = {port_name : list(filter(lambda pl: pl in states, places)) for (port_name, places) in tmp_ports.items()}
         constraints = set(
-            map(lambda goal: CostRegular.constraint_from_goal(goal, cause=f"goal submitted by {cr_node.admin}", active=init_state, component=component), 
+            map(lambda goal: CostRegular.constraint_from_goal(goal, cause=f"goal({cr_node.id}_9_{cr_node.admin})", active=init_state, component=component), 
                 cr_node.goals[component]))
         models[component.name] = CostRegular(states, beahviors, matrix, costs, init_state, ports, constraints)
     return MultiCostRegular(models, cr_node)
 
 
+def is_caused_internally(reason: str):
+    if string_utils.startswith(reason, "model") or string_utils.startswith(reason, "state"):
+        return True
+    elif string_utils.startswith(reason, "port") or string_utils.startswith(reason, "transition"):
+        return not ("infer" in reason)
+    else:
+        return True
+
+def split_reason(reason):
+    reason_constraint,reason_message = None, None # TODO
+    if string_utils.startswith(reason, "port"):
+        port_reason = reason[len("port")+1:-1]
+        port_name, status, isFinal, isGoal_asInt, infered = port_reason.split(',')
+        isFinal = True if isFinal == "True" or isFinal == "1" else False 
+        isGoal = True if isGoal_asInt == "1" else False 
+        msg_source, msg_target, msg_port, msg_status, msg_behavior, msg_isFinal = \
+            infered.replace(")","").replace("infer(","").replace("goal(","").split('_9_')
+        msg_isFinal = True if msg_isFinal == "True" or msg_isFinal == "1" else False 
+        msg_behavior = None if msg_behavior == "None" else msg_behavior
+        reason_message = ConstraintMessage(msg_source, msg_target, msg_port, msg_status, msg_behavior, [], msg_isFinal)
+        reason_constraint = PortConstraint(port_name, status, infered, isFinal, isGoal)
+    elif string_utils.startswith(reason, "transition"):
+        port_reason = reason[len("transition")+1:-1]
+        transition, isGoal_asInt, infered = port_reason.split(',')
+        isGoal = True if isGoal_asInt == "1" else False 
+        msg_source, msg_target, msg_port, msg_status, msg_behavior, msg_isFinal = \
+            infered.replace(")","").replace("infer(","").replace("goal(","").split('_9_')
+        msg_isFinal = True if msg_isFinal == "True" or msg_isFinal == "1" else False 
+        msg_behavior = None if msg_behavior == "None" else msg_behavior
+        reason_message = ConstraintMessage(msg_source, msg_target, msg_port, msg_status, msg_behavior, [], msg_isFinal)
+        reason_constraint = TransitionConstraint(transition, infered, isGoal)
+    return reason_constraint,reason_message
+
+
+def make_reason_explicit(reason):
+    #TODO
+    return reason
+
 def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False):
     out_messages = set()
-    opt_ack = None
+    opt_ack = set()
     results = cr_model.solve(write_file=write_file)
     for (comp_name, result) in results.items():
         if result.is_sat:
@@ -742,10 +779,16 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False):
             if debug:
                 print("\n")
         else:
-            constraint = None # TODO find what constraints that are not goals makes it unsat, and list them.
-            opt_ack = AckFailure(comp_name, target=None, constraint=constraint, cause=result.result)
-            print(f"Plan for {comp_name} is unsat:")
-            print(f"{result.result}")
+            all_reasons = [s for s in result.result.split('\n') if s.strip()]
+            explainity = '/\\'.join(map(lambda reason: make_reason_explicit(reason), all_reasons))
+            # TODO if exists internal reason, also print all reasons for local devops. Store it somewhere ?
+            for reason in all_reasons:
+                if not is_caused_internally(reason):
+                    (reason_constraint,reason_message) = split_reason(reason)
+                    fail_ack = AckFailure(comp_name, None, reason_message, explainity)
+                    opt_ack.add(fail_ack)
+                    if debug:
+                        print(f"AckFailure: {fail_ack}")
     out_messages = cr_model.get_node().remove_deplicata(out_messages)
     return out_messages, opt_ack
 
@@ -767,9 +810,10 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
         return tmp_ports[port]
     node: CostRegularNode = model.get_node()
     for message in messages:
+        msg_source = f"infer({message.source}_9_{message.target}_9_{message.port}_9_{message.status}_9_{message.behavior}_9_{message.final})"
         connected_ports = node.use_by_port(message.source, message.port, message.target) + node.provide_by_port(message.source, message.port, message.target)
         for connected_port in connected_ports:
-            port_constraint = PortConstraint(connected_port, message.status, source=message.source, final=message.final, goal=False)
+            port_constraint = PortConstraint(connected_port, message.status, source=msg_source, final=message.final, goal=False)
             model.add_constraint(message.target, port_constraint)
         # TODO in a future version, manage such a case a multiport constraint
         # multiport_constraint = MultiPortConstraint(connected_ports, message.status, source=message.source, final=message.final, goal=False)
@@ -788,7 +832,8 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
                             validating_states.add(place)
             for state in validating_states:
                 model.add_transition(message.target, transition_name, state, state)
-            wait_constraint = TransitionConstraint(transition_name, source=message.source)
+            
+            wait_constraint = TransitionConstraint(transition_name, source=msg_source)
             model.add_constraint(message.target, wait_constraint)
     return model
 
@@ -835,12 +880,11 @@ def cr_ack(node: CostRegularNode, ack:Acknowledgement=None):
             If comp_name is waiting acks from A, and comp_name has to validate constraints from A
             then validate all messages received by comp_name from A
             """
-            # TODO instead of checking source in 2., check if it is in node.passed_by
             # 1. Get all targets in node.get_out_message()[comp_name].keys()
             waiting_ack_from_out_message = set() 
             for message in node.get_out_message()[comp_name].keys():
                 waiting_ack_from_out_message.add(message.target)
-            # If one of these target is in node.passed_by, then validate all messages received from a source in passed_by
+            # 2. If one of these target is in node.passed_by, then validate all messages received from a source in passed_by
             for target in waiting_ack_from_out_message:
                 if target in node.passed_by:
                     messages_to_ack = []
@@ -853,17 +897,4 @@ def cr_ack(node: CostRegularNode, ack:Acknowledgement=None):
                         if message.source not in result.keys():
                             result[message.source] = set()
                         result[message.source].add(to_send_ack)
-                
-            # for source in waiting_ack_from_out_message:
-            #     messages_from_source = [] 
-            #     # 2. Find all received messages (that are waiting for ack) from source
-            #     for message in node.get_in_message()[comp_name].keys():
-            #         if message.source == source and node.get_in_message()[comp_name][message] == None:
-            #             messages_from_source.append(message)
-            #     # 3. Validate all these messages
-            #     for message in messages_from_source:                
-            #         to_send_ack = AckSuccess(comp_name, message.source, message)
-            #         if message.source not in result.keys():
-            #             result[message.source] = set()
-            #         result[message.source].add(to_send_ack)
     return result

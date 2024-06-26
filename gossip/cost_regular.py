@@ -256,18 +256,19 @@ class CostRegular(Model):
                 assert constraint.state in states
     
     @staticmethod
-    def constraint_from_goal(goal: Goal, cause="goal", component:Component=None, active=None):
+    def constraint_from_goal(goal: Goal, cause, component:Component=None, active=None):
         if goal.isBehaviorGoal():
             return TransitionConstraint(transition = goal.behavior(), source=cause, goal=True)
         elif goal.isPlaceGoal():
             return StateConstraint(state=goal.place(), source=cause, final=goal.final(), goal=True)
         elif goal.isPortGoal():
-            return PortConstraint(port=goal.port(), status="enabled" if goal.isEnable() else "disabled", source=cause, final=goal.final(), goal=True) # TODO status ????
+            return PortConstraint(port=goal.port(), status="enabled" if goal.isEnable() else "disabled", 
+                                  source=cause, final=goal.final(), goal=True)
         elif goal.isStateGoal():
             if goal.state() == "deployed" or goal.state() == "running":
-                to_reach = component.get_places[-1] # TODO add this concept to Component definition
+                to_reach = component.running_place 
             elif goal.state() == "destroyed":
-                to_reach = component.get_places[0] # TODO add this concept to Component definition
+                to_reach = component.initial_place_place
             else:
                 to_reach = active
             return StateConstraint(state=to_reach, source=cause, final=goal.final(), goal=True)    

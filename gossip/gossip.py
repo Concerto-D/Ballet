@@ -84,7 +84,7 @@ def check_global_acks(node: Node, roots: list[str]):
 
 def gossip (node: Node, roots: list[str],
             f_init: Callable[[Node], Model], 
-            f_local: Callable[[Model, Optional[bool]], tuple[list[Message], Optional[Acknowledgement]]], 
+            f_local: Callable[[Model, Optional[bool]], tuple[list[Message], list[Acknowledgement]]], 
             f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
             f_enrich: Callable[[Model, list[Message]], Model],
             f_ack: Callable[[Node, Acknowledgement], dict[Node, Acknowledgement]],
@@ -100,11 +100,11 @@ def gossip (node: Node, roots: list[str],
             Creates CP model from current node
         f_local: Model -> list[Message] x Option[Acknowledgement]
             Local resolution of the model, and infered output message from results. In some cases, a Ack can be emitted here (e.g., Failure)
-        f_msg: Node x list[Message] -> dict[Node, list[Message]]
+        f_msg: Node x list[Message] -> dict[str, list[Message]]
             Decides from a node and list of message w list of message to deliver to target nodes
         f_enrich: Model x list[Message] -> Model
             How to enrich the local model using received message
-        f_ack: Node x Acknowledgement -> dict[Node, Acknowledgement]
+        f_ack: Node x Acknowledgement -> dict[str, Acknowledgement]
             When a node emits a ack, decides to which it must be sent
         f_final: Model -> Solution 
             When gossip ends, make a final resolution
@@ -123,11 +123,11 @@ def gossip (node: Node, roots: list[str],
             model = f_enrich(model, received_messages)
         if must_solve:
             must_solve = False
-            (out_messages, ack_refuse) = f_local(model, debug)
-            if ack_refuse != None:
+            (out_messages, acks_refuse) = f_local(model, debug)
+            if acks_refuse != []:
                 # We face a failure... there is no solution? 
-                # We then have a Failure ack to send back to roots
-                target_acks = f_ack(node, ack_refuse)
+                # We then have a FailureAck s to send back to roots
+                target_acks = f_ack(node, acks_refuse)
                 for (target, acks) in target_acks.items():
                     node.send_acks(target, acks)
                 break

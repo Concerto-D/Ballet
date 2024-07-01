@@ -1,5 +1,5 @@
 from gossip.gossip import gossip
-from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
+from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, ConstraintMessage
 from ballet.assembly.concertod.components.openstack.mariadb_master import MariadbMaster
 from ballet.assembly.concertod.components.openstack.mariadb_worker import MariadbWorker
 from ballet.assembly.concertod.components.openstack.facts import Facts
@@ -41,7 +41,7 @@ node = CostRegularNode(id="main_node",
     worker2:"deployed"
     },
   goals={
-    mariadb_master: [StateReconfigurationGoal("initial", final=True), BehaviorReconfigurationGoal("update")], 
+    mariadb_master: [StateReconfigurationGoal("initiated", final=True)], 
     facts_master: [StateReconfigurationGoal("initial", final=True)],
     worker1: [StateReconfigurationGoal("initial", final=True)],
     worker2: [StateReconfigurationGoal("initial", final=True)]
@@ -49,15 +49,12 @@ node = CostRegularNode(id="main_node",
   port=PORT,
   inventory=inventory)
 
-# roots
+# # # roots
+
 roots=['master']
-
-# -----------------------------------------------------------------------
-#  PLAN
-# -----------------------------------------------------------------------
-
 plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
+
 print("\n----------------------\n")
 if plan != None:
   for instruction in plan.instructions():
-    print(instruction)
+    print(instruction) 

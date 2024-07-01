@@ -41,7 +41,7 @@ node = CostRegularNode(id="main_node",
     worker2:"deployed"
     },
   goals={
-    mariadb_master: [StateReconfigurationGoal("initial", final=True), BehaviorReconfigurationGoal("update")], 
+    mariadb_master: [StateReconfigurationGoal("initiated", final=True)], 
     facts_master: [StateReconfigurationGoal("initial", final=True)],
     worker1: [StateReconfigurationGoal("initial", final=True)],
     worker2: [StateReconfigurationGoal("initial", final=True)]
@@ -50,21 +50,22 @@ node = CostRegularNode(id="main_node",
   inventory=inventory)
 
 
-model = cr_init(node)
-# cr_local(model, debug=True)
-received_messages = [
-  ConstraintMessage('worker1','master','master_service','disabled',None,'[]',True)
-]
-model = cr_enrich(model, received_messages)
-cr_local(model, debug=True, write_file=True)
+# model = cr_init(node)
+# # cr_local(model, debug=True)
+# received_messages = [
+#   ConstraintMessage('worker1','master','master_service','disabled',None,'[]',True)
+# ]
+# model = cr_enrich(model, received_messages)
+# cr_local(model, debug=True, write_file=True)
 
 
 
 
-# # roots
-# roots=['master']
+# # # roots
 
-# plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-# print("\n----------------------\n")
-# for instruction in plan.instructions():
-#   print(instruction)
+roots=['master']
+plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
+
+print("\n----------------------\n")
+for instruction in plan.instructions():
+  print(instruction) 

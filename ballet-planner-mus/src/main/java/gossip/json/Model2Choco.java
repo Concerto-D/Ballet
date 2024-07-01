@@ -67,16 +67,14 @@ public class Model2Choco {
                 .map(state -> makeline_cost(cr_model, costs.get(state))).toArray(int[][]::new);
     }
 
-    private static void addTracker(Object cstr, String cause, Map<Object, List<String>> tracker) {
-        if (!tracker.containsKey(cstr))
-            tracker.put(cstr, new ArrayList<>());
-        tracker.get(cstr).add(cause);
+    private static void addTracker(Object cstr, String cause, Map<Object, String> tracker) {
+        tracker.put(cstr, cause);
     }
 
     public static Model toChocoModel(CostRegularModel cr_model) {
 
         Model model = new Model();
-        Map<Object, List<String>> tracker = new HashMap<>();
+        Map<Object, String> tracker = new HashMap<>();
         // STATE
         int seq_length = cr_model.getStates().size() * cr_model.getTransitions().size();
         Map<String, Integer> states_as_int = new HashMap<>();
@@ -140,8 +138,9 @@ public class Model2Choco {
                 BoolVar orVar = model.or(states_bool_var).reify();
                 Constraint c = model.arithm(orVar, "=", port_boolvar);
                 String at = (i == seq_length) ? "the end of the reconfiguration" : "i="+i;
-                addTracker(c, port + " is enabled iff state in "+
-                        cr_model.getPorts().get(port) +" (not satisfiable at " + at + "), caused by : [MODEL] lifecycle", tracker);
+                String places = String.join("%", cr_model.getPorts().get(port)); // TODO make a list
+                String c_tracker = "model("+port+","+places+")";
+                addTracker(c,  c_tracker, tracker);
                 c.post();
             }
             model.addHook(name_var, status_var);
@@ -152,51 +151,55 @@ public class Model2Choco {
 
         // Reconfiguration as constraints
         for (CostRegularModel.PortConstraint constraint: cr_model.getPortConstraints()) {
+            String tracker_constraint = "port("+constraint.getPort()+","+constraint.getStatus()+","+constraint.isFinal()+","+constraint.getGoal()+","+constraint.getSource()+")";
             String intvar_name = "count_"+constraint.getPort()+"_"+constraint.getStatus();
             IntVar count_status_port = model.intVar(intvar_name, 0, seq_length);
             model.sum((BoolVar[]) model.getHook(constraint.getPort() +"_status"),
                     "=", count_status_port).post();
             Constraint c0 = model.arithm(count_status_port, ">", 0);
-            String tag = constraint.getGoal() == 1 ? "[GOAL]" : "[EXTERNAL]" ;
-            addTracker(c0, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " during the reconfiguration, caused by: " + tag + " " + constraint.getSource(), tracker);
+            addTracker(c0, tracker_constraint, tracker);
             c0.post();
             if (constraint.isFinal()) {
                 Constraint c1 = model.arithm(((BoolVar[])model.getHook(constraint.getPort() +"_status"))[seq_length],
                         "=", status_as_int.get(constraint.getStatus()));
-                addTracker(c1, "The port " + constraint.getPort() + " must be " + constraint.getStatus() + " at the end of the reconfiguration, caused by: "+ tag + " " + constraint.getSource(), tracker);
+                addTracker(c1, tracker_constraint, tracker);
                 c1.post();
             }
         }
 
         for (CostRegularModel.StateConstraint constraint: cr_model.getStateConstraints()) {
+            String tracker_constraint = "state("+constraint.getState()+","+constraint.isFinal()+","+constraint.getGoal()+","+constraint.getSource()+")";
             String intvar_name = "count_" + constraint.getState();
             IntVar count_state = model.intVar(intvar_name, 0, seq_length);
             model.sum(
                     Arrays.stream(states).map(s -> s.eq(states_as_int.get(constraint.getState())).boolVar())
                             .toArray(BoolVar[]::new), "=", count_state).post();
             Constraint c0 = model.arithm(count_state, ">", 0);
-            String tag = constraint.getGoal() == 1 ? "[GOAL]" : "[EXTERNAL]" ;
-            addTracker(c0, "The component must be " + constraint.getState() + " during the reconfiguration, caused by : "+ tag + " " + constraint.getSource(), tracker);
+            addTracker(c0, tracker_constraint, tracker);
             c0.post();
             if (constraint.isFinal()) {
                 Constraint c1 = model.arithm(states[seq_length], "=", states_as_int.get(constraint.getState()));
-                addTracker(c1, "The component must be " + constraint.getState() + " at the end of the reconfiguration, caused by : " + tag + " "+ constraint.getSource(), tracker);
+                addTracker(c1, tracker_constraint, tracker);
                 c1.post();
             }
         }
 
         for (CostRegularModel.TransitionConstraint constraint: cr_model.getTransitionConstraints()) {
+            String tracker_constraint = "transition("+constraint.getTransition()+","+constraint.getGoal()+","+constraint.getSource()+")";
             IntVar count_transition = model.intVar("count_"+constraint.getTransition(), 0, seq_length);
             Constraint c0 = model.sum(
                     Arrays.stream(sequence).map(s -> s.eq(behaviors_as_int.get(constraint.getTransition())).boolVar())
                             .toArray(BoolVar[]::new), "=", count_transition);
+            addTracker(c0, tracker_constraint, tracker);
             c0.post();
             Constraint c1 = model.arithm(count_transition, ">", 0);
-            addTracker(c1, "The behavior must execute " + constraint.getTransition() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
+            addTracker(c1, tracker_constraint, tracker);
             c1.post();
         }
 
         for (CostRegularModel.MultiportConstraint constraint: cr_model.getMultiPortConstraints()){
+            String str_ports = "["+String.join("%", constraint.getPorts())+"]" ;
+            String tracker_constraint = "multiport("+str_ports+","+constraint.getStatus()+","+constraint.isFinal()+","+constraint.getGoal()+","+constraint.getSource()+")";
             String name_intvar = "count_" + String.join("_", constraint.getPorts()) + "_" + constraint.getStatus();
             IntVar count_multiport = model.intVar(name_intvar, 0, seq_length+1);
 
@@ -212,15 +215,15 @@ public class Model2Choco {
                 // tmp_list at this point is a view of each port_status for a given i
                 count_wanted_status[i] = model.intVar(name_count_wanted, 0, tmp_list.size());
                 Constraint c0 = model.count(wanted_status, tmp_list.toArray(new IntVar[0]), count_wanted_status[i] );
-                // TODO add tacker
+                addTracker(c0, tracker_constraint, tracker);
                 c0.post();
             }
             // count_multiport : number of times count_wanted_status respects "all equals to wanted_status"
             Constraint c1 = model.count(constraint.getPorts().size(), count_wanted_status, count_multiport);
-            // TODO add tracker on c1
+            addTracker(c1, tracker_constraint, tracker);
             c1.post();
             Constraint c2 = model.arithm(count_multiport, ">", 0);
-            addTracker(c2, "The ports [" + String.join(",", constraint.getPorts()) + "] must be all "+ constraint.getStatus() + " during the reconfiguration, caused by : " + constraint.getSource(), tracker);
+            addTracker(c2, tracker_constraint, tracker);
             c2.post();
         }
 

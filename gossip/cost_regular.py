@@ -269,8 +269,10 @@ class CostRegular(Model):
                 to_reach = component.running_place 
             elif goal.state() == "destroyed":
                 to_reach = component.initial_place_place
-            else:
+            elif goal.state() == "current" or goal.state() == "initial":
                 to_reach = active
+            else:
+                to_reach = goal.state()
             return StateConstraint(state=to_reach, source=cause, final=goal.final(), goal=True)    
     
     @property

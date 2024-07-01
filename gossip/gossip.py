@@ -8,6 +8,17 @@ class Acknowledgement(ABC):
     def __init__(self):
         pass
     
+    def is_failure(self):
+        pass
+
+
+class GlobalAcknowledgement(ABC):
+    
+    def __init__(self):
+        pass
+    
+    def is_failure(self):
+        pass
 
 class Node (ABC):
     
@@ -46,6 +57,10 @@ class Node (ABC):
     def is_root(self):
         pass
     
+    @abstractmethod
+    def get_failing_reasons(self):
+        pass
+    
 class Model (ABC):
     
     @abstractmethod
@@ -69,17 +84,25 @@ class Solution(ABC):
 
 
 def check_global_acks(node: Node, roots: list[str]):
+    has_fail_ack = False
     """ Check if one root of the gossip diffusion has sent a global ack """
     def __is_acked(list_of_global_acks, root):
         for ack in list_of_global_acks:
             if ack.source == root:
                 return True
         return False
+    """ Check if one root of the gossip diffusion has sent a failure global ack """
+    def __is_fail_acked(list_of_global_acks, root):
+        for ack in list_of_global_acks:
+            if ack.source == root and ack.is_failure():
+                return True
+        return False
     """ Check if all roots of the gossip diffusion has sent a global ack """
     for root in roots:
         if not __is_acked(node.get_global_acks(), root):
-            return False
-    return True
+            return False, has_fail_ack
+        has_fail_ack = has_fail_ack or __is_fail_acked(node.get_global_acks(), root)
+    return True, has_fail_ack
     
 
 def gossip (node: Node, roots: list[str],
@@ -113,54 +136,54 @@ def gossip (node: Node, roots: list[str],
     model = f_init(node)
     ended_resolution = False
     # Initially, only node considered as roots must process an initial CP solving
-    must_solve = node.is_root(roots)
+    node_is_root = node.is_root(roots)
+    must_solve = node_is_root
+    # Different tracker for debug and unsat management
     nloop = 0
+    is_unsat = False
+    has_fail_ack = False
+    first_loop_unsat = False
     while not ended_resolution:
-        nloop = nloop + 1 
-        received_messages = node.new_received_messages() 
-        if received_messages != []:
-            must_solve = True
-            model = f_enrich(model, received_messages)
-        if must_solve:
-            must_solve = False
-            (out_messages, acks_refuse) = f_local(model, debug)
-            if acks_refuse != []:
-                # We face a failure... there is no solution? 
-                # We then have a FailureAck s to send back to roots
-                target_acks = f_ack(node, acks_refuse)
-                for (target, acks) in target_acks.items():
-                    node.send_acks(target, acks)
-                break
-            elif out_messages != []:
-                # A solution is found, leading to new constraint to diffuse
-                target_messages = f_msg(node, out_messages)
-                for (target, messages) in target_messages.items():
-                    node.send_messages(target, messages)
-        # Now that the process is done, does the node must send accept acks ?
-        target_acks = f_ack(node)
-        for (target, acks) in target_acks.items():
-            node.send_acks(target, acks)
-        # Check global acks to send, and received, and end local solve if needed
+        if not is_unsat:
+            nloop = nloop + 1 
+            received_messages = node.new_received_messages() 
+            if received_messages != []:
+                must_solve = True
+                model = f_enrich(model, received_messages)
+            if must_solve:
+                must_solve = False
+                (out_messages, acks_refuse) = f_local(model, debug=debug)
+                if acks_refuse != []:
+                    # We face a failure... there is no solution? 
+                    # We then have FailureAcks to send back
+                    target_acks = f_ack(node, acks_refuse)
+                    for (target, acks) in target_acks.items():
+                        node.send_acks(target, acks)
+                        is_unsat = True
+                elif out_messages != []:
+                    # A solution is found, leading to new constraint to diffuse
+                    target_messages = f_msg(node, out_messages)
+                    for (target, messages) in target_messages.items():
+                        node.send_messages(target, messages)
+            # Now that the process is done, does the node must send accept acks ?
+            target_acks = f_ack(node)
+            for (target, acks) in target_acks.items():
+                node.send_acks(target, acks)
+            # Check global acks to send, and received, and end local solve if needed
         global_acks = node.get_global_acks_to_send(roots)
         if len(global_acks) != 0:
             node.send_global_acks(global_acks)
-        ended_resolution = check_global_acks(node, roots)
-        if debug:
+        ended_resolution, has_fail_ack = check_global_acks(node, roots)
+        if debug and not first_loop_unsat:
+            first_loop_unsat = True
             print(f"At the end of the {nloop}th loop:")
             node.print_status()
-        if debug:
             time.sleep(1)
-    return f_final(model)
-
-
-""" 
-node:
-f_ack:
-    Je dois envoyer un ack:
-    - soit un failure
-        -> Si mon model local n'a pas de solution
-        (1) identifier quelles clauses sont conflictuelles
-            * Regarder les messages reçu et comparer
-        (2) Envoyer un ack à l'emetteur du message. Ca veut dire qu'a chaque resolution on doit etre capable de dire quels messages j'ai emis,
-            et quels messages ont été "neufs" poru cetet resolution
-"""
+    if has_fail_ack:
+        if node_is_root:
+            print(node.get_failing_reasons())
+        else:
+            print("The reconfiguration is unsat considering the current submitted goals")
+        return None 
+    else:
+        return f_final(model)

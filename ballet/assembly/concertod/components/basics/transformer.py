@@ -22,10 +22,10 @@ class Transformer(Component):
         }
 
         self.dependencies = {
-            'config_in': (DepType.USE, ['installed', 'configured', 'running']),
-            'config_out': (DepType.PROVIDE, ['configured', 'running']),
-            'service_in': (DepType.USE, ['running']),
-            'service_out': (DepType.PROVIDE, ['running'])
+            'configIn': (DepType.USE, ['installed', 'configured', 'running']),
+            'configOut': (DepType.PROVIDE, ['configured', 'running']),
+            'serviceIn': (DepType.USE, ['running']),
+            'serviceOut': (DepType.PROVIDE, ['running'])
         }
         
         self.initial_place = "uninstalled"

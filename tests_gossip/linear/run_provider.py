@@ -40,9 +40,9 @@ for (comp, con) in inventory.items():
 connections = []
 
 if n > 0:
-    connect_config = (f'provider','config',f'transformer{0}',f'config_in')
+    connect_config = (f'provider','config',f'transformer{0}',f'configIn')
     connections.append(connect_config)
-    connect_service = (f'provider','service',f'transformer{0}',f'service_in')
+    connect_service = (f'provider','service',f'transformer{0}',f'serviceIn')
     connections.append(connect_service)
     print(connect_config)
     print(connect_service)
@@ -72,7 +72,7 @@ else:
     roots=['provider', f'transformer{n-1}']
     
 plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-if len(plan.instructions()):
+if plan != None and len(plan.instructions()):
   print("LOCAL PLAN:")
   for instruction in plan.instructions():
     print(instruction)

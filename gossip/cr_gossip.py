@@ -631,7 +631,9 @@ class CostRegularNode(Node):
             comp_name = component.name
             acks = self._p2p_service.get_acks(comp_name) 
             for ack in acks:
-                self.__out_message[comp_name][ack.constraint] = ack
+                for message in self.__out_message[comp_name].keys():
+                    if message == ack.constraint:
+                        self.__out_message[comp_name][message] = ack
         
     def remove_deplicata(self, out_messages):
         result = set()

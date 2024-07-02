@@ -85,6 +85,7 @@ class Solution(ABC):
 
 def check_global_acks(node: Node, roots: list[str]):
     has_fail_ack = False
+    all_acked = True
     """ Check if one root of the gossip diffusion has sent a global ack """
     def __is_acked(list_of_global_acks, root):
         for ack in list_of_global_acks:
@@ -101,10 +102,11 @@ def check_global_acks(node: Node, roots: list[str]):
     for root in roots:
         has_fail_ack = has_fail_ack or __is_fail_acked(node.get_global_acks(), root)
         if not __is_acked(node.get_global_acks(), root):
-            print(f"CHECKING GLOBAL ACK : {len(node.get_global_acks())} global acks received (with fail : {has_fail_ack})")
-            return False, has_fail_ack
-    print(f"CHECKING GLOBAL ACK : {len(node.get_global_acks())} global acks received (all success)")
-    return True, has_fail_ack
+            all_acked = False
+        if not all_acked and has_fail_ack:
+            break
+    print(f"CHECK GLOBAL ACK: all_acked={all_acked} ; has_fail_ack:{has_fail_ack}")
+    return all_acked, has_fail_ack
     
 
 def gossip (node: Node, roots: list[str],
@@ -194,15 +196,15 @@ def gossip (node: Node, roots: list[str],
                 for ack in global_acks:
                     print(f"SEND GLOBAL ACK {ack}")
             node.send_global_acks(global_acks)
-        all_success, has_fail_ack = check_global_acks(node, roots)
-        ended_resolution = all_success or has_fail_ack
+        all_acked, has_fail_ack = check_global_acks(node, roots)
+        ended_resolution = all_acked or has_fail_ack 
+        node.new_received_ack()
         if debug:
             print(f"====================================================")
             print(f"At the end of the {nloop}th loop:")
             node.print_status()
             print(f"====================================================")
             time.sleep(1)
-        node.new_received_ack()
     if has_fail_ack:
         if node_is_root:
             print(node.get_failing_reasons())

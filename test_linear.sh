@@ -19,8 +19,6 @@ fi
 cp "$tests_dir/run_provider.py" .
 cp "$tests_dir/run_transformer.py" .
 
-# Run provider
-gnome-terminal -- bash -c "python3 run_provider.py -n $n $unsat_flag; echo ""; read -n 1; exec bash"
 
 # Check if n is not equal to 0
 if [ "$n" -ne 0 ]; then
@@ -31,6 +29,9 @@ if [ "$n" -ne 0 ]; then
 else
     echo "n is equal to 0, no chained transformer to run"
 fi
+
+# Run provider
+gnome-terminal -- bash -c "python3 run_provider.py -n $n $unsat_flag; echo ""; read -n 1; exec bash"
 
 echo "Press any key for cleaning local environement"; read -n 1;
 rm "run_provider.py"

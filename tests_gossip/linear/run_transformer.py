@@ -45,24 +45,24 @@ for (comp, con) in inventory.items():
 connections = []
 # Connection to the left
 if id == 1:
-    connect_config = (f'provider','config',f'transformer{0}',f'config_in')
+    connect_config = (f'provider','config',f'transformer{0}',f'configIn')
     connections.append(connect_config)
-    connect_service = (f'provider','service',f'transformer{0}',f'service_in')
+    connect_service = (f'provider','service',f'transformer{0}',f'serviceIn')
     connections.append(connect_service)
     print(connect_config)
     print(connect_service)
 else: 
-    connect_config = (f'transformer{id-2}','config',f'transformer{id-1}',f'config_in')
+    connect_config = (f'transformer{id-2}','configOut',f'transformer{id-1}',f'configIn')
     connections.append(connect_config)
-    connect_service = (f'transformer{id-2}','service',f'transformer{id-1}',f'service_in')
+    connect_service = (f'transformer{id-2}','serviceOut',f'transformer{id-1}',f'serviceIn')
     connections.append(connect_service)
     print(connect_config)
     print(connect_service)
 # Connection to the right
 if id != n:
-    connect_config = (f'transformer{id-1}','config',f'transformer{id}',f'config_in')
+    connect_config = (f'transformer{id-1}','configOut',f'transformer{id}',f'configIn')
     connections.append(connect_config)
-    connect_service = (f'transformer{id-1}','service',f'transformer{id}',f'service_in')
+    connect_service = (f'transformer{id-1}','serviceOut',f'transformer{id}',f'serviceIn')
     connections.append(connect_service)
     print(connect_config)
     print(connect_service)
@@ -90,13 +90,14 @@ if sat or n == 0:
     roots=['provider']
 else:
     roots=['provider', f'transformer{n-1}']
+    print(f'UNSAT and N > 0: roots = {roots}')
     
 # -----------------------------------------------------------------------
 #  PLAN
 # -----------------------------------------------------------------------
 
 plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-if len(plan.instructions()):
+if plan != None and len(plan.instructions()):
   print("LOCAL PLAN:")
   for instruction in plan.instructions():
     print(instruction)

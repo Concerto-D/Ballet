@@ -73,7 +73,7 @@ roots=['provider']
 # -----------------------------------------------------------------------
 
 plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-if len(plan.instructions()):
+if plan != None and len(plan.instructions()):
   print("LOCAL PLAN:")
   for instruction in plan.instructions():
     print(instruction)

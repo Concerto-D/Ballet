@@ -794,7 +794,10 @@ class MultiCostRegular(Model):
         return result
     
     def get_sequence(self, component):
-        return self._solutions[component].get("sequence")[:self.__first_skip[component]]
+        try:
+            return self._solutions[component].get("sequence")[:self.__first_skip[component]]
+        except:
+            return []
     
     def get_states(self, component):
         return self._solutions[component].get("states")[:self.__first_skip[component]+1]

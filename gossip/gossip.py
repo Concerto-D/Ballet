@@ -99,9 +99,11 @@ def check_global_acks(node: Node, roots: list[str]):
         return False
     """ Check if all roots of the gossip diffusion has sent a global ack """
     for root in roots:
-        if not __is_acked(node.get_global_acks(), root):
-            return False, has_fail_ack
         has_fail_ack = has_fail_ack or __is_fail_acked(node.get_global_acks(), root)
+        if not __is_acked(node.get_global_acks(), root):
+            print(f"CHECKING GLOBAL ACK : {len(node.get_global_acks())} global acks received (with fail : {has_fail_ack})")
+            return False, has_fail_ack
+    print(f"CHECKING GLOBAL ACK : {len(node.get_global_acks())} global acks received (all success)")
     return True, has_fail_ack
     
 
@@ -192,7 +194,8 @@ def gossip (node: Node, roots: list[str],
                 for ack in global_acks:
                     print(f"SEND GLOBAL ACK {ack}")
             node.send_global_acks(global_acks)
-        ended_resolution, has_fail_ack = check_global_acks(node, roots)
+        all_success, has_fail_ack = check_global_acks(node, roots)
+        ended_resolution = all_success or has_fail_ack
         if debug:
             print(f"====================================================")
             print(f"At the end of the {nloop}th loop:")

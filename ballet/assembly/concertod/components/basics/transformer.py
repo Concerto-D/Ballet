@@ -11,14 +11,14 @@ class Transformer(Component):
         ]
 
         self.transitions = {
-            'install1': ('uninstalled', 'installed', self.install1),
-            'install2': ('installed', 'configured', self.install2),
-            'install3': ('configured', 'running', self.install3),
-            'update1': ('running', 'configured', self.update1),
-            'suspend1': ('running', 'installed', self.suspend1),
-            'stop1': ('running', 'uninstalled', self.stop1),
-            'stop2': ('installed', 'uninstalled', self.stop2),
-            'stop3': ('configured', 'uninstalled', self.stop3)
+            'install1': ('uninstalled', 'installed', 'install', 0, self.install1),
+            'install2': ('installed', 'configured', 'install', 0, self.install2),
+            'install3': ('configured', 'running', 'install', 0, self.install3),
+            'update1': ('running', 'configured', 'update', 0, self.update1),
+            'suspend1': ('running', 'installed', 'suspend', 0, self.suspend1),
+            'stop1': ('running', 'uninstalled', 'stop', 0, self.stop1),
+            'stop2': ('installed', 'uninstalled', 'stop', 0, self.stop2),
+            'stop3': ('configured', 'uninstalled', 'stop', 0, self.stop3)
         }
 
         self.dependencies = {
@@ -27,6 +27,8 @@ class Transformer(Component):
             'service_in': (DepType.USE, ['running']),
             'service_out': (DepType.PROVIDE, ['running'])
         }
+        
+        self.initial_place = "uninstalled"
 
     def install1(self):
         pass

@@ -1,0 +1,79 @@
+from gossip.gossip import gossip
+from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
+from ballet.assembly.concertod.components.basics.provider import Provider
+from ballet.planner.goal import *
+from ballet.utils.dict_utils import *
+
+import argparse
+
+# -----------------------------------------------------------------------
+#  SETUP CONSIDERED LOADED FROM .yaml FILES IN BALLET
+# -----------------------------------------------------------------------
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Run gossip node script")
+parser.add_argument('-n', type=int, default=1, help='Number of users')
+parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
+args = parser.parse_args()
+
+n = args.n
+sat = False if args.unsat else True
+
+ADDRESS = 'localhost'
+PROVIDER_PORT = 3000
+PORT = PROVIDER_PORT
+
+# instances
+provider = Provider()
+provider.set_name("provider")
+
+# inventory
+inventory = {}
+inventory['provider'] = {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
+for i in range(n):
+    inventory[f'user{i}'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT + i + 1}
+print("Inventory:")
+for (comp, con) in inventory.items():
+      print(f"{comp} @ {con['address']}:{con['port_planner']}")
+
+
+print(f"n={n}")
+## Connections
+connections = []
+for i in range(n):
+    connect_config = ('provider','config',f'user{i}','config')
+    connections.append(connect_config)
+    connect_service = ('provider','service',f'user{i}','service')
+    connections.append(connect_service)
+    print(connect_config)
+    print(connect_service)
+
+## Active
+active = {provider: 'running'}
+
+## Goal
+if sat:
+    goals = {provider: [BehaviorReconfigurationGoal('update'), StateReconfigurationGoal("initial", final=True)]}
+else:
+    goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
+    
+node = CostRegularNode(id="node0",
+  admin="DevOps0", components=[provider], 
+  connections=connections,
+  active=active,
+  goals=goals,
+  port=PORT,
+  inventory=inventory)
+
+# roots
+roots=['provider']
+
+# -----------------------------------------------------------------------
+#  PLAN
+# -----------------------------------------------------------------------
+
+plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
+if len(plan.instructions()):
+  print("LOCAL PLAN:")
+  for instruction in plan.instructions():
+    print(instruction)

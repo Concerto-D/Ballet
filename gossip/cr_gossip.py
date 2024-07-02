@@ -357,7 +357,9 @@ class CRServer:
             for (address, has_to_be_pinged) in to_ping.items():
                 if has_to_be_pinged:
                     try:
+                        print(f"Ping {address}")
                         self.__ping(address)
+                        print(f"Pong {address}")
                         to_ping[address] = False
                         n = n-1
                     except:
@@ -586,7 +588,8 @@ class CostRegularNode(Node):
                 if self.__in_message[comp_name][message] != None and isinstance(self.__in_message[comp_name][message], AckFailure):
                     acked = "ACKED FAILURE"
                 else:
-                    acked = str(self.__out_message[comp_name][message])
+                    acked = str(self.__in_message[comp_name][message])
+                    
                 str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, [{','.join(message.passed_by)}], {message.final})"
                 print(f"\t\t* {str_message}: {acked}")
         
@@ -911,7 +914,13 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
     new_constraints = set()
     def __get_places(component, port):
         tmp_ports = reverse_dict(component.get_bindings())
-        return tmp_ports[port]
+        tmp_places = tmp_ports[port]
+        result = []
+        model_states = model.get_model(component.name).states
+        for place in tmp_places:
+            if place in model_states:
+                result.append(place)
+        return result
     node: CostRegularNode = model.get_node()
     for message in messages:
         msg_source = f"infer({message.source}_9_{message.target}_9_{message.port}_9_{message.status}_9_{message.behavior}_9_{message.final})"
@@ -934,7 +943,7 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
                 elif message.status == "disabled":
                     invalid_states = __get_places(component, connected_port)
                     for place in component.get_places():
-                        if place not in invalid_states:
+                        if place not in invalid_states and place in model.get_model(component.name).states:
                             validating_states.add(place)
             for state in validating_states:
                 model.add_transition(message.target, transition_name, state, state)

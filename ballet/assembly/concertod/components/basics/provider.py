@@ -8,19 +8,23 @@ class Provider(Component):
             'installed',
             'running'
         ]
+        
+        # self.behaviors = ['install', 'update', 'stop']
 
         self.transitions = {
-            'install1': ('uninstalled', 'installed', self.install1),
-            'install2': ('installed', 'running', self.install2),
-            'update1': ('running', 'installed', self.update1),
-            'stop1': ('running', 'uninstalled', self.stop1),
-            'stop2': ('installed', 'uninstalled', self.stop2)
+            'install1': ('uninstalled', 'installed', 'install', 0, self.install1),
+            'install2': ('installed', 'running', 'install', 0, self.install2),
+            'update1': ('running', 'installed', 'update', 0, self.update1),
+            'stop1': ('running', 'uninstalled', 'stop', 0, self.stop1),
+            'stop2': ('installed', 'uninstalled','stop',  0, self.stop2)
         }
 
         self.dependencies = {
             'config': (DepType.PROVIDE, ['installed', 'running']),
             'service': (DepType.PROVIDE, ['running'])
         }
+        
+        self.initial_place = "uninstalled"
 
     def install1(self):
         pass

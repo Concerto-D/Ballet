@@ -75,7 +75,7 @@ goals = {}
 if not sat and id==n:
     goals[transformer] = [BehaviorReconfigurationGoal('update'), StateReconfigurationGoal("initial", final=True)]
 else: 
-    goals[transformer] = [StateReconfigurationGoal("initial", final=True)]
+    goals[transformer] = []
 
 node = CostRegularNode(id=node_name,
   admin=devops, components=[transformer], 

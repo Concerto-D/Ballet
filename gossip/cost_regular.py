@@ -232,7 +232,8 @@ class CostRegular(Model):
             assert source in states # assert source is declared
             for label in automata[source].keys():
                 assert label in transitions # assert the label of transition is declared
-                assert automata[source][label] in states or automata[source][label] == "<>" # assert target is declared, or the transition does not exist
+                assert automata[source][label] in states or automata[source][label] == "<>" or automata[source][label] == "error" 
+                # assert target is declared, or the transition does not exist
         
     def __assert_conform_costs(states: list[str], transitions: list[str], costs: dict[str,dict[str,int]], automata:dict[str,dict[str,str]]):
         for source in costs.keys():
@@ -318,13 +319,13 @@ class CostRegular(Model):
     def port_names(self):
         return list(self.__ports.keys())
         
-    def __make_mzn_transitions_line(self, state):
+    def __make_mzn_transitions_line(self, state, undefined="<>"):
         targets = []
         for transition in self.__transitions:
             if state in self.__automata.keys() and transition in self.__automata[state].keys(): # the transition exists
                 targets.append(self.__automata[state][transition])
             else:
-                targets.append("<>")
+                targets.append(undefined)
         return '|' + ','.join(targets)
         
     def __make_choco_transitions_line(self, state):
@@ -341,6 +342,13 @@ class CostRegular(Model):
         ll = '\n'.join(lines)
         return '\n'.join(f"""
 [{ll}|]""".split('\n')[1:])
+
+    def __make_mzn_global_transitions_matrix(self):
+        error_line = "|" + ','.join(["error" for i in range(len(self.transitions))])
+        lines = [error_line] + list(map(lambda state: self.__make_mzn_transitions_line(state, "error").replace("<>","error"), self.__states))
+        ll = '\n'.join(lines)
+        return '\n'.join(f"""
+[{ll}|]""".split('\n')[1:])
         
     def __make_choco_transitions_matrix(self):
         lines = map(lambda state: self.__make_choco_transitions_line(state), self.__states)
@@ -354,7 +362,7 @@ class CostRegular(Model):
             if state in self.__costs.keys() and transition in self.__costs[state].keys(): # the transition has a cost
                 targets.append(str(self.__costs[state][transition]))
             else:
-                targets.append(str(1000000))
+                targets.append(str(100000))
         return "|" + ','.join(targets)  
 
         
@@ -364,11 +372,18 @@ class CostRegular(Model):
             if state in self.__costs.keys() and transition in self.__costs[state].keys(): # the transition has a cost
                 targets.append(str(self.__costs[state][transition]))
             else:
-                targets.append(str(1000000))
+                targets.append(str(100000))
         return "{" + ','.join(targets) + "}" 
 
     def __make_mzn_costs_matrix(self):
         lines = map(lambda state: self.__make_mzn_costs_line(state), self.__states)
+        ll = '\n'.join(lines)
+        return '\n'.join(f"""
+[{ll}|]""".split('\n')[1:])
+
+    def __make_mzn_global_costs_matrix(self):
+        error_line = "|" + ','.join([str(100000) for i in range(len(self.transitions))])
+        lines = [error_line] + list(map(lambda state: self.__make_mzn_costs_line(state), self.__states))
         ll = '\n'.join(lines)
         return '\n'.join(f"""
 [{ll}|]""".split('\n')[1:])
@@ -463,6 +478,69 @@ class CostRegular(Model):
         res.append(f"constraint {count_name} > 0; {suffix}")
         return res
     
+    # ---------
+    
+    def __make_mzn_port_global_constraint_line(self, constraint: PortConstraint):
+        #TODO using Count
+        suffix = "% goal" if constraint.isGoal() else "% inferred"
+        res = []
+        count_name = f"count_{constraint.port}_status_{constraint.status}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
+        if constraint.final:
+            res.append(f"constraint {constraint.port}_status[seq_length+1] = {constraint.status}; {suffix}")
+        res.append(f"var int: {count_name}; {suffix}")
+        res.append(f"constraint {count_name} = sum(s in {constraint.port}_status) (s = {constraint.status}); {suffix}")
+        res.append(f"constraint {count_name} > 0; {suffix}")
+        return res
+    
+    def __make_mzn_multiport_global_constraint_line(self, constraint: PortConstraint):
+        #TODO using Count
+        suffix = "% goal" if constraint.isGoal() else "% inferred"
+        res = []
+        count_name = f"count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
+        if constraint.final:
+            for port in constraint.ports:
+                res.append(f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}")
+        res.append(f"var int: {count_name}; {suffix}")
+        and_condition = ' /\ '.join(map(lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports))
+        res.append(f"constraint {count_name} = sum (i in 1..seq_length+1) ({and_condition});")
+        res.append(f"constraint {count_name} > 0; {suffix}")
+        return res
+    
+    def __make_mzn_transition_global_constraint_line(self, constraint: TransitionConstraint):
+        #TODO using Count
+        suffix = "% goal" if constraint.isGoal() else "% inferred"
+        count_name = f"count_{constraint.transition}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
+        decl1 = f"var int: {count_name}; {suffix}"
+        decl2 = f"constraint {count_name} = sum(b in sequence) (b = {constraint.transition}); {suffix}"
+        if count_name.startswith("count_wait"):
+            arity = "= 1"
+        else:
+            arity = "> 0"
+        cstr = f"constraint {count_name} {arity}; {suffix}"
+        return [decl1, decl2, cstr]
+    
+    def __make_mzn_state_global_constraint_line(self, constraint: StateConstraint):
+        #TODO using Count
+        suffix = "% goal" if constraint.isGoal() else "% inferred"
+        count_name = f"count_{constraint.state}"
+        if constraint.source:
+            count_name = count_name + "_" + string_utils.clean(constraint.source)
+        res = []
+        if constraint.final:
+            res.append(f"constraint states[seq_length+1] = {constraint.state}; {suffix}") 
+        res.append(f"var int: {count_name}; {suffix}")
+        res.append(f"constraint {count_name} = sum(s in states) (s = {constraint.state}); {suffix}")
+        res.append(f"constraint {count_name} > 0; {suffix}")
+        return res
+    
+    # ---------
+    
     def __make_choco_port_constraint_line(self, constraint: PortConstraint):
         suffix = "// goal" if constraint.isGoal() else "// inferred"
         res = []
@@ -514,6 +592,16 @@ class CostRegular(Model):
         if constraint.isMultiPortConstraint():
             return self.__make_mzn_multiport_constraint_line(constraint)
     
+    def __make_mzn_global_constraint_line(self, constraint):
+        if constraint.isPortConstraint():
+            return self.__make_mzn_port_global_constraint_line(constraint)
+        if constraint.isStateConstraint():
+            return self.__make_mzn_state_global_constraint_line(constraint)
+        if constraint.isTransitionConstraint():
+            return self.__make_mzn_transition_global_constraint_line(constraint)
+        if constraint.isMultiPortConstraint():
+            return self.__make_mzn_multiport_global_constraint_line(constraint)
+    
     def __make_choco_constraint_line(self, constraint):
         if constraint.isPortConstraint():
             return self.__make_choco_port_constraint_line(constraint)
@@ -527,6 +615,11 @@ class CostRegular(Model):
     def __make_mzn_goal_constraints(self):
         set_of_constraints = set(self.__constraints)
         lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), set_of_constraints)
+        return '\n'.join(lines)
+    
+    def __make_mzn_goal_global_constraints(self):
+        set_of_constraints = set(self.__constraints)
+        lines = flatmap(lambda constraint: self.__make_mzn_global_constraint_line(constraint), set_of_constraints)
         return '\n'.join(lines)
     
     def __make_choco_goal_constraints(self):
@@ -701,12 +794,96 @@ solve minimize scost;
 """.split('\n')[1:])
         return content
     
+    def __make_mzn_model_global(self):
+        """
+        TODO
+        self.__make_mzn_goal_global_constraints() like self.__make_mzn_goal_constraints() using global constraint
+        """
+        s_len = len(self.states) + 1 
+        q_len = len(self.transitions)
+        enum_states = list(map(lambda p: f"int: {p[0]} = {p[1]};", indexify(self.states, 2)))
+        enum_behavior = list(map(lambda p: f"int: {p[0]} = {p[1]};", indexify(self.transitions, 1))) # TODO (start by 1)
+        joined_states = '\n'.join(enum_states)
+        joined_behaviors = '\n'.join(enum_behavior)
+        content = '\n'.join(f"""
+include "globals.mzn";
+int: seq_length = {self.__seq_length};
+int: S = {s_len};
+int: Q = {q_len};
+
+int: error = 1;
+{joined_states}
+
+{joined_behaviors}
+
+int: enabled = 1;
+int: disabled = 0;
+
+set of int: STATE = {{ error, {','.join(self.states)}}};
+set of int: BEHAVIOR = {{{','.join(self.transitions)}}}; 
+set of int: STATUS = {{enabled, disabled}};
+
+array[STATE, BEHAVIOR] of STATE: transitions = 
+{self.__make_mzn_global_transitions_matrix()};
+
+array[STATE, BEHAVIOR] of int: costs = 
+{self.__make_mzn_global_costs_matrix()};
+
+% Captured variables
+array[1..seq_length] of var BEHAVIOR: sequence;
+array[1..seq_length+1] of var STATE: states;
+
+constraint forall (i in 1..seq_length) (states[i + 1] = transitions[states[i], sequence[i]]);
+constraint forall (i in 1..seq_length-1) (sequence[i] = skip -> sequence[i+1] = skip);
+
+var int: scost;
+constraint
+  cost_regular(sequence, S, Q, transitions, running, {{{self.__init_state}}}, costs, scost);
+
+constraint states[1] = {self.__init_state};
+
+% Ports' statuses
+{self.__make_mzn_ports_status_constraints()}
+
+% Reconfiguration goals as constraints
+{self.__make_mzn_goal_global_constraints()}
+
+% Goal
+solve minimize scost;
+
+""".split('\n')[1:])
+        return content
     
-    def solve_minizinc(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
+    
+    
+    def solve_minizinc(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
         wf = write_file if not findmus else True
         modelfile = file_name
         model = mznModel()
         mzn_str_model = self.__make_mzn_model()
+        if print_model:
+            print(mzn_str_model)
+        if wf:
+            with open(modelfile, 'w') as f:
+                f.write(mzn_str_model)
+                f.close()
+            model.add_file(modelfile)
+        else:
+            model.add_string(mzn_str_model)
+        solver = Solver.lookup(solve_with)
+        instance = Instance(solver, model)
+        result = instance.solve()
+        if result.status == Status.UNSATISFIABLE or findmus:
+            raise FindMUSException("UNSAT model")
+        else:
+            r = result.solution
+            return CRSolution(r, sat=True)
+    
+    def solve_minizinc_global(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
+        wf = write_file if not findmus else True
+        modelfile = file_name
+        model = mznModel()
+        mzn_str_model = self.__make_mzn_model_global()
         if print_model:
             print(mzn_str_model)
         if wf:
@@ -748,9 +925,11 @@ solve minimize scost;
                     f.close()
             return None, None
     
-    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
+    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
         if mode == "minizinc":
             return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
+        if mode == "minizinc-global" or  mode == "minizinc_global" or mode == "global":
+            return self.solve_minizinc_global(findmus, write_file, file_name, print_model, solve_with)
         if mode == "choco":
             return self.solve_choco(findmus, write_file, print_model)
         
@@ -767,10 +946,13 @@ class MultiCostRegular(Model):
     def solve(self, mode="minizinc", print_model=False, write_file=False):
         for (key, model) in self._models.items():
             try:
-                solution =  model.solve(mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
-                self._solutions[key] = solution
-                self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
-                self.__first_skip[key] = indexOf('skip', solution.get("sequence"))
+                real_mode = "minizinc" if mode == "minizinc-test" else mode
+                solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
+                if mode != "minizinc-global" and mode != "minizinc-test":
+                    self._solutions[key] = solution
+                    self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+                    skip_value = solution.get("sequence")[-1]
+                    self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
             except FindMUSException:
                 self._solutions[key] = model.solve(mode="choco", findmus=True, print_model=False, write_file=False)
         return self._solutions

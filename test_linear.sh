@@ -33,6 +33,12 @@ fi
 # Run provider
 gnome-terminal -- bash -c "python3 run_provider.py -n $n $unsat_flag; echo ""; read -n 1; exec bash"
 
-echo "Press any key for cleaning local environement"; read -n 1;
+echo "Press any key for cleaning local environement"; read -n 1 key;
 rm "run_provider.py"
 rm "run_transformer.py"
+
+if [ "$key" = "x" ]; then
+    rm *.mzn
+else
+    echo "Done"
+fi

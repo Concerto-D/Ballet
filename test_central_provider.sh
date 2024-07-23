@@ -32,6 +32,12 @@ else
     echo "n is equal to 0, no parallel user to run"
 fi
 
-echo "Press any key for cleaning local environement"; read -n 1;
+echo "Press any key for cleaning local environement"; read -n 1 key;
 rm "run_provider.py"
 rm "run_user.py"
+
+if [ "$key" = "x" ]; then
+    rm *.mzn
+else
+    echo "Done"
+fi

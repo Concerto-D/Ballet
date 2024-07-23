@@ -7,6 +7,7 @@ from ballet.utils.list_utils import find
 from ballet.utils.dict_utils import reverse_dict
 from ballet.utils import set_utils
 from ballet.utils import string_utils
+from ballet.utils import time_utils
 from ballet.assembly.concertod.dependency import DepType
 from ballet.assembly.plan.plan import Plan, Wait, PushB, merge_plans
 from gossip.grpc import gossip_pb2_grpc
@@ -858,13 +859,27 @@ def make_reason_explicit(reason):
     #TODO
     return reason
 
-def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False):
+def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=30):
     if debug:
         write_file = True
     out_messages = set()
     node: CostRegularNode = cr_model.get_node()
     opt_ack = set()
+    
+    if time != 0:
+        nexecutions=time
+        def solve_with_global():
+            cr_model.solve(mode="minizinc-global",write_file=write_file)
+        def solve_without_global():
+            cr_model.solve(mode="minizinc-test", write_file=write_file)
+            
+        (_, time_with_global)= time_utils.timeit_detailed(solve_with_global, n=nexecutions)
+        (_, time_without_global) = time_utils.timeit_detailed(solve_without_global, n=nexecutions)
+        print(f"Execution time with global constraints (avg on {nexecutions} executions): \n\t {time_with_global} ")
+        print(f"Execution time without global constraints (avg on {nexecutions} executions):\n\t {time_without_global} ")    
+    
     results = cr_model.solve(write_file=write_file)
+    
     for (comp_name, result) in results.items():
         if result.is_sat:
             sequence = cr_model.get_sequence(comp_name)
@@ -872,12 +887,12 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False):
                 print(f"{comp_name}:")
                 print("\tstates = ", cr_model.get_states(comp_name))
                 print("\tsequence = ", sequence)
-            for (port, _) in cr_model.get_port_statuses(comp_name).items():
+            for (port_name, _) in cr_model.get_port_statuses(comp_name).items():
+                port_status = cr_model.get_port_status(comp_name, port_name)
+                port_status_str = list(map(lambda v: "enabled" if v == 1 else "disabled", port_status))
                 if debug:
-                    print(f"\t{port}: {cr_model.get_port_status(comp_name, port)}")
+                    print(f"\t{port_name}: {port_status_str}")
                 component = node.components_from_str(comp_name)
-                port_name = port
-                port_status = cr_model.get_port_status(comp_name, port)
                 msgs = make_messages(sequence, port_name, port_status, node.passed_by, component)
                 out_messages = out_messages | msgs
             if debug:
@@ -966,7 +981,7 @@ def cr_final(cr_model: MultiCostRegular, write_file=False):
     cr_model.solve(write_file=write_file)
     plans = map(lambda comp_name: 
         Plan(comp_name, 
-             list(map(lambda inst: __format_wait(inst) if inst[0:4] == "wait" else __format_push(comp_name, inst), 
+             list(map(lambda inst: __format_wait(inst) if inst[0:4] > "wait" else __format_push(comp_name, inst), 
                       cr_model.get_sequence(comp_name)))
              ), cr_model.get_components())
     return merge_plans(list(plans))

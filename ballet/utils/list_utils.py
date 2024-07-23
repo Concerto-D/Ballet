@@ -40,7 +40,7 @@ def findAll(p: Callable[[A], bool], seq: list[A]) -> list[A]:
 
 
 def indexify(seq: list[A],starter:int=0) -> list[(A,int)]:
-    return list(zip(seq, range(starter, len(seq))))
+    return list(zip(seq, range(starter, len(seq)+starter)))
 
 
 def difference(l1: Iterable[A], l2: Iterable[A]):

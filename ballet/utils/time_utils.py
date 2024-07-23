@@ -31,8 +31,10 @@ def timeit_detailed(f: Callable[[A], B], n: Optional[int]=1) -> Tuple[B, dict[st
         median_time = statistics.median(times)
         q1_time = statistics.quantiles(times, n=4)[0]
         q3_time = statistics.quantiles(times, n=4)[2]
+        min_time = min(times)
+        max_time = max(times)
     else:
-        mean_time = variance_time = stdev_time = median_time = q1_time = q3_time = 0.0
+        mean_time = variance_time = stdev_time = median_time = q1_time = q3_time = min_time = max_time = 0.0
         
     stats = {
         "mean": mean_time,
@@ -40,6 +42,8 @@ def timeit_detailed(f: Callable[[A], B], n: Optional[int]=1) -> Tuple[B, dict[st
         "stdev": stdev_time,
         "median": median_time,
         "q1": q1_time,
-        "q3": q3_time
+        "q3": q3_time,
+        "min": min_time,
+        "max": max_time
     }
     return res, stats

@@ -1,9 +1,23 @@
+print("0000000000000 --")
 from gossip.gossip import gossip
+print("a")
 from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
-from ballet.assembly.concertod.components.basics.transformer import Transformer
+print("b")
+
 from ballet.assembly.concertod.components.basics.provider import Provider
+print("c1")
+from ballet.assembly.concertod.components.basics.transformer import Transformer
+print("c2")
+
 from ballet.planner.goal import *
+print("d")
+
 from ballet.utils.dict_utils import *
+print("e")
+
+import argparse
+print("f")
+
 
 # Parse command-line arguments
 n = 2

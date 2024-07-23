@@ -37,7 +37,7 @@ class Group(object):
             self.delta = delta
 
         def is_nothing(self) -> bool:
-            return self.delta is 0
+            return self.delta == 0
 
     def __init__(self, component_name: str, name: str):
         self.component_name: str = component_name
@@ -108,7 +108,7 @@ class Group(object):
         return (not self.is_active()) and (operation.delta > 0)
 
     def is_deactivating(self, operation: Operation) -> bool:
-        return self.is_active() and (self.nb_tokens + operation.delta is 0)
+        return self.is_active() and (self.nb_tokens + operation.delta == 0)
 
     def is_active(self):
         return self.nb_tokens > 0
@@ -809,7 +809,7 @@ class Component(object, metaclass=ABCMeta):
                 continue
             odocks = place.get_output_docks(self.act_behavior)
             log_once.debug(f"Move from place to odocks ({place.get_name()})")
-            if len(odocks) is 0:
+            if len(odocks) == 0:
                 continue
 
             self._put_provide_deps_in_refusing_state(place)
@@ -915,7 +915,7 @@ class Component(object, metaclass=ABCMeta):
 
         # check if some of these running transitions are finished
         for trans in self.act_transitions:
-            if trans.get_name() is not "_init":
+            if trans.get_name() != "_init":
                 if self.gantt is None:
                     gantt_tuple = None
                 else:
@@ -959,7 +959,7 @@ class Component(object, metaclass=ABCMeta):
             # allant vers cette place
             grp_inp_docks = place.get_groups_of_input_docks(self.act_behavior)
             for inp_docks in grp_inp_docks:
-                if len(inp_docks) is 0:
+                if len(inp_docks) == 0:
                     log_once.debug(f"{len(inp_docks)} is 0, continue")
                     continue
 

@@ -9,6 +9,8 @@ from ballet.utils.dict_utils import *
 n = 2
 sat = True
 
+print("WELCOME")
+
 ADDRESS = 'localhost'
 PORT = 3000 
 

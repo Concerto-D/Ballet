@@ -1,0 +1,43 @@
+components:
+  facts:
+    type: 'Facts'
+    active: 'initial'
+  common:
+    type: 'Common'
+    active: 'initial'
+  haproxy:
+    type: 'HAProxy'
+    active: 'initial'
+  memcached:
+    type: 'MemCached'
+    active: 'initial'
+  ovswitch:
+    type: 'OvSwitch'
+    active: 'initial'
+  rabbitmq:
+    type: 'RabbitMQ'
+    active: 'initial'
+  mariadb:
+    type: 'MariaDB'
+    active: 'running'
+  keystone:
+    type: 'Keystone'
+    active: 'running'
+  glance:
+    type: 'Glance'
+    active: 'running'
+
+connections:
+  - facts,service,common,facts_service
+  - facts,service,haproxy,facts_service
+  - facts,service,memcached,facts_service
+  - facts,service,ovswitch,facts_service
+  - facts,service,rabbitmq,facts_service
+  - common,service,mariadb,common_service
+  - haproxy,service,mariadb,haproxy_service
+  - mariadb,service,nova,mariadb_service
+  - mariadb,service,keystone,mariadb_service
+  - mariadb,service,neutron,mariadb_service
+  - mariadb,service,glance,mariadb_service
+  - keystone,service,nova,keystone_service
+  - keystone,service,nova,glance_service

@@ -1,0 +1,10 @@
+components:
+  neutron:
+    type: 'Neutron'
+    active: 'running'
+
+connections:
+  - mariadb,service,nova,mariadb_service
+  - keystone,service,nova,keystone_service
+  - keystone,service,nova,neutron_service
+  - keystone,service,nova,glance_service

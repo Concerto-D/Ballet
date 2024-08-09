@@ -1,0 +1,7 @@
+behaviors:
+  - component : mariadb
+    behavior : update
+  - component : mariadb
+    behavior : deploy
+components:
+  - forall : running

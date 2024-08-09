@@ -1,0 +1,55 @@
+facts:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+common:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+haproxy:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+memcached:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+ovswitch:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+rabbitmq:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+mariadb:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+keystone:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+nova:
+  - address: localhost
+  - port_front: 5000
+  - port_planner: 5001
+  - port_executor: 5002
+neutron:
+  - address: localhost
+  - port_front: 5003
+  - port_planner: 5004
+  - port_executor: 5005
+glance:
+  - address: localhost
+  - port_front: 5006
+  - port_planner: 5007
+  - port_executor: 5008

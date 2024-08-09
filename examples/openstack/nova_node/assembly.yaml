@@ -1,0 +1,8 @@
+components:
+  nova:
+    type: 'Nova'
+    active: 'running'
+
+connections:
+  - mariadb,service,neutron,mariadb_service
+  - keystone,service,nova,neutron_service

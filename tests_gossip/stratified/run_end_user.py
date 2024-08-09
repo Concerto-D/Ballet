@@ -1,0 +1,76 @@
+from gossip.gossip import gossip
+from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
+from ballet.assembly.concertod.components.basics.parallel_user import ParallelUser
+from ballet.planner.goal import *
+from ballet.utils.dict_utils import *
+
+import argparse
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Run gossip node script")
+parser.add_argument('-n', type=int, default=1, help='Number of users')
+parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
+
+args = parser.parse_args()
+n = args.n
+sat = False if args.unsat else True
+
+ADDRESS = 'localhost'
+PROVIDER_PORT = 3000
+ENDUSER_PORT = 3001
+PORT = ENDUSER_PORT
+
+node_name = "node_enduser"
+devops = "DevOpsEndUser"
+print(f"WELCOME TO {node_name} MANAGED BY {devops} RUN ON {ADDRESS}:{PORT}")
+
+m = 1 if n == 0 else ((n - 1) % 3) + 1
+enduser = ParallelUser(m)
+enduser.set_name(f"enduser")
+
+inventory = {}
+inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
+inventory[f'enduser'] =  {'address': ADDRESS, 'port_planner': ENDUSER_PORT}
+for uid in range(0, n):
+  inventory[f'user{uid}'] = {'address': ADDRESS, 'port_planner': ENDUSER_PORT + 1 + uid}
+print(inventory)
+
+connections = []
+if n == 0:
+    service_enduser = ("provider", "service", "enduser", "service0")
+    connections.append(service_enduser)
+    config_enduser = ("provider", "config", "enduser", "config0")
+    connections.append(config_enduser)
+else:
+    for i in range(n):
+        u_id = f"user{i}"
+        if i >= ((n - 1) // 3) * 3:
+            service_enduser = (u_id, "service", "enduser", "service" + str(i % 3))
+            connections.append(service_enduser)
+            config_enduser = (u_id, "config", "enduser", "config" + str(i % 3))
+            connections.append(config_enduser)
+for connection in connections:
+    print(connection) 
+    
+active = {enduser: 'running'}
+
+# Goals
+
+goals = {enduser: [BehaviorReconfigurationGoal('suspend'), StateReconfigurationGoal("initial", final=True)]}
+    
+node = CostRegularNode(id=node_name,
+admin=devops, components=[enduser], 
+connections=connections,
+active=active,
+goals=goals,
+port=PORT,
+inventory=inventory)
+    
+# roots
+roots=['provider','enduser']
+    
+plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
+if plan != None and len(plan.instructions()):
+  print("LOCAL PLAN:")
+  for instruction in plan.instructions():
+    print(instruction)    

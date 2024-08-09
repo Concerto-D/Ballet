@@ -92,9 +92,9 @@ def __is_acked(list_of_global_acks, root):
 def check_all_acked(node: Node, roots: list[str]):
     """ Check if all roots of the gossip diffusion has sent a global ack """
     global_acks = node.get_global_acks()
-    print("CURRENT RECEIVED GLOBAL ACK: ")
-    for glack in global_acks:
-        print(f"\t {glack.source} ({glack})")
+    # print("CURRENT RECEIVED GLOBAL ACK: ")
+    # for glack in global_acks:
+    #     print(f"\t {glack.source} ({glack})")
     for root in roots:
         if not __is_acked(global_acks, root):
             return False
@@ -111,9 +111,9 @@ def check_global_acks(node: Node, roots: list[str]):
         return False
     """ Check if all roots of the gossip diffusion has sent a global ack """
     global_acks = node.get_global_acks()
-    print("CURRENT RECEIVED GLOBAL ACK: ")
-    for glack in global_acks:
-        print(f"\t {glack.source} ({glack})")
+    # print("CURRENT RECEIVED GLOBAL ACK: ")
+    # for glack in global_acks:
+        # print(f"\t {glack.source} ({glack})")
     for root in roots:
         has_fail_ack = has_fail_ack or __is_fail_acked(global_acks, root)
         if not __is_acked(global_acks, root):
@@ -239,7 +239,8 @@ def gossip (node: Node, roots: list[str],
                 node.send_global_acks(global_acks)
                 has_sent_global_ack = True
         all_acked, has_fail_ack = check_global_acks(node, roots)
-        print(f"CHECK GLOBAL ACK: all_acked={all_acked} ; has_fail_ack:{has_fail_ack}")
+        if debug:
+            print(f"CHECK GLOBAL ACK: all_acked={all_acked} ; has_fail_ack:{has_fail_ack}")
         ended_resolution = all_acked
         if debug:
             print(f"====================================================")
@@ -250,9 +251,9 @@ def gossip (node: Node, roots: list[str],
             time.sleep(1)    
     if debug:
         print(f"====================================================")
-    print(f"At the end :")
-    node.print_status()
-    print(f"====================================================")
+        print(f"At the end :")
+        node.print_status()
+        print(f"====================================================")
 
     if has_fail_ack:
         if node_is_root:

@@ -1,0 +1,79 @@
+from gossip.gossip import gossip
+from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
+from ballet.assembly.concertod.components.basics.provider import Provider
+from ballet.planner.goal import *
+from ballet.utils.dict_utils import *
+
+import argparse
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Run gossip node script")
+parser.add_argument('-n', type=int, default=1, help='Number of users')
+parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
+
+args = parser.parse_args()
+n = args.n
+sat = False if args.unsat else True
+
+ADDRESS = 'localhost'
+PROVIDER_PORT = 3000
+ENDUSER_PORT = 3001
+PORT = PROVIDER_PORT
+
+node_name = "node_provider"
+devops = "DevOpsProvider"
+print(f"WELCOME TO {node_name} MANAGED BY {devops} RUN ON {ADDRESS}:{PORT}")
+
+provider = Provider()
+provider.set_name(f"provider")
+
+inventory = {}
+inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
+inventory[f'enduser'] =  {'address': ADDRESS, 'port_planner': ENDUSER_PORT}
+for uid in range(0, n):
+  inventory[f'user{uid}'] = {'address': ADDRESS, 'port_planner': ENDUSER_PORT + 1 + uid}
+print(inventory)
+
+connections = []
+if n == 0:
+    service_enduser = ("provider", "service", "enduser", "service0")
+    connections.append(service_enduser)
+    config_enduser = ("provider", "config", "enduser", "config0")
+    connections.append(config_enduser)
+else:
+    bound = n if n < 3 else 3
+    for i in range(bound):
+        u_id = f"user{i}"
+        service_enduser = ("provider", "service", u_id, "service0")
+        connections.append(service_enduser)
+        config_enduser = ("provider", "config", u_id, "config0")
+        connections.append(config_enduser)
+for connection in connections:
+    print(connection) 
+    
+active = {provider: 'running'}
+
+# Goals
+if sat:
+    goals = {provider: [BehaviorReconfigurationGoal('update'), StateReconfigurationGoal("initial", final=True)]}
+else:
+    goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
+    
+    
+node = CostRegularNode(id=node_name,
+admin=devops, components=[provider], 
+connections=connections,
+active=active,
+goals=goals,
+port=PORT,
+inventory=inventory)
+    
+    
+# roots
+roots=['provider','enduser']
+    
+plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
+if plan != None and len(plan.instructions()):
+  print("LOCAL PLAN:")
+  for instruction in plan.instructions():
+    print(instruction)    

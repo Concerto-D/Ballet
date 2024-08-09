@@ -20,7 +20,6 @@ import grpc
 import threading
 import time
 
-
 class ConstraintMessage:
     
     def __init__(self, source, target, port, status, behavior, passed_by, final=False):
@@ -261,8 +260,8 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
                                        behavior=message_to_ack.behavior, passed_by=passed_by,
                                        final=message_to_ack.final)
         ack = AckSuccess(request.component_source, request.component_target, constraint_to_ack)
-        print(f"------ MARK -------")
-        print(f"I RECEIVED ACKSUCCESS FROM {request.component_source} FOR THE CONSTRAINT {constraint_to_ack}")
+        # print(f"------ MARK -------")
+        # print(f"I RECEIVED ACKSUCCESS FROM {request.component_source} FOR THE CONSTRAINT {constraint_to_ack}")
         with self._lock_new_acks:
             if target not in self._acks.keys():
                 self._acks[target] = set()
@@ -290,8 +289,8 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
                                        behavior=message_to_ack.behavior, passed_by=passed_by,
                                        final=message_to_ack.final)
         ack = AckFailure(request.component_source, request.component_target, constraint_to_ack, request.cause)
-        print(f"------ MARK -------")
-        print(f"I RECEIVED ACKFAILURE FROM {request.component_source} FOR THE CONSTRAINT {constraint_to_ack}")
+        # print(f"------ MARK -------")
+        # print(f"I RECEIVED ACKFAILURE FROM {request.component_source} FOR THE CONSTRAINT {constraint_to_ack}")
         with self._lock_new_acks:
             if target not in self._acks.keys():
                 self._acks[target] = set()
@@ -302,7 +301,7 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
     def add_global_ack_success(self, request, context):
         source = request.component_source
         ack = GlobalAckSuccess(source)
-        print(f"GLOBAL ACK FROM {ack.source} ({ack}) IS ADDED")
+        # print(f"GLOBAL ACK FROM {ack.source} ({ack}) IS ADDED")
         with self._lock_new_global_ack:
             self._global_acks.add(ack)
         return gossip_pb2.Empty()
@@ -364,9 +363,9 @@ class CRServer:
             for (address, has_to_be_pinged) in to_ping.items():
                 if has_to_be_pinged:
                     try:
-                        print(f"Ping {address}")
+                        # print(f"Ping {address}")
                         self.__ping(address)
-                        print(f"Pong {address}")
+                        # print(f"Pong {address}")
                         to_ping[address] = False
                         n = n-1
                     except:
@@ -427,16 +426,16 @@ class CRClient:
             to_send = gossip_pb2.AckFailure(component_source = ack.source, component_target = ack.target, 
                                             to_message = acked_message, cause = ack.cause)
             
-            print(f"FROM PROXY POV, I AM SENDING : {ack}")
+            # print(f"FROM PROXY POV, I AM SENDING : {ack}")
             stub.add_ack_failure(to_send)
     
     def send_ack(self, ack: AckMessage):
-        print(f"FROM CLIENT POV, I AM SENDING : {ack}")
+        # print(f"FROM CLIENT POV, I AM SENDING : {ack}")
         if isinstance(ack, AckSuccess):
-            print(f"WHICH IS SUCCESS")
+            # print(f"WHICH IS SUCCESS")
             self.__send_ack_success(ack)
         elif isinstance(ack, AckFailure):
-            print(f"WHICH IS FAILURE")
+            # print(f"WHICH IS FAILURE")
             self.__send_ack_failure(ack)
             
     def __send_global_ack_success(self, address, ack: GlobalAckSuccess):
@@ -683,8 +682,8 @@ class CostRegularNode(Node):
                     print(f"UNREACHABLE HOST FOR SENDING {ack}")
                     time.sleep(10)
                     raise e
-        print(f"---------- MARK ---------")
-        print(f"SENDING ACK {ack} ..... ")
+        # print(f"---------- MARK ---------")
+        # print(f"SENDING ACK {ack} ..... ")
         self.mark_in_message(ack.source, ack.constraint, ack) 
         __sec_send_ack(ack)
             
@@ -733,7 +732,7 @@ class CostRegularNode(Node):
                             ack_is_success = False
                             break
                 if ack_to_send:
-                    print(f"I HAVE TO SEND A GLOBAL ACK ! (success ? {ack_is_success}). Here my data:")
+                    # print(f"I HAVE TO SEND A GLOBAL ACK ! (success ? {ack_is_success}). Here my data:")
                     self.print_status()
                     
                     if ack_is_success:
@@ -760,7 +759,7 @@ class CostRegularNode(Node):
                 if not self.__root_processed():
                     __sec_send_global_ack(ack)
                 else:
-                    print(f"UNREACHABLE HOST FOR SENDING {ack}")
+                    # print(f"UNREACHABLE HOST FOR SENDING {ack}")
                     time.sleep(10)
                     raise e
         __sec_send_global_ack(ack)
@@ -870,27 +869,23 @@ def make_messages(sequence, port_name, port_status, passed_by, component: Compon
         if port_status[-1] == "disabled":
             # at the end, the related use ports must be deactivated
             message = ConstraintMessage(component.get_name(), None, port_name, "disabled", None, curr_passed_by, final=True)
-            print("1" + str(message))  
             result.add(message)
         for i in range(len(refined_port_status)-2):
             if refined_port_status[i][1] == "enabled" and refined_port_status[i+1][1] == "disabled" and refined_port_status[i+2][1] == "enabled":
                 # at a moment, the provide port is deactivate by a behavior. It is activate then
                 behavior = refined_port_status[i+1][0]
                 message = ConstraintMessage(component.get_name(), None, port_name, "disabled", behavior, curr_passed_by)   
-                print("2" + str(message))  
                 result.add(message) 
     elif port_type == DepType.USE:
         if port_status[-1] == "enabled":
             # at the end, the related provide ports must be activated
             message = ConstraintMessage(component.get_name(), None, port_name, "enabled", None, curr_passed_by, final=True)
-            print("3" + str(message))
             result.add(message)
         for i in range(len(refined_port_status)-2):
             if refined_port_status[i][1] == "disabled" and refined_port_status[i+1][1] == "enabled" and refined_port_status[i+2][1] == "disabled":
                 # at a moment, the use port is activate by a behavior. It is activate then
                 behavior = refined_port_status[i+1][0]
                 message = ConstraintMessage(component.get_name(), None, port_name, "enabled", behavior, curr_passed_by)
-                print("4" + str(message))
                 result.add(message)          
     return result
   
@@ -987,26 +982,22 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
                 print("\n")
         else:
             all_reasons = [s for s in result.result.split('\n') if s.strip()]
-            print(f"Model is unsat. Here are all reasons \n \t {all_reasons}")
+            # print(f"Model is unsat. Here are all reasons \n \t {all_reasons}")
             explainity = '/\\'.join(map(lambda reason: make_reason_explicit(reason), all_reasons))
             node.set_local_conflict(explainity)
             # TODO if exists internal reason, also print all reasons for local devops. Store it somewhere ?
             for reason in all_reasons:
                 if not is_caused_internally(reason):
-                    print(f"Looking for the message to ack in {reason} since it is external")
+                    # print(f"Looking for the message to ack in {reason} since it is external")
                     message_to_ack = None
                     (_, reason_message) = split_reason(reason)
                     for (_, messages) in node.get_in_message().items():
                         for (message, _) in messages.items():
                             if message == reason_message:
                                 message_to_ack = message
-                            else:
-                                print(f"{message} is not the reason of {reason_message}")
                     if message_to_ack != None:
                         fail_ack = AckFailure(comp_name, None, message_to_ack, explainity)
                         opt_ack.add(fail_ack)
-                    else:
-                        print(f"Cannot find the message to ack in \n \t {reason}")
     out_messages = cr_model.get_node().remove_deplicata(out_messages)
     return out_messages, list(opt_ack)
 
@@ -1103,7 +1094,6 @@ def cr_ack_with_ack(node: CostRegularNode, ack:Acknowledgement):
 
 def cr_ack_default(node: CostRegularNode):
     node.new_received_ack()
-    # TODO Scenario to debug: a component received a ack failure ! But did not sent back any AckFailure
     result: dict[Node, Acknowledgement] = {}
     for component in node.components:
         comp_name = component.name
@@ -1122,7 +1112,7 @@ def cr_ack_default(node: CostRegularNode):
                         # get the origin_message, if exists, who caused this origin_constraint. 
                         origin_message: ConstraintMessage = node.get_origin_of_constraint(origin_constraint)
                         # send AckFail to this message 
-                        new_cause = got_ack_message.cause # TODO prefix this cause by what,local transitive information,  
+                        new_cause = got_ack_message.cause + f"/\\ trans({origin_constraint},on::{comp_name}) "# TODO prefix this cause by what,local transitive information,  
                         to_send_ack = AckFailure(comp_name, origin_message.source, origin_message, new_cause)
                         if to_send_ack.target not in result.keys():
                             result[to_send_ack.target] = set()

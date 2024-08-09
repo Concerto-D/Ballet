@@ -927,7 +927,7 @@ solve minimize scost;
             return None, None
     
     def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
-        print(f"Solve with: {mode}, findMus: {findmus}, solver: {solve_with}")
+        # print(f"Solve with: {mode}, findMus: {findmus}, solver: {solve_with}")
         if mode == "minizinc":
             return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
         if mode == "minizinc-global" or  mode == "minizinc_global" or mode == "global":
@@ -935,7 +935,7 @@ solve minimize scost;
         if mode == "choco":
             return self.solve_choco(findmus, write_file, file_name, print_model)
         
-        
+    
 class MultiCostRegular(Model):
     
     def __init__(self, models: dict[str, CostRegular], node):

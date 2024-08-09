@@ -82,16 +82,27 @@ class Message(ABC):
 class Solution(ABC):
     pass
 
+""" Check if one root of the gossip diffusion has sent a global ack """
+def __is_acked(list_of_global_acks, root):
+    for ack in list_of_global_acks:
+        if ack.source == root:
+            return True
+    return False
+
+def check_all_acked(node: Node, roots: list[str]):
+    """ Check if all roots of the gossip diffusion has sent a global ack """
+    global_acks = node.get_global_acks()
+    print("CURRENT RECEIVED GLOBAL ACK: ")
+    for glack in global_acks:
+        print(f"\t {glack.source} ({glack})")
+    for root in roots:
+        if not __is_acked(global_acks, root):
+            return False
+    return True
 
 def check_global_acks(node: Node, roots: list[str]):
     has_fail_ack = False
     all_acked = True
-    """ Check if one root of the gossip diffusion has sent a global ack """
-    def __is_acked(list_of_global_acks, root):
-        for ack in list_of_global_acks:
-            if ack.source == root:
-                return True
-        return False
     """ Check if one root of the gossip diffusion has sent a failure global ack """
     def __is_fail_acked(list_of_global_acks, root):
         for ack in list_of_global_acks:
@@ -99,13 +110,16 @@ def check_global_acks(node: Node, roots: list[str]):
                 return True
         return False
     """ Check if all roots of the gossip diffusion has sent a global ack """
+    global_acks = node.get_global_acks()
+    print("CURRENT RECEIVED GLOBAL ACK: ")
+    for glack in global_acks:
+        print(f"\t {glack.source} ({glack})")
     for root in roots:
-        has_fail_ack = has_fail_ack or __is_fail_acked(node.get_global_acks(), root)
-        if not __is_acked(node.get_global_acks(), root):
+        has_fail_ack = has_fail_ack or __is_fail_acked(global_acks, root)
+        if not __is_acked(global_acks, root):
             all_acked = False
         if not all_acked and has_fail_ack:
             break
-    print(f"CHECK GLOBAL ACK: all_acked={all_acked} ; has_fail_ack:{has_fail_ack}")
     return all_acked, has_fail_ack
     
 
@@ -137,6 +151,7 @@ def gossip (node: Node, roots: list[str],
             When gossip ends, make a final resolution
     """
     # Init a CP model from Node
+    node.set_roots(roots)
     model = f_init(node)
     ended_resolution = False
     # Initially, only node considered as roots must process an initial CP solving
@@ -146,7 +161,11 @@ def gossip (node: Node, roots: list[str],
     nloop = 0
     is_unsat = False
     has_fail_ack = False
+    has_sent_global_ack = False
     while not ended_resolution:
+        all_acked, has_fail_ack = check_global_acks(node, roots)
+        if all_acked:
+            break  
         nloop = nloop + 1 
         if debug:
             print(f"====================================================")
@@ -158,13 +177,28 @@ def gossip (node: Node, roots: list[str],
             if debug:
                 for message in received_messages:
                     print(f"RECEIVE MSG {message}")
+            all_acked, has_fail_ack = check_global_acks(node, roots)
+            if all_acked:
+                break
             if received_messages != []:
                 must_solve = True
                 model = f_enrich(model, received_messages)
             if must_solve:
-                must_solve = False
+                if debug:
+                    print(f"====================================================")
+                    print(f"During the {nloop}th loop:")
+                    node.print_status()
+                    print(f"====================================================")
+                must_solve = False 
+                all_acked, has_fail_ack = check_global_acks(node, roots)
+                if all_acked:
+                    break
+                if debug:
+                    print("BEGIN SOLVE")
                 (out_messages, acks_refuse) = f_local(model, debug=debug)
-                if acks_refuse != []:
+                if debug:
+                    print("END SOLVE")
+                if acks_refuse != []:     
                     # We face a failure... there is no solution? 
                     # We then have FailureAcks to send back
                     target_acks = f_ack(node, acks_refuse)
@@ -175,6 +209,9 @@ def gossip (node: Node, roots: list[str],
                         node.send_acks(target, acks)
                         is_unsat = True
                 elif out_messages != []:
+                    all_acked, has_fail_ack = check_global_acks(node, roots)
+                    if all_acked:
+                        break   
                     # A solution is found, leading to new constraint to diffuse
                     target_messages = f_msg(node, out_messages)
                     for (target, messages) in target_messages.items():
@@ -183,6 +220,9 @@ def gossip (node: Node, roots: list[str],
                                 print(f"SEND MSG {message}")
                         node.send_messages(target, messages)
             # Now that the process is done, does the node must send accept acks ?
+            all_acked, has_fail_ack = check_global_acks(node, roots)
+            if all_acked:
+                break  
             target_acks = f_ack(node)
             for (target, acks) in target_acks.items():
                 if debug:
@@ -190,27 +230,38 @@ def gossip (node: Node, roots: list[str],
                         print(f"SEND ACK {ack}")
                 node.send_acks(target, acks)
             # Check global acks to send, and received, and end local solve if needed
-        global_acks = node.get_global_acks_to_send(roots)
-        if len(global_acks) != 0:
-            if debug:
-                for ack in global_acks:
-                    print(f"SEND GLOBAL ACK {ack}")
-            node.send_global_acks(global_acks)
+        if not has_sent_global_ack:
+            global_acks = node.get_global_acks_to_send(roots)  
+            if len(global_acks) != 0:
+                if debug:
+                    for ack in global_acks:
+                        print(f"SEND GLOBAL ACK {ack}")
+                node.send_global_acks(global_acks)
+                has_sent_global_ack = True
         all_acked, has_fail_ack = check_global_acks(node, roots)
-        ended_resolution = all_acked or has_fail_ack 
-        node.new_received_ack()
+        print(f"CHECK GLOBAL ACK: all_acked={all_acked} ; has_fail_ack:{has_fail_ack}")
+        ended_resolution = all_acked
         if debug:
             print(f"====================================================")
             print(f"At the end of the {nloop}th loop:")
             node.print_status()
+            print(f"ENDED RESOLUTION : {ended_resolution}")
             print(f"====================================================")
-            time.sleep(1)
+            time.sleep(1)    
+    if debug:
+        print(f"====================================================")
+    print(f"At the end :")
+    node.print_status()
+    print(f"====================================================")
+
     if has_fail_ack:
         if node_is_root:
             print(node.get_failing_reasons())
         else:
             print("The reconfiguration is unsat considering the current submitted goals.")
             print(node.get_local_conflict())
-        return None 
+        result = None 
     else:
-        return f_final(model)
+        result = f_final(model)
+    # node.global_synchro()
+    return result

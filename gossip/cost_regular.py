@@ -902,11 +902,12 @@ solve minimize scost;
             r = result.solution
             return CRSolution(r, sat=True)
         
-    def solve_choco(self,findmus=False, write_file=False, print_model=False):
+    def solve_choco(self,findmus=False, write_file=False, filename="mode.json", print_model=False):
         if findmus:
-            self.make_json_model(print_model=False, write_file=True, filepath="model.json")
+            # TODO Change model.json into model_component.json
+            self.make_json_model(print_model=False, write_file=True, filepath=filename)
             try:
-                cmd = "java -jar ballet-planner-mus-1.0-SNAPSHOT-shaded.jar model.json"
+                cmd = f"java -jar ballet-planner-mus-1.0-SNAPSHOT-shaded.jar {filename}"
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 return CRSolution(result.stdout, sat=False)
             except subprocess.CalledProcessError as e:
@@ -926,12 +927,13 @@ solve minimize scost;
             return None, None
     
     def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
+        print(f"Solve with: {mode}, findMus: {findmus}, solver: {solve_with}")
         if mode == "minizinc":
             return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
         if mode == "minizinc-global" or  mode == "minizinc_global" or mode == "global":
             return self.solve_minizinc_global(findmus, write_file, file_name, print_model, solve_with)
         if mode == "choco":
-            return self.solve_choco(findmus, write_file, print_model)
+            return self.solve_choco(findmus, write_file, file_name, print_model)
         
         
 class MultiCostRegular(Model):
@@ -954,7 +956,7 @@ class MultiCostRegular(Model):
                     skip_value = solution.get("sequence")[-1]
                     self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
             except FindMUSException:
-                self._solutions[key] = model.solve(mode="choco", findmus=True, print_model=False, write_file=False)
+                self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
         return self._solutions
 
     def get_node(self):

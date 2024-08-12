@@ -5,6 +5,7 @@ from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
 import argparse
+import json
 
 # -----------------------------------------------------------------------
 #  SETUP CONSIDERED LOADED FROM .yaml FILES IN BALLET
@@ -14,12 +15,14 @@ import argparse
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
 parser.add_argument('-i', type=int, default=1, help='ID of user')
+parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
 
 args = parser.parse_args()
 
 n = args.n
 sat = False if args.unsat else True
+inventory_file = args.inventory
 
 ADDRESS = 'localhost'
 USER_PORT = 3000
@@ -27,7 +30,6 @@ PORT = USER_PORT
 
 node_name = "node_user"
 devops = "DevOpsUser"
-print(f"WELCOME TO {node_name} MANAGED BY {devops}")
 
 # instances
 user = ParallelUser(n) 
@@ -35,12 +37,13 @@ user.set_name(f"user")
 
 # inventory
 inventory = {}
-inventory[f'user'] =  {'address': ADDRESS, 'port_planner': USER_PORT}
-for i in range(n):
-  inventory[f'provider{i}'] = {'address': ADDRESS, 'port_planner': USER_PORT + i + 1}
-print("Inventory:")
-for (comp, con) in inventory.items():
-      print(f"{comp} @ {con['address']}:{con['port_planner']}")
+if inventory_file != None:
+    with open(inventory_file, 'r') as file:
+        inventory = json.load(file)
+else:
+    inventory[f'user'] =  {'address': ADDRESS, 'port_planner': USER_PORT}
+    for i in range(n):
+      inventory[f'provider{i}'] = {'address': ADDRESS, 'port_planner': USER_PORT + i + 1}
 
 connections = []
 for i in range(n):
@@ -48,8 +51,6 @@ for i in range(n):
     connections.append(connect_config)
     connect_service = (f'provider{i}','service',f'user',f'service{i}')
     connections.append(connect_service)
-    print(connect_config)
-    print(connect_service)
 
 ## Active
 active = {user: 'running'}

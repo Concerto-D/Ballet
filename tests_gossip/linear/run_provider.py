@@ -5,15 +5,18 @@ from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
 import argparse
+import json
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
+parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
 
 args = parser.parse_args()
 n = args.n
 sat = False if args.unsat else True
+inventory_file = args.inventory
 
 ADDRESS = 'localhost'
 PROVIDER_PORT = 3000
@@ -21,7 +24,6 @@ PORT = PROVIDER_PORT
 
 node_name = "node_provider"
 devops = "DevOpsProvider"
-print(f"WELCOME TO {node_name} MANAGED BY {devops} RUN ON {ADDRESS}:{PORT}")
 
 # instances
 provider = Provider()
@@ -29,14 +31,14 @@ provider.set_name(f"provider")
 
 # inventory
 inventory = {}
-inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
-for i in range(n):
-  inventory[f'transformer{i}'] = {'address': ADDRESS, 'port_planner': PROVIDER_PORT + i + 1}
-
-print("Inventory:")
-for (comp, con) in inventory.items():
-      print(f"{comp} @ {con['address']}:{con['port_planner']}")
-      
+if inventory_file != None:
+    with open(inventory_file, 'r') as file:
+        inventory = json.load(file)
+else:
+    inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
+    for i in range(n):
+        inventory[f'transformer{i}'] = {'address': ADDRESS, 'port_planner': PROVIDER_PORT + i + 1}
+          
 connections = []
 
 if n > 0:
@@ -44,8 +46,6 @@ if n > 0:
     connections.append(connect_config)
     connect_service = (f'provider','service',f'transformer{0}',f'serviceIn')
     connections.append(connect_service)
-    print(connect_config)
-    print(connect_service)
     
 active = {provider: 'running'}
 
@@ -54,8 +54,6 @@ if sat:
     goals = {provider: [BehaviorReconfigurationGoal('update'), StateReconfigurationGoal("initial", final=True)]}
 else:
     goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
-    
-    
     
 node = CostRegularNode(id=node_name,
   admin=devops, components=[provider], 

@@ -5,10 +5,12 @@ from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
 import argparse
+import json
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
+parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('-i', type=int, default=1, help='ID of user')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
 
@@ -17,6 +19,7 @@ args = parser.parse_args()
 n = args.n
 id = args.i
 sat = False if args.unsat else True
+inventory_file = args.inventory
 
 ADDRESS = 'localhost'
 PROVIDER_PORT = 3000 
@@ -24,7 +27,6 @@ PORT = PROVIDER_PORT + id
 
 node_name = f"node_transformer{id-1}"
 devops = f"DevOpsTransformer{id-1}"
-print(f"WELCOME TO {node_name} MANAGED BY {devops} RUN ON {ADDRESS}:{PORT}")
 
 # instances
 transformer = Transformer()
@@ -32,15 +34,13 @@ transformer.set_name(f"transformer{id-1}")
 
 # inventory
 inventory = {}
-inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
-for i in range(n):
-  inventory[f'transformer{i}'] = {'address': ADDRESS, 'port_planner': PROVIDER_PORT + i + 1}
-
-print("Inventory:")
-for (comp, con) in inventory.items():
-      print(f"{comp} @ {con['address']}:{con['port_planner']}")
-
-
+if inventory_file != None:
+    with open(inventory_file, 'r') as file: 
+        inventory = json.load(file)
+else:
+    inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
+    for i in range(n):
+        inventory[f'transformer{i}'] = {'address': ADDRESS, 'port_planner': PROVIDER_PORT + i + 1}
 
 connections = []
 # Connection to the left
@@ -49,23 +49,17 @@ if id == 1:
     connections.append(connect_config)
     connect_service = (f'provider','service',f'transformer{0}',f'serviceIn')
     connections.append(connect_service)
-    print(connect_config)
-    print(connect_service)
 else: 
     connect_config = (f'transformer{id-2}','configOut',f'transformer{id-1}',f'configIn')
     connections.append(connect_config)
     connect_service = (f'transformer{id-2}','serviceOut',f'transformer{id-1}',f'serviceIn')
     connections.append(connect_service)
-    print(connect_config)
-    print(connect_service)
 # Connection to the right
 if id != n:
     connect_config = (f'transformer{id-1}','configOut',f'transformer{id}',f'configIn')
     connections.append(connect_config)
     connect_service = (f'transformer{id-1}','serviceOut',f'transformer{id}',f'serviceIn')
     connections.append(connect_service)
-    print(connect_config)
-    print(connect_service)
     
 active = {transformer: 'running'}
 
@@ -90,7 +84,6 @@ if sat or n == 0:
     roots=['provider']
 else:
     roots=['provider', f'transformer{n-1}']
-    print(f'UNSAT and N > 0: roots = {roots}')
     
 # -----------------------------------------------------------------------
 #  PLAN

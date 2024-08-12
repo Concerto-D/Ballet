@@ -4,6 +4,7 @@ from ballet.assembly.concertod.components.basics.provider import Provider
 from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
+import json
 import argparse
 
 # -----------------------------------------------------------------------
@@ -13,11 +14,13 @@ import argparse
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
+parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
 args = parser.parse_args()
 
 n = args.n
 sat = False if args.unsat else True
+inventory_file = args.inventory
 
 ADDRESS = 'localhost'
 PROVIDER_PORT = 3000
@@ -29,15 +32,14 @@ provider.set_name("provider")
 
 # inventory
 inventory = {}
-inventory['provider'] = {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
-for i in range(n):
-    inventory[f'user{i}'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT + i + 1}
-print("Inventory:")
-for (comp, con) in inventory.items():
-      print(f"{comp} @ {con['address']}:{con['port_planner']}")
+if inventory_file != None:
+    with open(inventory_file, 'r') as file:
+        inventory = json.load(file)
+else:
+    inventory['provider'] = {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
+    for i in range(n):
+        inventory[f'user{i}'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT + i + 1}
 
-
-print(f"n={n}")
 ## Connections
 connections = []
 for i in range(n):
@@ -45,8 +47,6 @@ for i in range(n):
     connections.append(connect_config)
     connect_service = ('provider','service',f'user{i}','service')
     connections.append(connect_service)
-    print(connect_config)
-    print(connect_service)
 
 ## Active
 active = {provider: 'running'}

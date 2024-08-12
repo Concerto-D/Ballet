@@ -3,6 +3,10 @@
 # Define the tests directory
 tests_dir="tests_gossip/stratified"
 
+ADDRESS="localhost"
+PROVIDER_PORT=3000
+ENDUSER_PORT=3001
+
 # Check for the first argument (-n)
 if [ -z "$1" ]; then
     n=0  # Default value
@@ -28,12 +32,26 @@ cp "$tests_dir/run_provider.py" .
 cp "$tests_dir/run_end_user.py" .
 cp "$tests_dir/run_parallel_user.py" .
 
+# Start building the JSON structure using jq
+inventory=$(jq -n --arg address "$ADDRESS" --argjson port_planner "$PROVIDER_PORT" \
+  '{provider: {address: $address, port_planner: $port_planner}}')
+inventory=$(echo "$inventory" | jq --arg address "$ADDRESS" --argjson port_planner "$ENDUSER_PORT" \
+  '. + {enduser: {address: $address, port_planner: $port_planner}}')
+# Loop to add users
+for uid in $(seq 0 $((n-1))); do
+    user_port=$((ENDUSER_PORT + 1 + uid))
+    inventory=$(echo "$inventory" | jq --arg address "$ADDRESS" --argjson port_planner "$user_port" --arg uid "$uid" \
+      '. + {("user" + $uid): {address: $address, port_planner: $port_planner}}')
+done
+# Write the inventory to a JSON file
+echo "$inventory" > inventory.json
+
 # Check if n is not equal to 0
 if [ "$n" -ne 0 ]; then
     for ((i=0; i<$n; i++)); do
         # Execute the run_parallel_user.py script with the current value of i and unsat flag
         # if [ "$i" -ne 0 ]; then
-        gnome-terminal -- bash -c "python3 $debugger_flag run_parallel_user.py -n $n -i $i $unsat_flag; echo ''; read -n 1; exec bash"
+        gnome-terminal -- bash -c "python3 $debugger_flag run_parallel_user.py -n $n -i $i $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
         # fi
     done
 else

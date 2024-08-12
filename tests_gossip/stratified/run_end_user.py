@@ -4,16 +4,19 @@ from ballet.assembly.concertod.components.basics.parallel_user import ParallelUs
 from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
+import json
 import argparse
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
+parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 
 args = parser.parse_args()
 n = args.n
 sat = False if args.unsat else True
+inventory_file = args.inventory
 
 ADDRESS = 'localhost'
 PROVIDER_PORT = 3000
@@ -22,18 +25,20 @@ PORT = ENDUSER_PORT
 
 node_name = "node_enduser"
 devops = "DevOpsEndUser"
-print(f"WELCOME TO {node_name} MANAGED BY {devops} RUN ON {ADDRESS}:{PORT}")
 
 m = 1 if n == 0 else ((n - 1) % 3) + 1
 enduser = ParallelUser(m)
 enduser.set_name(f"enduser")
 
 inventory = {}
-inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
-inventory[f'enduser'] =  {'address': ADDRESS, 'port_planner': ENDUSER_PORT}
-for uid in range(0, n):
-  inventory[f'user{uid}'] = {'address': ADDRESS, 'port_planner': ENDUSER_PORT + 1 + uid}
-print(inventory)
+if inventory_file != None:
+    with open(inventory_file, 'r') as file:
+        inventory = json.load(file)
+else:
+    inventory[f'provider'] =  {'address': ADDRESS, 'port_planner': PROVIDER_PORT}
+    inventory[f'enduser'] =  {'address': ADDRESS, 'port_planner': ENDUSER_PORT}
+    for uid in range(0, n):
+        inventory[f'user{uid}'] = {'address': ADDRESS, 'port_planner': ENDUSER_PORT + 1 + uid}
 
 connections = []
 if n == 0:
@@ -49,8 +54,6 @@ else:
             connections.append(service_enduser)
             config_enduser = (u_id, "config", "enduser", "config" + str(i % 3))
             connections.append(config_enduser)
-for connection in connections:
-    print(connection) 
     
 active = {enduser: 'running'}
 

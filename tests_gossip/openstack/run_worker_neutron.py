@@ -31,7 +31,7 @@ PORT =  MASTER_PORT + 10 * (i + 1) + 2
  
 # instances
 neutron_worker = Neutron()
-neutron_worker.set_name(f"neutron{i}")
+neutron_worker.set_name(f"neutronworker{i}")
 components = [neutron_worker]
 
 # inventory
@@ -64,8 +64,8 @@ else:
         inventory[f'neutronworker{wid}'] = {'address': ADDRESS, 'port_planner': WORKER_NEUTRON_PORT} 
         
 connections = []
-connections.append((f'mariadbworker{i}','service', f'neutron{i}', 'mariadbservice'))  
-connections.append((f'keystone{i}','service', f'neutron{i}', 'keystoneservice'))  
+connections.append((f'mariadbworker{i}','service', f'neutronworker{i}', 'mariadbservice'))  
+connections.append((f'keystoneworker{i}','service', f'neutronworker{i}', 'keystoneservice'))  
 
 ## Active
 active = {
@@ -74,9 +74,10 @@ active = {
 
 ## Goal
 if sat:
-    goals = {}
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
 else:
-    goals = {}
+    # TODO setup a scenario
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
     
 node = CostRegularNode(id=node_name,
   admin=devops, components=components, 
@@ -87,7 +88,7 @@ node = CostRegularNode(id=node_name,
   inventory=inventory)
 
 # roots
-roots=[]
+roots=['mariadbmaster']
 
 # -----------------------------------------------------------------------
 #  PLAN

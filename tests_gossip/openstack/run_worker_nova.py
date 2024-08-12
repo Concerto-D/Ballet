@@ -31,7 +31,7 @@ PORT =  MASTER_PORT + 10 * (i + 1) + 1
  
 # instances
 nova_worker = Nova()
-nova_worker.set_name(f"nova{i}")
+nova_worker.set_name(f"novaworker{i}")
 components = [nova_worker]
 
 # inventory
@@ -64,8 +64,8 @@ else:
         inventory[f'novaworker{wid}'] = {'address': ADDRESS, 'port_planner': WORKER_NEUTRON_PORT} 
         
 connections = []
-connections.append((f'mariadbworker{i}','service', f'nova{i}', 'mariadbservice'))  
-connections.append((f'keystone{i}','service', f'nova{i}', 'keystoneservice'))  
+connections.append((f'mariadbworker{i}','service', f'novaworker{i}', 'mariadbservice'))  
+connections.append((f'keystoneworker{i}','service', f'novaworker{i}', 'keystoneservice'))  
 
 ## Active
 active = {
@@ -74,9 +74,10 @@ active = {
 
 ## Goal
 if sat:
-    goals = {}
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
 else:
-    goals = {}
+    # TODO setup a scenario
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
     
 node = CostRegularNode(id=node_name,
   admin=devops, components=components, 
@@ -87,7 +88,7 @@ node = CostRegularNode(id=node_name,
   inventory=inventory)
 
 # roots
-roots=[]
+roots=['mariadbmaster']
 
 # -----------------------------------------------------------------------
 #  PLAN

@@ -107,9 +107,12 @@ active = {
 
 ## Goal
 if sat:
-    goals = {}
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
+    goals[mariadb_master].append(BehaviorReconfigurationGoal('update'))
 else:
-    goals = {}
+    # TODO setup a scenario
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
+    goals[mariadb_master].append(BehaviorReconfigurationGoal('update'))
     
 node = CostRegularNode(id=node_name,
   admin=devops, components=components, 
@@ -120,7 +123,7 @@ node = CostRegularNode(id=node_name,
   inventory=inventory)
 
 # roots
-roots=[]
+roots=['mariadbmaster']
 
 # -----------------------------------------------------------------------
 #  PLAN

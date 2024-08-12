@@ -67,15 +67,15 @@ done
 echo "$inventory" > inventory.json
 
 # Run master
-gnome-terminal -- bash -c "python3 $debugger_flag run_provider.py -n $n $unsat_flag; echo ''; read -n 1; exec bash"
+gnome-terminal -- bash -c "python3 $debugger_flag run_master.py -worker $n $unsat_flag; echo ''; read -n 1; exec bash"
 # Check if n is not equal to 0
 if [ "$n" -ne 0 ]; then
     for ((i=0; i<$n; i++)); do
         # Execute the run_parallel_user.py script with the current value of i and unsat flag
         # if [ "$i" -ne 0 ]; then
-        gnome-terminal -- bash -c "python3 $debugger_flag run_worker_mariadb.py -n $n -i $i $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
-        gnome-terminal -- bash -c "python3 $debugger_flag run_worker_neutron.py -n $n -i $i $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
-        gnome-terminal -- bash -c "python3 $debugger_flag run_worker_nova.py -n $n -i $i $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+        gnome-terminal -- bash -c "python3 $debugger_flag run_worker_mariadb.py -worker $n -i $i $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+        gnome-terminal -- bash -c "python3 $debugger_flag run_worker_neutron.py -worker $n -i $i $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+        gnome-terminal -- bash -c "python3 $debugger_flag run_worker_nova.py -worker $n -i $i $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
         # fi
     done
 else
@@ -83,10 +83,10 @@ else
 fi
 
 echo "Press any key for cleaning local environment"; read -n 1 key
-rm "$tests_dir/run_master.py" .
-rm "$tests_dir/run_worker_mariadb.py" .
-rm "$tests_dir/run_worker_neutron.py" .
-rm "$tests_dir/run_worker_nova.py" .
+rm "run_master.py" 
+rm "run_worker_mariadb.py" 
+rm "run_worker_neutron.py" 
+rm "run_worker_nova.py" 
 
 if [ "$key" = "x" ] || [ "$key" = "c" ]; then
     echo "You pressed 'x'. Cleaning local environment."

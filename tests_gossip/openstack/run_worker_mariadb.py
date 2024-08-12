@@ -54,10 +54,11 @@ facts_worker = Facts()
 facts_worker.set_name(f"factsworker{i}")
 keystone_worker = Keystone()
 keystone_worker.set_name(f"keystoneworker{i}")
-glance_worker = Keystone()
+glance_worker = Glance()
 glance_worker.set_name(f"glanceworker{i}")
 components = [mariadb_worker, common_worker, haproxy_worker, memcached_worker, 
-              ovswitch_worker, rabbitmq_worker, facts_worker]
+              ovswitch_worker, rabbitmq_worker, facts_worker, keystone_worker, 
+              glance_worker]
 
 # inventory
 inventory = {}
@@ -89,6 +90,7 @@ else:
         inventory[f'neutronworker{wid}'] = {'address': ADDRESS, 'port_planner': WORKER_NEUTRON_PORT} 
         
 connections = []
+connections.append(('mariadbmaster','service',f'mariadbworker{i}','masterservice'))  
 connections.append((f'factsworker{i}','service',f'commonworker{i}','factsservice'))
 connections.append((f'factsworker{i}','service',f'haproxyworker{i}','factsservice'))
 connections.append((f'factsworker{i}','service',f'memcachedworker{i}','factsservice'))
@@ -96,14 +98,13 @@ connections.append((f'factsworker{i}','service',f'ovswitchworker{i}','factsservi
 connections.append((f'factsworker{i}','service',f'rabbitmqworker{i}','factsservice'))
 connections.append((f'commonworker{i}','service',f'mariadbworker{i}','commonservice'))
 connections.append((f'haproxyworker{i}','service',f'mariadbworker{i}','haproxyservice'))
-connections.append(('mariadbmaster','service',f'mariadbworker{i}','masterservice'))  
-connections.append((f'mariadbworker{i}','service', f'keystone{i}', 'mariadbservice'))  
-connections.append((f'mariadbworker{i}','service', f'glance{i}', 'mariadbservice'))  
-connections.append((f'mariadbworker{i}','service', f'nova{i}', 'mariadbservice'))  
-connections.append((f'mariadbworker{i}','service', f'neutron{i}', 'mariadbservice'))  
-connections.append((f'keystone{i}','service', f'nova{i}', 'keystoneservice'))  
-connections.append((f'keystone{i}','service', f'neutron{i}', 'keystoneservice'))  
-connections.append((f'keystone{i}','service', f'glance{i}', 'keystoneservice'))  
+connections.append((f'mariadbworker{i}','service', f'keystoneworker{i}', 'mariadbservice'))  
+connections.append((f'mariadbworker{i}','service', f'glanceworker{i}', 'mariadbservice'))  
+connections.append((f'mariadbworker{i}','service', f'novaworker{i}', 'mariadbservice'))  
+connections.append((f'mariadbworker{i}','service', f'neutronworker{i}', 'mariadbservice'))  
+connections.append((f'keystoneworker{i}','service', f'novaworker{i}', 'keystoneservice'))  
+connections.append((f'keystoneworker{i}','service', f'neutronworker{i}', 'keystoneservice'))  
+connections.append((f'keystoneworker{i}','service', f'glanceworker{i}', 'keystoneservice'))  
 
 ## Active
 active = {
@@ -120,9 +121,10 @@ active = {
 
 ## Goal
 if sat:
-    goals = {}
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
 else:
-    goals = {}
+    # TODO setup a scenario
+    goals = {comp : [StateReconfigurationGoal("initial", final=True)] for comp in components}
     
 node = CostRegularNode(id=node_name,
   admin=devops, components=components, 
@@ -133,7 +135,7 @@ node = CostRegularNode(id=node_name,
   inventory=inventory)
 
 # roots
-roots=[]
+roots=['mariadbmaster']
 
 # -----------------------------------------------------------------------
 #  PLAN

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the tests directory
-tests_dir="tests_gossip/central_provider"
+tests_dir="examples/tests_gossip/central_provider"
 
 ADDRESS='localhost'
 PROVIDER_PORT=3000

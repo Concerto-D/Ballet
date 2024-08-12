@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the tests directory
-tests_dir="tests_gossip/openstack"
+tests_dir="examples/tests_gossip/openstack"
 
 ADDRESS="localhost"
 MASTER_PORT=3000

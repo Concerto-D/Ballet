@@ -23,7 +23,7 @@ class Memcached(Component):
         
         self.dependencies = {
             "service": (DepType.PROVIDE, ["deployed"]),
-            "facts_service": (DepType.USE, ["deployed"])
+            "factsservice": (DepType.USE, ["deployed"])
         }
         
         self.initial_place = "initiated"

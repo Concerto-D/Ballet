@@ -28,8 +28,8 @@ class Neutron(Component):
         
         self.dependencies = {
             "service": (DepType.PROVIDE, ["deployed"]),
-            "mariadb_service": (DepType.USE, ["deployed", "pulled"]),
-            "keystone_service": (DepType.USE, ["deployed", "pulled"])
+            "mariadbservice": (DepType.USE, ["deployed", "pulled"]),
+            "keystoneservice": (DepType.USE, ["deployed", "pulled"])
         }
         
         self.initial_place = "initiated"

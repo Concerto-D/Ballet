@@ -36,9 +36,9 @@ class MariadbWorker(Component):
         
         self.dependencies = {
             "service": (DepType.PROVIDE, ["deployed"]),
-            "haproxy_service": (DepType.USE, ["restarted", "bootstrapped"]),
-            "common_service": (DepType.USE, ["registered", "restarted", "interrupted", "deployed"]),
-            "master_service": (DepType.USE, ["registered", "bootstrapped", "deployed", "restarted", "interrupted"])
+            "haproxyservice": (DepType.USE, ["restarted", "bootstrapped"]),
+            "commonservice": (DepType.USE, ["registered", "restarted", "interrupted", "deployed"]),
+            "masterservice": (DepType.USE, ["registered", "bootstrapped", "deployed", "restarted", "interrupted"])
         }
         
         self.initial_place = "initiated"

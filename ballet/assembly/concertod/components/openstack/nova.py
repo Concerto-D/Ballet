@@ -37,8 +37,8 @@ class Nova(Component):
         
         self.dependencies = {
             "service": (DepType.PROVIDE, ["deployed"]),
-            "mariadb_service": (DepType.USE, ["restarted", "ready", "pulled", "deployed"]),
-            "keystone_service": (DepType.USE, ["restarted", "ready", "interrupted", "deployed"])
+            "mariadbservice": (DepType.USE, ["restarted", "ready", "pulled", "deployed"]),
+            "keystoneservice": (DepType.USE, ["restarted", "ready", "interrupted", "deployed"])
         }
         
         self.initial_place = "initiated"

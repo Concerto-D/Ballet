@@ -28,8 +28,8 @@ class Glance(Component):
         
         self.dependencies = {
             "service": (DepType.PROVIDE, ["deployed"]),
-            "mariadb_service": (DepType.USE, ["pulled", "deployed"]),
-            "keystone_service": (DepType.USE, ["pulled", "deployed"])
+            "mariadbservice": (DepType.USE, ["pulled", "deployed"]),
+            "keystoneservice": (DepType.USE, ["pulled", "deployed"])
         }
         
         self.initial_place = "initiated"

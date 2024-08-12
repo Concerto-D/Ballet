@@ -26,7 +26,7 @@ class Common(Component):
         
         self.dependencies = {
             "service": (DepType.PROVIDE, ["deployed"]),
-            "facts_service": (DepType.USE, ["deployed", "configured"])
+            "factsservice": (DepType.USE, ["deployed", "configured"])
         }
         
         self.initial_place = "initiated"

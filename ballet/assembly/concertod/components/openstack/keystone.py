@@ -26,7 +26,7 @@ class Keystone(Component):
         
         self.dependencies = {
             "service": (DepType.PROVIDE, ["deployed"]),
-            "mariadb_service": (DepType.USE, ["deployed", "pulled"])
+            "mariadbservice": (DepType.USE, ["deployed", "pulled"])
         }
         
         self.initial_place = "initiated"

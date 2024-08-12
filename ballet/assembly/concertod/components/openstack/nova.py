@@ -6,9 +6,10 @@ from ballet.assembly.concertod.dependency import DepType
 
 class Nova(Component):
 
-    def __init__(self, **kwargs):
+    def __init__(self, trans_time={}, versions=[]):
         Component.__init__(self)
-        self.trans_times = kwargs
+        self.trans_times = trans_time
+        self.versions = versions
     
     def create(self):
         self.places = [
@@ -16,9 +17,13 @@ class Nova(Component):
             "pulled",
             "ready",
             "restarted",
-            "deployed",
             "interrupted"
         ]
+        if self.versions == []:
+            self.places.append("deployed")
+        else:
+            for version in self.versions:
+                self.places.append(f"deployedv{version}")
         
         self.transitions = {
             "pull0": ("initiated", "pulled", "deploy", 0, self.pull0),
@@ -27,19 +32,33 @@ class Nova(Component):
             "ready0": ("pulled", "ready", "deploy", 0, self.ready0),
             "ready1": ("pulled", "ready", "deploy", 0, self.ready1),
             "start": ("ready", "restarted", "deploy", 0, self.start),
-            "deploy": ("restarted", "deployed", "deploy", 0, self.deploy),
-            "cell_setup": ("pulled", "deployed", "deploy", 0, self.cell_setup),
-            "interrupt": ("deployed", "interrupted", "interrupt", 0, self.interrupt),
             "pause": ("interrupted", "ready", "pause", 0, self.pause),
             "unpull": ("interrupted", "pulled", "update", 0, self.unpull),
             "uninstall": ("interrupted", "initiated", "uninstall", 0, self.uninstall)
         }
+        if self.versions == []:
+            self.transitions["deploy"] = ("restarted", "deployed", "deploy", 0, self.deploy)
+            self.transitions["interrupt"] = ("deployed", "interrupted", "interrupt", 0, self.interrupt)
+            self.transitions["cell_setup"] = ("pulled", "deployed", "deploy", 0, self.cell_setup)
+        else:
+            for version in self.versions:
+                self.transitions[f"deployv{version}"] = ("restarted", f"deployedv{version}", f"deployv{version}", 0, lambda _: self.deploy(version))
+                self.transitions[f"interruptv{version}"] = (f"deployedv{version}", "interrupted", "interrupt", 0, self.interrupt)
+                self.transitions[f"cell_setupv{version}"] = ("pulled", f"deployedv{version}", "deploy", 0, lambda _: self.deploy(version))
+        
         
         self.dependencies = {
-            "service": (DepType.PROVIDE, ["deployed"]),
             "mariadbservice": (DepType.USE, ["restarted", "ready", "pulled", "deployed"]),
             "keystoneservice": (DepType.USE, ["restarted", "ready", "interrupted", "deployed"])
         }
+        if self.versions == []:
+            self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
+        else:
+            deployed_states = []
+            for version in self.versions:
+                deployed_states.append(f"deployedv{version}")
+                self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
+            self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
         
         self.initial_place = "initiated"
 
@@ -91,7 +110,7 @@ class Nova(Component):
             pass
         self.print_color("end start")
 
-    def deploy(self):
+    def deploy(self, version=None):
         self.print_color("begin deploy")
         if "deploy" in self.trans_times:
             time.sleep(self.trans_times["deploy"])
@@ -99,7 +118,7 @@ class Nova(Component):
             pass
         self.print_color("end deploy")
 
-    def cell_setup(self):
+    def cell_setup(self, version=None):
         self.print_color("begin cell_setup")
         if "cell_setup" in self.trans_times:
             time.sleep(self.trans_times["cell_setup"])

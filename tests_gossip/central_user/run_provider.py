@@ -46,7 +46,6 @@ else:
     for i in range(n):
       inventory[f'provider{i}'] = {'address': ADDRESS, 'port_planner': USER_PORT + i + 1}
 
-print(f"n={n}")
 ## Connections
 connections = []
 connect_config = (f'provider{id-1}','config','user',f'config{id}')

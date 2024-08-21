@@ -7,9 +7,9 @@ from ballet.assembly.concertod.dependency import DepType
 class Common(Component):
 
     def __init__(self, trans_time={}, versions=[]):
-        Component.__init__(self)
         self.trans_times = trans_time
         self.versions = versions
+        super().__init__()
     
     def create(self):
         self.places = [
@@ -23,28 +23,30 @@ class Common(Component):
                 self.places.append(f"deployedv{version}")
         
         self.transitions = {
-            "configure": ("initiated", "configured", "deploy", 0, self.configure),
-            "stop": ("deployed", "configured", "stop", 0, self.stop),
+            "configure": ("initiated", "configured", "deploy", 0, self.configure)
         }
         if self.versions == []:
             self.transitions["deploy"] = ("configured", "deployed", "deploy", 0, self.deploy)
             self.transitions["uninstall"] = ("deployed", "initiated", "uninstall", 0, self.uninstall)
+            self.transitions["stop"] = ("deployed", "configured", "stop", 0, self.stop)
         else:
             for version in self.versions:
                 self.transitions[f"deployv{version}"] = ("configured", f"deployedv{version}", f"deployv{version}", 0, lambda _: self.deploy(version))
                 self.transitions[f"uninstallv{version}"] = (f"deployedv{version}", "initiated", "uninstall", 0, self.uninstall)
-            
-        self.dependencies = {
-            "factsservice": (DepType.USE, ["deployed", "configured"])
-        }
+                self.transitions[f"stopv{version}"] = (f"deployedv{version}", "configured", "stop", 0, self.stop)
+                
+        self.dependencies = {}
         if self.versions == []:
             self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
+            self.dependencies["factsservice"] = (DepType.USE, ["deployed", "configured"])
         else:
-            deployed_states = []
+            all_deployed_states = []
             for version in self.versions:
-                deployed_states.append(f"deployedv{version}")
+                all_deployed_states.append(f"deployedv{version}")
                 self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
-            self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
+                self.dependencies[f"factsservicev{version}"] = (DepType.USE, [f"deployedv{version}", "configured"])
+            self.dependencies["service"] = (DepType.PROVIDE, all_deployed_states)
+            self.dependencies["factsservice"] = (DepType.USE, all_deployed_states + ["configured"])
         
         self.initial_place = "initiated"
 

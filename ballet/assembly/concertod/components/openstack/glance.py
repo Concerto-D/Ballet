@@ -7,9 +7,9 @@ from ballet.assembly.concertod.dependency import DepType
 class Glance(Component):
 
     def __init__(self, trans_time={}, versions=[]):
-        Component.__init__(self)
         self.trans_times = trans_time
         self.versions = versions
+        super().__init__()
     
     def create(self):
         self.places = [
@@ -30,27 +30,31 @@ class Glance(Component):
         
         if self.versions == []:
             self.transitions["deploy"] = ("pulled", "deployed", "deploy", 0, self.deploy)
-            self.transitions["stop"] = ("deployed", "pulled", "stop", 0, self.stop),
+            self.transitions["stop"] = ("deployed", "pulled", "stop", 0, self.stop)
             self.transitions["turnoff"] = ("deployed", "initiated", "uninstall", 0, self.turnoff)
         else:
             for version in self.versions:
                 self.transitions[f"deployv{version}"] = ("pulled", f"deployedv{version}", f"deployv{version}", 0, lambda _: self.deploy(version))
-                self.transitions[f"stopv{version}"] = (f"deployedv{version}", "pulled", "stop", 0, self.stop),
+                self.transitions[f"stopv{version}"] = (f"deployedv{version}", "pulled", "stop", 0, self.stop)
                 self.transitions[f"turnoffv{version}"] = (f"deployedv{version}", "initiated", "uninstall", 0, self.turnoff)
         
         
         self.dependencies = {
-            "mariadbservice": (DepType.USE, ["pulled", "deployed"]),
-            "keystoneservice": (DepType.USE, ["pulled", "deployed"])
         }
         if self.versions == []:
             self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
+            self.dependencies["mariadbservice"] = (DepType.USE, ["pulled", "deployed"])
+            self.dependencies["keystoneservice"] = (DepType.USE, ["pulled", "deployed"])
         else:
-            deployed_states = []
+            all_deployed_states = []
             for version in self.versions:
-                deployed_states.append(f"deployedv{version}")
+                all_deployed_states.append(f"deployedv{version}")
                 self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
-            self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
+                self.dependencies[f"mariadbservicev{version}"] = (DepType.USE, [f"deployedv{version}", "pulled"])
+                self.dependencies[f"keystoneservicev{version}"] = (DepType.USE, [f"deployedv{version}", "pulled"])
+            self.dependencies["service"] = (DepType.PROVIDE, all_deployed_states)
+            self.dependencies["mariadbservice"] = (DepType.USE, all_deployed_states + ["pulled"])
+            self.dependencies["keystoneservice"] = (DepType.USE, all_deployed_states + ["pulled"])
         
         
         self.initial_place = "initiated"

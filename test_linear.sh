@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the tests directory
-tests_dir="tests_gossip/linear"
+tests_dir="examples/tests_gossip/linear"
 
 ADDRESS='localhost'
 PROVIDER_PORT=3000

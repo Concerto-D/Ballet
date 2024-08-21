@@ -7,9 +7,9 @@ from ballet.assembly.concertod.dependency import DepType
 class Memcached(Component):
 
     def __init__(self, trans_time={}, versions=[]):
-        Component.__init__(self)
         self.trans_times = trans_time
         self.versions = versions
+        super().__init__()
     
     def create(self):
         self.places = [
@@ -32,17 +32,17 @@ class Memcached(Component):
                 self.transitions[f"deployv{version}"] = ("initiated", f"deployedv{version}", f"deployv{version}", 0, lambda _: self.deploy(version))
                 self.transitions[f"uninstallv{version}"] = (f"deployedv{version}", "initiated", "uninstall", 0, lambda _: self.uninstall)
                 
-        self.dependencies = {
-            "factsservice": (DepType.USE, ["deployed"])
-        }
-        
+        self.dependencies = {}
         if self.versions == []:
+            self.dependencies["factsservice"] = (DepType.USE, ["deployed"])
             self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
         else:
             deployed_states = []
             for version in self.versions:
                 deployed_states.append(f"deployedv{version}")
                 self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
+                self.dependencies[f"factsservicev{version}"] = (DepType.USE, [f"deployedv{version}"])
+            self.dependencies["factsservice"] = (DepType.USE, deployed_states)
             self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
         
         self.initial_place = "initiated"

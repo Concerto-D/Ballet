@@ -207,7 +207,9 @@ class CostRegular(Model):
         CostRegular.__assert_conform_costs(states, transitions, costs, automata)
         CostRegular.__assert_conform_ports(states, ports)
         CostRegular.__assert_conform_constraints(states, transitions, ports, constraints)
-        assert init_state in states
+        if not (init_state in states):
+            raise AssertionError(f"Initial state {init_state} is not a valid state ({list(states)}). Hint for the error component:\n{ports}")
+        
         self.__states = states
         self.__transitions = transitions
         added_skip = False
@@ -254,6 +256,8 @@ class CostRegular(Model):
             if constraint.isTransitionConstraint():
                 assert constraint.transition in transitions
             if constraint.isStateConstraint():
+                if not (constraint.state in states):
+                    print(f"{constraint.state} is not in {states} (component = {ports})")
                 assert constraint.state in states
     
     @staticmethod
@@ -879,7 +883,7 @@ solve minimize scost;
             r = result.solution
             return CRSolution(r, sat=True)
     
-    def solve_minizinc_global(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
+    def solve_minizinc_global(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
         wf = write_file if not findmus else True
         modelfile = file_name
         model = mznModel()
@@ -926,7 +930,7 @@ solve minimize scost;
                     f.close()
             return None, None
     
-    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="gecode"):
+    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
         # print(f"Solve with: {mode}, findMus: {findmus}, solver: {solve_with}")
         if mode == "minizinc":
             return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
@@ -949,6 +953,7 @@ class MultiCostRegular(Model):
         for (key, model) in self._models.items():
             try:
                 real_mode = "minizinc" if mode == "minizinc-test" else mode
+                print(f"solving {key} ...")
                 solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
                 if mode != "minizinc-global" and mode != "minizinc-test":
                     self._solutions[key] = solution
@@ -956,7 +961,9 @@ class MultiCostRegular(Model):
                     skip_value = solution.get("sequence")[-1]
                     self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
             except FindMUSException:
+                print(f"{key} 's model is unsat. Qx running")
                 self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
+            print(f"Solving {key}'s model is done")
         return self._solutions
 
     def get_node(self):

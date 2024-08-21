@@ -7,9 +7,9 @@ from ballet.assembly.concertod.dependency import DepType
 class MariadbMaster(Component):
 
     def __init__(self, trans_time={}, versions=[]):
-        Component.__init__(self)
         self.trans_times = trans_time
         self.versions = versions
+        super().__init__()
     
     def create(self):
         self.places = [
@@ -17,7 +17,7 @@ class MariadbMaster(Component):
             "configured",
             "bootstrapped",
             "restarted",
-            "registered"
+            "registered",
             "interrupted"
         ]
         if self.versions == []:
@@ -46,17 +46,19 @@ class MariadbMaster(Component):
         
         
         self.dependencies = {
-            "haproxyservice": (DepType.USE, ["bootstrapped", "restarted"]),
-            "commonservice": (DepType.USE, ["interrupted", "deployed", "restarted", "registered"])
+            "haproxyservice": (DepType.USE, ["bootstrapped", "restarted"])
         }
         if self.versions == []:
             self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
+            self.dependencies["commonservice"] = (DepType.USE, ["interrupted", "deployed", "restarted", "registered"])
         else:
-            deployed_states = []
+            all_deployed_states = []
             for version in self.versions:
-                deployed_states.append(f"deployedv{version}")
+                all_deployed_states.append(f"deployedv{version}")
                 self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
-            self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
+                self.dependencies[f"commonservicev{version}"] = (DepType.USE, [f"deployedv{version}", "interrupted", "restarted", "registered"])
+            self.dependencies["service"] = (DepType.PROVIDE, all_deployed_states)
+            self.dependencies["commonservice"] = (DepType.USE, all_deployed_states + ["interrupted", "restarted", "registered"])
         
         self.initial_place = "initiated"
 

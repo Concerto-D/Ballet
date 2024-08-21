@@ -7,9 +7,9 @@ from ballet.assembly.concertod.dependency import DepType
 class Nova(Component):
 
     def __init__(self, trans_time={}, versions=[]):
-        Component.__init__(self)
         self.trans_times = trans_time
         self.versions = versions
+        super().__init__()
     
     def create(self):
         self.places = [
@@ -47,18 +47,21 @@ class Nova(Component):
                 self.transitions[f"cell_setupv{version}"] = ("pulled", f"deployedv{version}", "deploy", 0, lambda _: self.deploy(version))
         
         
-        self.dependencies = {
-            "mariadbservice": (DepType.USE, ["restarted", "ready", "pulled", "deployed"]),
-            "keystoneservice": (DepType.USE, ["restarted", "ready", "interrupted", "deployed"])
-        }
+        self.dependencies = {}
         if self.versions == []:
             self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
+            self.dependencies["mariadbservice"] = (DepType.USE, ["restarted", "ready", "pulled", "deployed"])
+            self.dependencies["keystoneservice"] = (DepType.USE, ["restarted", "ready", "interrupted", "deployed"])
         else:
             deployed_states = []
             for version in self.versions:
                 deployed_states.append(f"deployedv{version}")
                 self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
+                self.dependencies[f"mariadbservicev{version}"] = (DepType.USE, [f"deployedv{version}", "restarted", "ready", "pulled"])
+                self.dependencies[f"keystoneservicev{version}"] = (DepType.USE, [f"deployedv{version}", "restarted", "ready", "interrupted"])
             self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
+            self.dependencies["mariadbservice"] = (DepType.USE, deployed_states + ["restarted", "ready", "pulled"])
+            self.dependencies["keystoneservice"] = (DepType.USE, deployed_states + ["restarted", "ready", "interrupted"])
         
         self.initial_place = "initiated"
 

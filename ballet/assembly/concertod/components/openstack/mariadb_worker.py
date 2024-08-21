@@ -7,9 +7,9 @@ from ballet.assembly.concertod.dependency import DepType
 class MariadbWorker(Component):
 
     def __init__(self, trans_time={}, versions=[]):
-        Component.__init__(self)
         self.trans_times = trans_time
         self.versions = versions
+        super().__init__()
     
     def create(self):
         self.places = [
@@ -47,17 +47,21 @@ class MariadbWorker(Component):
         
         self.dependencies = {
             "haproxyservice": (DepType.USE, ["restarted", "bootstrapped"]),
-            "commonservice": (DepType.USE, ["registered", "restarted", "interrupted", "deployed"]),
-            "masterservice": (DepType.USE, ["registered", "bootstrapped", "deployed", "restarted", "interrupted"])
         }
         if self.versions == []:
             self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
+            self.dependencies["commonservice"] = (DepType.USE, ["registered", "restarted", "interrupted", "deployed"])
+            self.dependencies["masterservice"] = (DepType.USE, ["registered", "bootstrapped", "deployed", "restarted", "interrupted"])
         else:
             deployed_states = []
             for version in self.versions:
                 deployed_states.append(f"deployedv{version}")
                 self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
+                self.dependencies[f"commonservicev{version}"] = (DepType.USE, [f"deployedv{version}", "interrupted", "restarted", "registered"])
+                self.dependencies[f"masterservicev{version}"] = (DepType.USE, [f"deployedv{version}", "bootstrapped", "interrupted", "restarted", "registered"])
             self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
+            self.dependencies["commonservice"] = (DepType.USE, deployed_states + ["registered", "restarted", "interrupted"])
+            self.dependencies["masterservice"] = (DepType.USE, deployed_states + ["registered", "bootstrapped", "restarted", "interrupted"])
         
         self.initial_place = "initiated"
 

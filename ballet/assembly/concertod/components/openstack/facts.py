@@ -7,9 +7,9 @@ from ballet.assembly.concertod.dependency import DepType
 class Facts(Component):
 
     def __init__(self, trans_time={}, versions=[]):
-        Component.__init__(self)
         self.trans_times = trans_time
         self.versions = versions
+        super().__init__()
     
     def create(self):
         self.places = [
@@ -36,11 +36,11 @@ class Facts(Component):
         if self.versions == []:
             self.dependencies["service"] = (DepType.PROVIDE, ["deployed"])
         else:
-            deployed_states = []
+            all_deployed_states = []
             for version in self.versions:
-                deployed_states.append(f"deployedv{version}")
+                all_deployed_states.append(f"deployedv{version}")
                 self.dependencies[f"servicev{version}"] = (DepType.PROVIDE, [f"deployedv{version}"])
-            self.dependencies["service"] = (DepType.PROVIDE, deployed_states)
+            self.dependencies["service"] = (DepType.PROVIDE, all_deployed_states)
         
         
         self.initial_place = "initiated"

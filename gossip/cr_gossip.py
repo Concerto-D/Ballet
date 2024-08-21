@@ -541,6 +541,9 @@ class CostRegularNode(Node):
     def add_root(self, root):
         self.__roots.add(root)
         
+    def is_comp_root(self, comp):
+        return comp in self.__roots
+        
     def set_local_conflict(self, local):
         self.__local_conflicting_reasons = local
         
@@ -1002,17 +1005,29 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
     return out_messages, list(opt_ack)
 
 
+def check_to_be_diffused(node: CostRegularNode, msg: ConstraintMessage):
+    # If source has no goal constraint, and no inferred constraint from remote message, do not create a message !
+    # It means, it solves a model tat was not needed to be solved... 
+    has_remote_constraint = len(node.get_in_message()[msg.source]) != 0
+    has_reconf_goal = node.is_comp_root(msg.source)
+    return has_remote_constraint or has_reconf_goal
+    
+
 def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, list[Message]]
     res = {}
     out_messages = set()
     for msg in msgs:
-        targets = node.use_by(msg.source, msg.port) + node.provide_by(msg.source, msg.port)
-        for target in targets:
-            if target not in res.keys():
-                res[target] = set()
-            message = ConstraintMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.passed_by, msg.final)
-            res[target].add(message)
-            out_messages.add(message)
+        # If source has no goal constraint, and no inferred constraint from remote message, do not create a message !
+        # It means, it solves a model tat was not needed to be solved... 
+        msg_to_be_diffused = check_to_be_diffused(node, msg)
+        if msg_to_be_diffused:
+            targets = node.use_by(msg.source, msg.port) + node.provide_by(msg.source, msg.port)
+            for target in targets:
+                if target not in res.keys():
+                    res[target] = set()
+                message = ConstraintMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.passed_by, msg.final)
+                res[target].add(message)
+                out_messages.add(message)
     node.add_consequence_of_constraints(node.get_lastest_constraints(), out_messages)        
     return {k: list(v) for (k,v) in res.items()}
 
@@ -1046,9 +1061,9 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
             for connected_port in connected_ports:
                 component = node.components_from_str(message.target)
                 if message.status == "enabled":
-                    validating_states = validating_states | __get_places(component, connected_port)
+                    validating_states = validating_states | set(__get_places(component, connected_port))
                 elif message.status == "disabled":
-                    invalid_states = __get_places(component, connected_port)
+                    invalid_states = set(__get_places(component, connected_port))
                     for place in component.get_places():
                         if place not in invalid_states and place in model.get_model(component.name).states:
                             validating_states.add(place)

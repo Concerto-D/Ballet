@@ -5,12 +5,7 @@ B = TypeVar('B')
 
 
 def map_index(f: Callable[[A, int], B], seq: list[A]) -> list[B]:
-    i = 0
-    res = []
-    for a in seq:
-        res.append(f(a, i))
-        i = i + 1
-    return res
+    return [f(a, i) for i, a in enumerate(seq)]
 
 
 def flatmap(f: Callable[[A], Iterable[B]], seq: list[A]) -> list[B]:
@@ -32,11 +27,7 @@ def exists(p: Callable[[A], bool], seq: list[A]) -> bool:
 
 
 def findAll(p: Callable[[A], bool], seq: list[A]) -> list[A]:
-    res = []
-    for a in seq:
-        if p(a):
-            res.append(a)
-    return res
+    return [a for a in seq if p(a)]
 
 
 def indexify(seq: list[A],starter:int=0) -> list[(A,int)]:
@@ -44,45 +35,22 @@ def indexify(seq: list[A],starter:int=0) -> list[(A,int)]:
 
 
 def difference(l1: Iterable[A], l2: Iterable[A]):
-    s1 = set(l1)
-    s2 = set(l2)
-    return [x for x in l2 if x not in s1] + [x for x in l1 if x not in s2]
+    return [x for x in l2 if x not in set(l1)] + [x for x in l1 if x not in set(l2)]
 
 
 def add_if_no_exist(l: list[A], v: A):
-    if not v in l:
-        l.append(v)
-    return l
-
+    return l + [v] if v not in l else l
 
 def intersection(lst1: Iterable[A], lst2: Iterable[A]):
     return [value for value in lst1 if value in lst2]
 
 
-def reverse(it: Iterable[A]):
-    res = []
-    for a in it:
-        res.insert(0, a)
-    return res
-
-
-def count(p: Callable[[A], bool], lst: Iterable[A]) -> int:
-    res = 0
-    for a in lst:
-        if p(a):
-            res = res + 1
-    return res
+def reverse(it: Iterable[A]) -> list[A]:
+    return list(it)[::-1]
 
 
 def split(p: Callable[[A], bool], lst: Iterable[A]) -> tuple[list[A], list[A]]:
-    l1: list[A] = []
-    l2: list[A] = []
-    for a in lst:
-        if p(a):
-            l1.append(a)
-        else:
-            l2.append(a)
-    return (l1, l2)
+    return [x for x in lst if p(x)], [x for x in lst if not p(x)]
 
 
 def sum_lists(l1: list[A], l2: list[A]) -> list[A]:
@@ -98,3 +66,8 @@ def indexOf(v: A, l: list[A], default: int = -1) -> int:
 
 def forall(p: Callable[[A], bool], l: list[A]) -> bool:
     return not exists(lambda a: not p(a), l)
+
+
+def count(p: Callable[[A], bool], l: list[A]) -> int:
+    return sum([1 if p(a) else 0 for a in l])
+            

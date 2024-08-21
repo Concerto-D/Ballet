@@ -1,10 +1,11 @@
 from minizinc import Instance, Model as mznModel, Solver, Status
-from ballet.utils.list_utils import flatmap, indexify, indexOf
+from ballet.utils.list_utils import flatmap, indexify, indexOf, count
 from ballet.utils import string_utils
 from gossip.gossip import Model, Solution
 from ballet.planner.goal import *
 from ballet.assembly.concertod.component import Component
 import subprocess, json
+import time
 
 class FindMUSException(Exception):
     
@@ -227,7 +228,9 @@ class CostRegular(Model):
                 self.__costs[state]["skip"] = 0
         self.__constraints = constraints
         self.__ports = ports
-        self.__seq_length = len(states) * len(transitions)
+        n_wait = count(lambda b: b.startswith("wait"), transitions)
+        n_bhv = len(transitions) - n_wait
+        self.__seq_length = 2*n_bhv
         
     def __assert_conform_automata(states: list[str], transitions: list[str], automata: dict[str,dict[str,str]]):
         for source in automata.keys():
@@ -313,7 +316,7 @@ class CostRegular(Model):
             self.__transitions.append(label)
         self.__automata[source][label] = target
         self.__costs[source][label] = cost
-        self.__seq_length = len(self.__states) * len(self.__transitions)
+        self.__seq_length = self.__seq_length + 1
         
     @property
     def ports(self):

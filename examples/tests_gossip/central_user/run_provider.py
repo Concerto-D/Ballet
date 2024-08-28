@@ -1,5 +1,5 @@
-from gossip.gossip import gossip
-from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
+from gossip.gossip import gossip, timed_gossip
+from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, cr_local_timed, cr_final_timed
 from ballet.assembly.concertod.components.basics.provider import Provider
 from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
@@ -15,14 +15,18 @@ import json
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
 parser.add_argument('-i', type=int, default=1, help='ID of user')
+parser.add_argument('-it', type=int, default=0, help='Iteration')
 parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
+parser.add_argument('--time', action='store_true', help='Indicate if the time flag is set')
 
 args = parser.parse_args()
 
 n = args.n
 id = args.i
+it = args.it
 sat = False if args.unsat else True
+ctime = True if args.time else False
 inventory_file = args.inventory
 
 node_name = f"node_provider{id-1}"
@@ -77,8 +81,11 @@ roots=[f'provider{i}' for i in range(n)]
 #  PLAN
 # -----------------------------------------------------------------------
 
-plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-if plan != None and len(plan.instructions()):
-  print("LOCAL PLAN:")
-  for instruction in plan.instructions():
-    print(instruction)
+if ctime:
+    plan = timed_gossip(node, roots, cr_init, cr_local_timed, cr_msg, cr_enrich, cr_ack, cr_final_timed, iteration=it)
+else:
+  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
+  if plan != None and len(plan.instructions()):
+    print("LOCAL PLAN:")
+    for instruction in plan.instructions():
+      print(instruction)

@@ -968,6 +968,24 @@ class MultiCostRegular(Model):
                 self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
             print(f"Solving {key}'s model is done")
         return self._solutions
+    
+    def solve_timed(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
+        for (key, model) in self._models.items():
+            try:
+                real_mode = "minizinc" if mode == "minizinc-test" else mode
+                start_time = time.time()
+                solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
+                if mode != "minizinc-global" and mode != "minizinc-test":
+                    self._solutions[key] = solution
+                    self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+                    skip_value = solution.get("sequence")[-1]
+                    self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
+            except FindMUSException:
+                self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
+            end_time = time.time()
+            cmp_time = end_time - start_time
+            print(f"{key}|{step}|{iteration}|{cmp_time}")
+        return self._solutions
 
     def get_node(self):
         return self._node

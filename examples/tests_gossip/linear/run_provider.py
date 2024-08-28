@@ -1,6 +1,5 @@
-from gossip.gossip import gossip
-from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
-from ballet.assembly.concertod.components.basics.provider import Provider
+from gossip.gossip import gossip, timed_gossip
+from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, cr_local_timed, cr_final_timedfrom ballet.assembly.concertod.components.basics.provider import Provider
 from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
@@ -13,7 +12,13 @@ parser.add_argument('-n', type=int, default=1, help='Number of users')
 parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
 
+parser.add_argument('--time', action='store_true', help='Indicate if the time flag is set')
+parser.add_argument('-it', type=int, default=0, help='Iteration')
+
 args = parser.parse_args()
+
+ctime = True if args.time else False
+it = args.it
 n = args.n
 sat = False if args.unsat else True
 inventory_file = args.inventory
@@ -69,8 +74,12 @@ if sat or n == 0:
 else:
     roots=['provider', f'transformer{n-1}']
     
-plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-if plan != None and len(plan.instructions()):
-  print("LOCAL PLAN:")
-  for instruction in plan.instructions():
-    print(instruction)
+
+if ctime:
+    plan = timed_gossip(node, roots, cr_init, cr_local_timed, cr_msg, cr_enrich, cr_ack, cr_final_timed, iteration=it)
+else:
+  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
+  if plan != None and len(plan.instructions()):
+    print("LOCAL PLAN:")
+    for instruction in plan.instructions():
+      print(instruction)

@@ -736,8 +736,7 @@ class CostRegularNode(Node):
                             break
                 if ack_to_send:
                     # print(f"I HAVE TO SEND A GLOBAL ACK ! (success ? {ack_is_success}). Here my data:")
-                    self.print_status()
-                    
+                    # self.print_status()
                     if ack_is_success:
                         result.add(GlobalAckSuccess(comp_name))
                     else:
@@ -1005,6 +1004,40 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
     return out_messages, list(opt_ack)
 
 
+
+def cr_local_timed(cr_model: MultiCostRegular, write_file=False, debug=False, iteration=0):
+    out_messages = set()
+    node: CostRegularNode = cr_model.get_node()
+    opt_ack = set()
+    results = cr_model.solve_timed(write_file=write_file, step="flocal", iteration=iteration)
+    
+    for (comp_name, result) in results.items():
+        if result.is_sat:
+            sequence = cr_model.get_sequence(comp_name)
+            for (port_name, _) in cr_model.get_port_statuses(comp_name).items():
+                port_status = cr_model.get_port_status(comp_name, port_name)
+                component = node.components_from_str(comp_name)
+                msgs = make_messages(sequence, port_name, port_status, node.passed_by, component)
+                out_messages = out_messages | msgs
+        else:
+            all_reasons = [s for s in result.result.split('\n') if s.strip()]
+            explainity = '/\\'.join(map(lambda reason: make_reason_explicit(reason), all_reasons))
+            node.set_local_conflict(explainity)
+            for reason in all_reasons:
+                if not is_caused_internally(reason):
+                    message_to_ack = None
+                    (_, reason_message) = split_reason(reason)
+                    for (_, messages) in node.get_in_message().items():
+                        for (message, _) in messages.items():
+                            if message == reason_message:
+                                message_to_ack = message
+                    if message_to_ack != None:
+                        fail_ack = AckFailure(comp_name, None, message_to_ack, explainity)
+                        opt_ack.add(fail_ack)
+    out_messages = cr_model.get_node().remove_deplicata(out_messages)
+    return out_messages, list(opt_ack)
+
+
 def check_to_be_diffused(node: CostRegularNode, msg: ConstraintMessage):
     # If source has no goal constraint, and no inferred constraint from remote message, do not create a message !
     # It means, it solves a model tat was not needed to be solved... 
@@ -1077,6 +1110,20 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
     node.set_lastest_constraints(list(new_constraints))
     return model
 
+def cr_final_timed(cr_model: MultiCostRegular, write_file=False, iteration=0):
+    def __format_wait(inst: str):
+        cw = inst.split('_')
+        return Wait('_'.join(cw[1:-1]), cw[-1])
+    def __format_push(compname, inst: str):
+        return PushB(compname, inst)
+    cr_model.solve_timed(write_file=write_file, step="ffinal", iteration=iteration)
+    plans = map(lambda comp_name: 
+        Plan(comp_name, 
+             list(map(lambda inst: __format_wait(inst) if inst[0:4] == "wait" else __format_push(comp_name, inst), 
+                      cr_model.get_sequence(comp_name)))
+             ), cr_model.get_components())
+    return merge_plans(list(plans))
+
 def cr_final(cr_model: MultiCostRegular, write_file=False):
     def __format_wait(inst: str):
         cw = inst.split('_')
@@ -1086,7 +1133,7 @@ def cr_final(cr_model: MultiCostRegular, write_file=False):
     cr_model.solve(write_file=write_file)
     plans = map(lambda comp_name: 
         Plan(comp_name, 
-             list(map(lambda inst: __format_wait(inst) if inst[0:4] > "wait" else __format_push(comp_name, inst), 
+             list(map(lambda inst: __format_wait(inst) if inst[0:4] == "wait" else __format_push(comp_name, inst), 
                       cr_model.get_sequence(comp_name)))
              ), cr_model.get_components())
     return merge_plans(list(plans))

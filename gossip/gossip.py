@@ -111,9 +111,6 @@ def check_global_acks(node: Node, roots: list[str]):
         return False
     """ Check if all roots of the gossip diffusion has sent a global ack """
     global_acks = node.get_global_acks()
-    # print("CURRENT RECEIVED GLOBAL ACK: ")
-    # for glack in global_acks:
-        # print(f"\t {glack.source} ({glack})")
     for root in roots:
         has_fail_ack = has_fail_ack or __is_fail_acked(global_acks, root)
         if not __is_acked(global_acks, root):
@@ -265,4 +262,80 @@ def gossip (node: Node, roots: list[str],
     else:
         result = f_final(model)
     # node.global_synchro()
+    return result
+
+
+def timed_gossip (node: Node, roots: list[str],
+            f_init: Callable[[Node], Model], 
+            f_local: Callable[[Model, Optional[bool]], tuple[list[Message], list[Acknowledgement]]], 
+            f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
+            f_enrich: Callable[[Model, list[Message]], Model],
+            f_ack: Callable[[Node, Acknowledgement], dict[Node, Acknowledgement]],
+            f_final: Callable[[Model], Solution], iteration=0):
+    node.set_roots(roots)
+    model = f_init(node)
+    ended_resolution = False
+    node_is_root = node.is_root(roots)
+    must_solve = node_is_root
+    nloop = 0
+    is_unsat = False
+    has_fail_ack = False
+    has_sent_global_ack = False
+    while not ended_resolution:
+        all_acked, has_fail_ack = check_global_acks(node, roots)
+        if all_acked:
+            break  
+        nloop = nloop + 1 
+        if not is_unsat:
+            received_messages = node.new_received_messages() 
+            all_acked, has_fail_ack = check_global_acks(node, roots)
+            if all_acked:
+                break
+            if received_messages != []:
+                must_solve = True
+                model = f_enrich(model, received_messages)
+            if must_solve:
+                must_solve = False 
+                all_acked, has_fail_ack = check_global_acks(node, roots)
+                if all_acked:
+                    break
+                (out_messages, acks_refuse) = f_local(model, debug=False, iteration=iteration)
+                if acks_refuse != []:     
+                    target_acks = f_ack(node, acks_refuse)
+                    for (target, acks) in target_acks.items():
+                        node.send_acks(target, acks)
+                        is_unsat = True
+                elif out_messages != []:
+                    all_acked, has_fail_ack = check_global_acks(node, roots)
+                    if all_acked:
+                        break   
+                    target_messages = f_msg(node, out_messages)
+                    for (target, messages) in target_messages.items():
+                        node.send_messages(target, messages)
+            # Now that the process is done, does the node must send accept acks ?
+            all_acked, has_fail_ack = check_global_acks(node, roots)
+            if all_acked:
+                break  
+            target_acks = f_ack(node)
+            for (target, acks) in target_acks.items():
+                node.send_acks(target, acks)
+            # Check global acks to send, and received, and end local solve if needed
+        if not has_sent_global_ack:
+            global_acks = node.get_global_acks_to_send(roots)  
+            if len(global_acks) != 0:
+                node.send_global_acks(global_acks)
+                has_sent_global_ack = True
+        all_acked, has_fail_ack = check_global_acks(node, roots)
+        ended_resolution = all_acked
+        time.sleep(0.5) 
+
+    if has_fail_ack:
+        if node_is_root:
+            print(node.get_failing_reasons())
+        else:
+            print(node.get_local_conflict())
+        result = None 
+        print("ko")
+    else:
+        result = f_final(model, iteration=iteration)
     return result

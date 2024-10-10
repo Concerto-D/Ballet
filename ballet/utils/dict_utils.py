@@ -16,3 +16,12 @@ def reverse_dict(d: dict[A, list[B]]) -> dict[B, list[A]]:
                 res[value] = []
             res[value].append(key)
     return res
+
+def min_max_set_size_with_keys(my_dict):
+    # Get the sizes and the corresponding keys of all sets in the dictionary
+    set_sizes = {key: len(s) for key, s in my_dict.items()}
+    min_key = min(set_sizes, key=set_sizes.get)
+    min_size = set_sizes[min_key]
+    max_key = max(set_sizes, key=set_sizes.get)
+    max_size = set_sizes[max_key]
+    return (min_key, min_size), (max_key, max_size)

@@ -605,6 +605,12 @@ class CostRegularNode(Node):
             self.__consequence_of_constraint[constraint].add(message)
             self.__origin_constraint_of_message[message] = constraint 
     
+    def get_len_messages(self):
+        number_of_messages = 0
+        for comp_name in self.__out_message.keys():
+            number_of_messages = number_of_messages + len(self.__out_message[comp_name].keys())
+        return number_of_messages
+    
     def print_status(self):
         print(f"PASSED BY: [{','.join(self._passed_by)}]")
         print("OUT_MESSAGES:")

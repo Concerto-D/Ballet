@@ -307,6 +307,9 @@ class CostRegular(Model):
     def constraints(self):
         return self.__constraints
       
+    def get_constraints(self):
+        return self.__constraints
+      
     def add_constraint(self, constraint):
         if constraint not in self.__constraints:
             self.__constraints.add(constraint)
@@ -980,12 +983,21 @@ class MultiCostRegular(Model):
                     self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
                     skip_value = solution.get("sequence")[-1]
                     self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
+                    end_time = time.time()
+                    rstep = step
             except FindMUSException:
                 self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
-            end_time = time.time()
+                end_time = time.time()
+                rstep = "funsat"
             cmp_time = end_time - start_time
-            print(f"{key}|{step}|{iteration}|{cmp_time}")
+            print(f"{key}|{rstep}|{iteration}|{cmp_time}")
         return self._solutions
+
+    def get_constraints(self):
+        constraints = {}
+        for cmp in self.get_components():
+            constraints[cmp] = self.get_model(cmp).constraints
+        return constraints
 
     def get_node(self):
         return self._node

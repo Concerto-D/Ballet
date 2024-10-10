@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
+from ballet.utils.dict_utils import min_max_set_size_with_keys
 
 import time
+import sys
 
 class Acknowledgement(ABC):
     
@@ -65,6 +67,10 @@ class Model (ABC):
     
     @abstractmethod
     def solve(self):
+        pass
+    
+    @abstractmethod
+    def get_constraints(self):
         pass
 
 
@@ -331,11 +337,19 @@ def timed_gossip (node: Node, roots: list[str],
 
     if has_fail_ack:
         if node_is_root:
-            print(node.get_failing_reasons())
+            print(node.get_failing_reasons(), file=sys.stderr)
         else:
-            print(node.get_local_conflict())
+            print(node.get_local_conflict(), file=sys.stderr)
         result = None 
-        print("ko")
     else:
         result = f_final(model, iteration=iteration)
+    
+    total_messages = node.get_len_messages()
+    model_constraints = model.get_constraints()
+    
+    (min_key, min_size), (max_key, max_size) = min_max_set_size_with_keys(model_constraints)
+    # component|key|iteration|value
+    print(f"{node.id}|messages|{iteration}|{total_messages}")
+    print(f"{min_key}|min_constraint|{iteration}|{min_size}")
+    print(f"{max_key}|max_constraint|{iteration}|{max_size}")
     return result

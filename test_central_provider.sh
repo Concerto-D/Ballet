@@ -54,7 +54,8 @@ echo "$inventory" > inventory.json
 if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
-    for ((ite=1; ite<=30; ite++)); do
+    echo "id|key|iteration|value" >> $time_file
+    for ((ite=1; ite<=10; ite++)); do
         python3 run_provider.py -n $n $unsat_flag -inventory inventory.json --time -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do

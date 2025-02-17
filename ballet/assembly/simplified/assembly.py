@@ -278,6 +278,9 @@ class ComponentType:
     def __hash__(self):
         return hash(self._name)
 
+    def __str__(self):
+        return self._name
+
 
 class CInstance(ABC):
 

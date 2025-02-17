@@ -76,6 +76,8 @@ class DecentralizedComponentInstance (CInstance):
     def __hash__(self):
         return hash(self._id) + hash(self._type)
 
+    def __str__(self):
+        return f"DecentralizedComponentInstance [{self._type}:{self._id}]"
 
 class DecentralizedAssembly(IAssembly):
 

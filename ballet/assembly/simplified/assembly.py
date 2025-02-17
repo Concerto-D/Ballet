@@ -134,7 +134,7 @@ class Behavior:
         return self._transitions
 
     def get_transition(self, name: str) -> Transition:
-        if name in self._transitions.keys:
+        if name in self._transitions:
             return self._transitions[name]
         else:
             return None

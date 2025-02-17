@@ -1,3 +1,5 @@
+import os
+
 from typing import Set, Iterable
 
 from ballet.assembly.simplified.assembly import CInstance, Place
@@ -55,7 +57,13 @@ class AssemblyParser:
         connections: list[(str, str, str, str)] = []
         variables: dict[str, str] = {}
         # Load the YAML file
-        with open(addYamlExtension(filename), 'r') as file:
+        f = addYamlExtension(filename)
+        try:
+            os.stat(f)
+        except Exception:
+            return components, connections, active
+
+        with open(f, 'r') as file:
             data = yaml.load(file, Loader=yaml.FullLoader)
         for key, value in data.items():
             if key == "components":

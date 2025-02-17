@@ -5,6 +5,10 @@ import time
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
+ch = logging.StreamHandler(stream=sys.stdout)
+ch.setLevel(logging.NOTSET)
+log.addHandler(ch)
+
 log_once = logging.getLogger("logger_once")
 log_once.setLevel(logging.DEBUG)
 

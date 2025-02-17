@@ -1,5 +1,7 @@
 import zenoh
 
+from zenoh import Session
+
 from ballet.executor.logger.debug_logger import log_once
 
 config = {}
@@ -15,11 +17,10 @@ class _ZenohSession:
     _session = None
 
 
-def _get_zenoh_session() -> zenoh.session.Session:
+def _get_zenoh_session() -> Session:
     if _ZenohSession._session is None:
         _ZenohSession._session = zenoh.open()
     return _ZenohSession._session
-
 
 def zenoh_session(func):
     """
@@ -35,16 +36,16 @@ def zenoh_session(func):
 
 
 @zenoh_session
-def get_nb_dependency_users(component_name: str, dependency_name: str, session: zenoh.session.Session = None) -> int:
+def get_nb_dependency_users(component_name: str, dependency_name: str, session: Session = None) -> int:
     zenoh_topic = f"nb_users/{component_name}/{dependency_name}"
-    res = session.get(zenoh_topic, zenoh.ListCollector())()
+    res = session.get(zenoh_topic, zenoh.Queue())()
     int_res = int(res[0].ok.payload.decode("utf-8")) if len(res) > 0 else -1
     log_once.debug(f"Get nb dependency users on {zenoh_topic}, result: {int_res}")
     return int_res
 
 
 @zenoh_session
-def send_nb_dependency_users(nb: int, component_name: str, dependency_name: str, session: zenoh.session.Session = None):
+def send_nb_dependency_users(nb: int, component_name: str, dependency_name: str, session: Session = None):
     zenoh_topic = f"nb_users/{component_name}/{dependency_name}"
     log_once.debug(f"Put nb dependency users {str(nb)} on {zenoh_topic}")
     session.put(zenoh_topic, str(nb))
@@ -53,7 +54,7 @@ def send_nb_dependency_users(nb: int, component_name: str, dependency_name: str,
 @zenoh_session
 def get_refusing_state(component_name: str, dependency_name: str, session=None) -> int:
     zenoh_topic = f"refusing/{component_name}/{dependency_name}"
-    res = session.get(zenoh_topic, zenoh.ListCollector())()
+    res = session.get(zenoh_topic, zenoh.Queue())()
     bool_res = bool(int(res[0].ok.payload.decode("utf-8"))) if len(res) > 0 else False
     log_once.debug(f"Get refusing state on {zenoh_topic}, result: {bool_res}")
     return bool_res
@@ -69,7 +70,7 @@ def send_refusing_state(value: int, component_name: str, dependency_name: str, s
 @zenoh_session
 def get_data_dependency(component_name: str, dependency_name: str, session=None):
     zenoh_topic = f"data/{component_name}/{dependency_name}"
-    res = session.get(zenoh_topic, zenoh.ListCollector())()
+    res = session.get(zenoh_topic, zenoh.Queue())()
     str_res = res[0].ok.payload.decode("utf-8") if len(res) > 0 else ""
     log_once.debug(f"Get data dependency on {zenoh_topic}, result: {str_res}")
     return str_res
@@ -92,7 +93,7 @@ def send_syncing_conn(syncing_component: str, component_to_sync: str,  dep_provi
 @zenoh_session
 def is_conn_synced(syncing_component: str, component_to_sync: str,  dep_provide: str, dep_use: str, action: str, session=None):
     zenoh_topic = f"{action}/{component_to_sync}/{syncing_component}/{dep_provide}/{dep_use}"
-    result = session.get(zenoh_topic, zenoh.ListCollector())()
+    result = session.get(zenoh_topic, zenoh.Queue())()
     if len(result) > 0:
         str_result = result[0].ok.payload.decode("utf-8")
     else:
@@ -114,7 +115,7 @@ def set_component_state(state: [ACTIVE, INACTIVE], component_name: str, reconfig
 @zenoh_session
 def get_remote_component_state(component_name: str, reconfiguration_name: str, session=None) -> [ACTIVE, INACTIVE]:
     zenoh_topic = f"wait/{reconfiguration_name}/{component_name}"
-    result = session.get(zenoh_topic, zenoh.ListCollector())()
+    result = session.get(zenoh_topic, zenoh.Queue())()
     if len(result) > 0:
         str_result = result[0].ok.payload.decode("utf-8")
     else:

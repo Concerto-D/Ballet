@@ -89,7 +89,7 @@ class ColorBook(object):
         # Read in task colors from configuration file
         config = ConfigParser()
         config.optionxform = str  # makes option names case sensitive
-        config.readfp(open(colorfname, 'r'))
+        config.read_file(open(colorfname, 'r'))
         # Colors are RGB colornames
         colors = dict(config.items('Colors'))
 

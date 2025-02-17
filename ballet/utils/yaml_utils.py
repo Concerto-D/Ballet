@@ -1,7 +1,7 @@
 import re
 
 def addYamlExtension(name: str) -> str:
-    return name + ".yaml" if not name.endswith(".yaml") else name
+    return name if name and name.endswith(".yaml") else name + ".yaml"
 
 def replace_variables(string, variables):
     # Find all occurrences of "${{ v }}" in the string

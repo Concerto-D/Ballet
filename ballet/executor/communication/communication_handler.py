@@ -50,7 +50,7 @@ def get_data_dependency(component_name: str, dependency_name: str):
 # TODO: check les utilisations de write
 def write_data_dependency(component_name: str, dependency_name: str, data):
     if global_variables.is_concerto_d_asynchronous():
-        zenoh_communication.write_data_dependency(component_name, dependency_name)
+        zenoh_communication.write_data_dependency(component_name, dependency_name, data)
     else:
         return
 

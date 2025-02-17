@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ballet"
+version = "v0.1"
+dependencies = [
+	"flask",
+	"grpcio",
+	"protobuf",
+	"PyYAML",
+	"eclipse-zenoh",
+	"Jinja2",
+	"requests",
+	"importlib-metadata",
+	"minizinc"
+]

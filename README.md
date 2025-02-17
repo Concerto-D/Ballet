@@ -15,15 +15,29 @@ Ballet is composed of 7 modules
 In addition, *choreography.py* contains some high-level functions for conducting each step of the global choreography.
 
 ## Installation
-To install Ballet, you just need to clone this current repository. 
-Then, you must install requirements presented in *ballet/requirements.txt*. It can be automatically done by running 
+To install Ballet, you just need to clone this current repository and install using standard procedure:
     ```shell
-    pip install -r ballet/requirements.txt
+    cd Ballet
+
+    python -m venv venv
+    venv/bin/activate
+
+    pip install .
+
+    # If activate doesn't work
+    venv/bin/pip install .
     ```
-Please note that a virtual environment can be used.
 
 Also, for the planning phase, MiniZinc must imperatively be installed. On your Linux machine, it can be done using the snap package manager. You can run the following command to install MiniZinc:
     ```shell
     sudo snap install minizinc
     ```
 Verify the installation by running minizinc --version in your terminal.
+
+## Development
+
+To run all tests:
+
+	```shell
+	venv/bin/python -m unittest discover
+	```

@@ -14,5 +14,7 @@ dependencies = [
 	"Jinja2",
 	"requests",
 	"importlib-metadata",
-	"minizinc"
+	"minizinc",
+	"eclipse-zenoh",
+	"protobuf"
 ]

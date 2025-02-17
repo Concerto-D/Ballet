@@ -1,7 +1,7 @@
 import unittest
 
 from ballet.planner.resolve import diff_assembly
-
+from ballet.assembly.plan.plan import Instruction, Disconnect, Add, Delete, Connect
 
 class TestResolve(unittest.TestCase):
 

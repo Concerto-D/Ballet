@@ -1,4 +1,4 @@
-import unittest
+import unittest, os
 
 from ballet.assembly.simplified.assembly_d import DecentralizedComponentInstance
 from ballet.assembly.simplified.type import openstack
@@ -8,9 +8,12 @@ from ballet.planner.goal import BehaviorReconfigurationGoal, PortReconfiguration
 
 class TestParser(unittest.TestCase):
 
+    def setUp(self):
+        self.path = os.path.dirname(__file__)
+
     def test_inventory_parser(self):
         parser = InventoryParser()
-        res = parser.parse("inventory.yaml")
+        res = parser.parse(os.path.join(self.path, "inventory.yaml"))
         assert("mdbmaster" in res)
         assert(res["mdbmaster"]["address"] == "gros-15.nancy.grid5000.fr")
         assert(res["mdbmaster"]["port_front"] == 5000)
@@ -34,7 +37,7 @@ class TestParser(unittest.TestCase):
 
     def test_assembly_parser(self):
         parser = AssemblyParser()
-        res, active, _, _ = parser.parse("assembly.yaml")
+        res, active, _, _ = parser.parse(os.path.join(self.path, "assembly.yaml"))
         master = DecentralizedComponentInstance("mdbmaster", openstack.mariadb_master_type())
         worker = DecentralizedComponentInstance("mdbworker0", openstack.mariadb_worker_type())
         glance = DecentralizedComponentInstance("glance0", openstack.glance_type())
@@ -56,10 +59,10 @@ class TestParser(unittest.TestCase):
         assert (res == exp)
 
     def test_goal_parser(self):
-        assembly, active, _, _ = AssemblyParser().parse("assembly.yaml")
+        assembly, active, _, _ = AssemblyParser().parse(os.path.join(self.path, "assembly.yaml"))
 
         parser = GoalParser(assembly, active)
-        res_goals, res_goals_state = parser.parse("goal.yaml")
+        res_goals, res_goals_state = parser.parse(os.path.join(self.path, "goal.yaml"))
 
         exp = []
         exp.append(("mdbmaster",BehaviorReconfigurationGoal("deploy")))

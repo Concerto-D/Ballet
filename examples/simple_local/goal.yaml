@@ -1,0 +1,11 @@
+behaviors:
+  - component : mdbmaster
+    behavior : deploy
+ports:
+  - forall : active
+  - component : mdbmaster
+    port : service
+    status : inactive
+components:
+  - component : mdbmaster
+    status : running

@@ -68,6 +68,8 @@ class BehaviorReconfigurationGoal(ReconfigurationGoal):
     def __str__(self):
         return f"[BEHAVIOR] {self._bhv} " + ("(final)" if self._final else "")
 
+    def __repr__(self):
+        return str(self)
 
 class StateReconfigurationGoal(ReconfigurationGoal):
 
@@ -96,6 +98,8 @@ class StateReconfigurationGoal(ReconfigurationGoal):
     def __str__(self):
         return f"[STATE] {self._state} " + "(final)" if self._final else ""
 
+    def __repr__(self):
+        return str(self)
 
 class PlaceReconfigurationGoal(ReconfigurationGoal):
 
@@ -124,6 +128,8 @@ class PlaceReconfigurationGoal(ReconfigurationGoal):
     def __str__(self):
         return f"[PLACE] {self._place} " + "(final)" if self._final else ""
 
+    def __repr__(self):
+        return str(self)
 
 class PortReconfigurationGoal(ReconfigurationGoal):
 
@@ -158,6 +164,9 @@ class PortReconfigurationGoal(ReconfigurationGoal):
 
     def __str__(self):
         return f"[PORT] {self._port} - " + ("on" if self._enable else "off") + (" (final)" if self._final else "")
+
+    def __repr__(self):
+        return str(self)
 
 
 class PortConstraint(Goal):
@@ -198,3 +207,7 @@ class PortConstraint(Goal):
 
     def __str__(self):
         return f"[PORT] {self._port} - {self._status} " + (f"(until {self._component}.{self._bhv})" if self._component != None else "")
+
+
+    def __repr__(self):
+        return str(self)

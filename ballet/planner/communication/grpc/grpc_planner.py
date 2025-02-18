@@ -63,6 +63,9 @@ class PlannerServicer(MessagingServicer):
             self._mailbox[compId] = set()
 
     def get_mailbox(self, compId, reset=True):
+        if compId not in self._mailbox:
+            return set()
+
         received = set()
         for m in self._mailbox[compId]:
             received.add(m)
@@ -135,6 +138,9 @@ class ClientGrpcPlanner(RemoteMessaging):
                     stub.AddPortConstraint(msg)
 
     def get_acks(self, comp: CInstance) -> Set[str]:
+        if comp.id() not in self._servicer.acks():
+            return set()
+
         res = self._servicer.acks()[comp.id()].copy()
         for m in res:
             print(f"[REMOTE] {comp.id()} received ack from {m}")

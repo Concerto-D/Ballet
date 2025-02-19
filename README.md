@@ -2,47 +2,55 @@
 
 ## Installation
 
-To run Ballet and Ballet⁺, follow these steps:
-
-1. To install Ballet, you just need to clone this current repository and install using standard procedure:
-
-    ```shell
-    cd Ballet
-
-    python -m venv venv
-    venv/bin/activate
-
-    pip install .
-
-    # If activate doesn't work
-    venv/bin/pip install .
-    ```
-
-2. Build the personalized Choco solver using make. Ensure that Maven is installed beforehand:
-
+Ballet is not yet on pypi so to install Ballet, you first need to clone the repository:
 ```sh
-sudo apt install maven  # On Linux
-make
+$ git clone git@github.com:Concerto-D/Ballet.git
+$ cd Ballet
 ```
 
-3. Install minizinc. On ubuntu, it can be done using the snap package manager:
-    ```shell
-    sudo snap install minizinc
-    ```
+all packages installation will be local to your installation. To do that you need to create a virtual env:
+```sh
+$ python -m venv
+
+$ venv/bin/activate
+```
+
+After which you may run standard commands: `python` to execute, `pip` to install, etc... If `venv/bin/activate` didn't work you may run commands not from your global installation but from the virtual environment:
+```sh
+$ venv/bin/python # execute
+
+$ venv/bin/pip # install package
+```
+
+As a prerequisite to make Ballet work you will need [concerto](https://github.com/Concerto-D/concerto-decentralized). It is also not published on pypi so not easily installable but can be retrieved thus:
+```sh
+$ git clone git@github.com:Concerto-D/concerto-decentralized.git /path/to/concerto-d
+$ venv/bin/pip install /path/to/concerto-d
+```
+
+After that, it's the standard procedure:
+```sh
+venv/bin/pip install .
+```
+
+# If activate doesn't work
+venv/bin/pip install .
+```
+
+Also, for the planning phase, MiniZinc must imperatively be installed. The apt version on Ubuntu 24.04 is not up to date, prefer the edge versino from snap:
+```sh
+$ sudo snap install minizinc
+```
 Verify the installation by running minizinc --version in your terminal.
+
+## Usage
+
+See the examples in the (examples)[./examples] folder
 
 ## Development
 
 To run all tests:
 
-	```shell
-	venv/bin/python -m unittest discover
-	```
-
-## Overview
-
-The `balletplus` module contains all the extensions we made. It enhances Ballet’s planner by introducing conflict management capabilities.
-
-## Examples
-
-Example usage can be found in the `examples/` directory.
+```sh
+venv/bin/python -m unittest discover
+```

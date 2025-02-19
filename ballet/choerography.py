@@ -75,6 +75,7 @@ def choerography(address, ports, assembly_in_filename: str, assembly_out_filenam
     for compid in goals:
         print(f"{compid}: {goals[compid]}")
     # time.sleep(10)
-    # my_plan = plan(instances, active, inventory, port_planner, goals, place_goals, components_in, connections_in, components_out, connections_out)
+    my_plan = plan(instances, active, inventory, port_planner, goals, place_goals, components_in, connections_in, components_out, connections_out)
+    print(my_plan)
     # assembly = None # TODO get concrete assembly
     # execute(assembly, my_plan)

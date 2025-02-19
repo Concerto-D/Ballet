@@ -19,4 +19,4 @@ if name not in inventory:
 
 print(f"Running {name}")
 addr = inventory[name]
-choerography.choerography(addr["address"], (addr["port_front"], addr["port_planner"], addr["port_executor"]), assembly_file, "", inventory_file, goal_file)
+choerography.choerography(addr["address"], (addr["port_front"], addr["port_planner"], addr["port_executor"]), "", assembly_file, inventory_file, goal_file)

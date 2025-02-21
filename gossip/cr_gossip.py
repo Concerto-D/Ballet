@@ -195,6 +195,10 @@ class GlobalAckSuccess(GlobalAcknowledgement):
     def __hash__(self):
         return hash(f"global-success-{self.source}")
     
+    def __str__(self):
+        return f"global-success-{self.source}"
+
+    
     
 class GlobalAckFailure(GlobalAcknowledgement):
     
@@ -214,7 +218,10 @@ class GlobalAckFailure(GlobalAcknowledgement):
         return False
                 
     def __hash__(self):
-        return hash(f"global-success-{self.source}")
+        return hash(f"global-failure-{self.source}")
+    
+    def __str__(self):
+        return f"global-failure-{self.source}"
 
 
 
@@ -956,18 +963,6 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
     node: CostRegularNode = cr_model.get_node()
     opt_ack = set()
     
-    if time != 0:
-        nexecutions=time
-        def solve_with_global():
-            cr_model.solve(mode="minizinc-global",write_file=write_file)
-        def solve_without_global():
-            cr_model.solve(mode="minizinc-test", write_file=write_file)
-            
-        (_, time_with_global)= time_utils.timeit_detailed(solve_with_global, n=nexecutions)
-        (_, time_without_global) = time_utils.timeit_detailed(solve_without_global, n=nexecutions)
-        print(f"Execution time with global constraints (avg on {nexecutions} executions): \n\t {time_with_global} ")
-        print(f"Execution time without global constraints (avg on {nexecutions} executions):\n\t {time_without_global} ")    
-    
     results = cr_model.solve(write_file=write_file)
     
     for (comp_name, result) in results.items():
@@ -1011,7 +1006,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
 
 
 
-def cr_local_timed(cr_model: MultiCostRegular, write_file=False, debug=False, iteration=0):
+def cr_local_timed(cr_model: MultiCostRegular, write_file=True, debug=False, iteration=0):
     out_messages = set()
     node: CostRegularNode = cr_model.get_node()
     opt_ack = set()
@@ -1223,6 +1218,10 @@ def cr_ack_default(node: CostRegularNode):
     
 
 def cr_ack(node: CostRegularNode, ack: Optional[Acknowledgement]=None):
+    """
+    node: the node which will send acks 
+    ack: if we preivously received a AckFailure, then we must send an ackfailure too..  
+    """
     if (ack != None):
         return cr_ack_with_ack(node, ack)
     else:

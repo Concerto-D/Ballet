@@ -230,7 +230,7 @@ class CostRegular(Model):
         self.__ports = ports
         n_wait = count(lambda b: b.startswith("wait"), transitions)
         n_bhv = len(transitions) - n_wait
-        self.__seq_length = 2*n_bhv
+        self.__seq_length = len(self.__states)*n_bhv
         
     def __assert_conform_automata(states: list[str], transitions: list[str], automata: dict[str,dict[str,str]]):
         for source in automata.keys():
@@ -468,7 +468,7 @@ class CostRegular(Model):
             count_name = count_name + "_" + string_utils.clean(constraint.source)
         decl1 = f"var int: {count_name}; {suffix}"
         decl2 = f"constraint {count_name} = sum(b in sequence) (b = {constraint.transition}); {suffix}"
-        if count_name.startswith("count_wait"):
+        if constraint.transition.startswith("wait"):
             arity = "= 1"
         else:
             arity = "> 0"
@@ -491,7 +491,6 @@ class CostRegular(Model):
     # ---------
     
     def __make_mzn_port_global_constraint_line(self, constraint: PortConstraint):
-        #TODO using Count
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
         count_name = f"count_{constraint.port}_status_{constraint.status}"
@@ -499,44 +498,32 @@ class CostRegular(Model):
             count_name = count_name + "_" + string_utils.clean(constraint.source)
         if constraint.final:
             res.append(f"constraint {constraint.port}_status[seq_length+1] = {constraint.status}; {suffix}")
-        res.append(f"var int: {count_name}; {suffix}")
-        res.append(f"constraint {count_name} = sum(s in {constraint.port}_status) (s = {constraint.status}); {suffix}")
-        res.append(f"constraint {count_name} > 0; {suffix}")
+        res.append(f"constraint count({constraint.port}_status, {constraint.status}) > 0; {suffix}")
         return res
     
     def __make_mzn_multiport_global_constraint_line(self, constraint: PortConstraint):
-        #TODO using Count
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
         count_name = f"count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
         if constraint.source:
-            count_name = count_name + "_" + string_utils.clean(constraint.source)
+            count_name += f"_{string_utils.clean(constraint.source)}"
         if constraint.final:
             for port in constraint.ports:
                 res.append(f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}")
-        res.append(f"var int: {count_name}; {suffix}")
         and_condition = ' /\ '.join(map(lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports))
-        res.append(f"constraint {count_name} = sum (i in 1..seq_length+1) ({and_condition});")
-        res.append(f"constraint {count_name} > 0; {suffix}")
+        res.append(f"constraint count([({and_condition}) | i in 1..seq_length+1], true) > 0; {suffix}")
         return res
     
     def __make_mzn_transition_global_constraint_line(self, constraint: TransitionConstraint):
-        #TODO using Count
         suffix = "% goal" if constraint.isGoal() else "% inferred"
-        count_name = f"count_{constraint.transition}"
-        if constraint.source:
-            count_name = count_name + "_" + string_utils.clean(constraint.source)
-        decl1 = f"var int: {count_name}; {suffix}"
-        decl2 = f"constraint {count_name} = sum(b in sequence) (b = {constraint.transition}); {suffix}"
-        if count_name.startswith("count_wait"):
+        if constraint.transition.startswith("wait"):
             arity = "= 1"
         else:
             arity = "> 0"
-        cstr = f"constraint {count_name} {arity}; {suffix}"
-        return [decl1, decl2, cstr]
+        constr = f"constraint count(sequence, {constraint.transition}) {arity}; {suffix}"
+        return [constr]
     
     def __make_mzn_state_global_constraint_line(self, constraint: StateConstraint):
-        #TODO using Count
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         count_name = f"count_{constraint.state}"
         if constraint.source:
@@ -544,9 +531,7 @@ class CostRegular(Model):
         res = []
         if constraint.final:
             res.append(f"constraint states[seq_length+1] = {constraint.state}; {suffix}") 
-        res.append(f"var int: {count_name}; {suffix}")
-        res.append(f"constraint {count_name} = sum(s in states) (s = {constraint.state}); {suffix}")
-        res.append(f"constraint {count_name} > 0; {suffix}")
+        res.append(f"constraint count (states, {constraint.state}) > 0; {suffix}")
         return res
     
     # ---------
@@ -764,9 +749,20 @@ public class {classname} {{
 """
         return content
     
-    def __make_mzn_model(self):
+    def __make_mzn_model(self, globalconstraint=True):
+        nstate = len(self.states)
+        nwait = count(lambda b: b.startswith("wait"), self.transitions)
+        nbhv = len(self.transitions) - nwait
+        seq_length = nbhv * nstate + nwait 
+        if globalconstraint:
+            goal_constraints = self.__make_mzn_goal_global_constraints()
+        else:
+            goal_constraints = self.__make_mzn_goal_constraints()
         content = '\n'.join(f"""
-int: seq_length = {self.__seq_length};
+include "count.mzn";
+include "regular.mzn";
+                            
+int: seq_length = {seq_length};
 
 enum STATE = {{{','.join(self.states)}}};
 enum BEHAVIOR = {{{','.join(self.transitions)}}}; 
@@ -792,79 +788,26 @@ constraint forall (i in 1..seq_length) (cost[i] = costs[states[i],sequence[i]]);
 
 % Init state
 constraint states[1]={self.__init_state};
+constraint regular(sequence, transitions, {self.__init_state}, {{{','.join(self.states)}}});
 
 % Reconfiguration goals as constraints
-{self.__make_mzn_goal_constraints()}
+{goal_constraints}
+
 
 % Goal
 var int: scost;
 constraint scost = sum(cost);
-solve minimize scost;
+
+% Side structure for exploration strategy
+array[1..seq_length] of var int: reversed_cost = array1d(1..seq_length, [cost[seq_length - i + 1] | i in 1..seq_length]);
+
+
+solve 
+:: int_search(reversed_cost, first_fail, indomain_min)
+minimize scost;
 
 """.split('\n')[1:])
         return content
-    
-    def __make_mzn_model_global(self):
-        """
-        TODO
-        self.__make_mzn_goal_global_constraints() like self.__make_mzn_goal_constraints() using global constraint
-        """
-        s_len = len(self.states) + 1 
-        q_len = len(self.transitions)
-        enum_states = list(map(lambda p: f"int: {p[0]} = {p[1]};", indexify(self.states, 2)))
-        enum_behavior = list(map(lambda p: f"int: {p[0]} = {p[1]};", indexify(self.transitions, 1))) # TODO (start by 1)
-        joined_states = '\n'.join(enum_states)
-        joined_behaviors = '\n'.join(enum_behavior)
-        content = '\n'.join(f"""
-include "globals.mzn";
-int: seq_length = {self.__seq_length};
-int: S = {s_len};
-int: Q = {q_len};
-
-int: error = 1;
-{joined_states}
-
-{joined_behaviors}
-
-int: enabled = 1;
-int: disabled = 0;
-
-set of int: STATE = {{ error, {','.join(self.states)}}};
-set of int: BEHAVIOR = {{{','.join(self.transitions)}}}; 
-set of int: STATUS = {{enabled, disabled}};
-
-array[STATE, BEHAVIOR] of STATE: transitions = 
-{self.__make_mzn_global_transitions_matrix()};
-
-array[STATE, BEHAVIOR] of int: costs = 
-{self.__make_mzn_global_costs_matrix()};
-
-% Captured variables
-array[1..seq_length] of var BEHAVIOR: sequence;
-array[1..seq_length+1] of var STATE: states;
-
-constraint forall (i in 1..seq_length) (states[i + 1] = transitions[states[i], sequence[i]]);
-constraint forall (i in 1..seq_length-1) (sequence[i] = skip -> sequence[i+1] = skip);
-
-var int: scost;
-constraint
-  cost_regular(sequence, S, Q, transitions, running, {{{self.__init_state}}}, costs, scost);
-
-constraint states[1] = {self.__init_state};
-
-% Ports' statuses
-{self.__make_mzn_ports_status_constraints()}
-
-% Reconfiguration goals as constraints
-{self.__make_mzn_goal_global_constraints()}
-
-% Goal
-solve minimize scost;
-
-""".split('\n')[1:])
-        return content
-    
-    
     
     def solve_minizinc(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
         wf = write_file if not findmus else True
@@ -882,36 +825,13 @@ solve minimize scost;
             model.add_string(mzn_str_model)
         solver = Solver.lookup(solve_with)
         instance = Instance(solver, model)
-        result = instance.solve()
+        result = instance.solve(free_search=True)
         if result.status == Status.UNSATISFIABLE or findmus:
             raise FindMUSException("UNSAT model")
         else:
             r = result.solution
             return CRSolution(r, sat=True)
-    
-    def solve_minizinc_global(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
-        wf = write_file if not findmus else True
-        modelfile = file_name
-        model = mznModel()
-        mzn_str_model = self.__make_mzn_model_global()
-        if print_model:
-            print(mzn_str_model)
-        if wf:
-            with open(modelfile, 'w') as f:
-                f.write(mzn_str_model)
-                f.close()
-            model.add_file(modelfile)
-        else:
-            model.add_string(mzn_str_model)
-        solver = Solver.lookup(solve_with)
-        instance = Instance(solver, model)
-        result = instance.solve()
-        if result.status == Status.UNSATISFIABLE or findmus:
-            raise FindMUSException("UNSAT model")
-        else:
-            r = result.solution
-            return CRSolution(r, sat=True)
-        
+         
     def solve_choco(self,findmus=False, write_file=False, filename="mode.json", print_model=False):
         if findmus:
             # TODO Change model.json into model_component.json
@@ -940,8 +860,6 @@ solve minimize scost;
         # print(f"Solve with: {mode}, findMus: {findmus}, solver: {solve_with}")
         if mode == "minizinc":
             return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
-        if mode == "minizinc-global" or  mode == "minizinc_global" or mode == "global":
-            return self.solve_minizinc_global(findmus, write_file, file_name, print_model, solve_with)
         if mode == "choco":
             return self.solve_choco(findmus, write_file, file_name, print_model)
         
@@ -955,11 +873,10 @@ class MultiCostRegular(Model):
         self._port_status = {k: None for k in models.keys()}
         self.__first_skip = {k: -1 for k in models.keys()}
         
-    def solve(self, mode="minizinc", print_model=False, write_file=False):
+    def solve(self, mode="minizinc", print_model=False, write_file=True):
         for (key, model) in self._models.items():
             try:
                 real_mode = "minizinc" if mode == "minizinc-test" else mode
-                print(f"solving {key} ...")
                 solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
                 if mode != "minizinc-global" and mode != "minizinc-test":
                     self._solutions[key] = solution
@@ -969,7 +886,6 @@ class MultiCostRegular(Model):
             except FindMUSException:
                 print(f"{key} 's model is unsat. Qx running")
                 self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
-            print(f"Solving {key}'s model is done")
         return self._solutions
     
     def solve_timed(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):

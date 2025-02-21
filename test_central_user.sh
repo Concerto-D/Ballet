@@ -6,6 +6,9 @@ tests_dir="examples/tests_gossip/central_user"
 ADDRESS='localhost'
 USER_PORT=3000
 
+
+# Usage: ./test_central_user 5 sat single --time
+
 # Check for the first argument (-n)
 if [ -z "$1" ]; then
     n=0  # Default value
@@ -23,13 +26,19 @@ else
 fi
 
 # Check for the third argument (-s) equal to "debug"
-if [ "$3" = "debug" ] || [ "$4" = "debug" ]; then
+if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ]; then
     debugger_flag="-m ipdb"
 else
     debugger_flag=""
 fi
 
-if [ "$3" = "single" ] || [ "$4" = "single" ]; then
+if [ "$3" = "verbose" ] || [ "$4" = "verbose" ] || [ "$5" = "verbose" ]; then
+    verbose_flag="--verbose"
+else
+    verbose_flag=""
+fi
+
+if [ "$3" = "single" ] || [ "$4" = "single" ] || [ "$5" = "single" ]; then
     single=true
 else
     single=false
@@ -56,24 +65,27 @@ if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
-    for ((ite=1; ite<=10; ite++)); do
-        python3 run_provider.py -n $n $unsat_flag -inventory inventory.json --time -it $ite >> $time_file &
+    for ((ite=1; ite<=1; ite++)); do
+    # for ((ite=1; ite<=10; ite++)); do
+        # python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json --time -it $ite # >> $time_file &
+        python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
-                python3 run_user.py -n $n -i $i $unsat_flag -inventory inventory.json --time -it $ite >> $time_file &
+                # python3.11 run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json --time -it $ite # >> $time_file &
+                python3.11 run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json &
             done
         fi
         wait
     done
 else
     # Run provider
-    gnome-terminal -- bash -c "python3 $debugger_flag run_user.py -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python3.11 $debugger_flag run_user.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
 
     # Check if n is not equal to 0
     if [ "$n" -ne 0 ]; then
         for ((i=1; i<=$n; i++)); do
             # Execute the run_user.py script with the current value of i and unsat flag
-            gnome-terminal -- bash -c "python3 $debugger_flag run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+            gnome-terminal -- bash -c "python3.11 $debugger_flag run_provider.py $verbose_flag -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no parallel user to run"

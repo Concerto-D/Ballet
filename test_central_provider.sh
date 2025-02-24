@@ -16,20 +16,26 @@ fi
 # Check for the second argument (-s) equal to "unsat"
 if [ "$2" = "unsat" ]; then
     unsat_flag="--unsat"
-    time_file="unsat_cprovider_$n.log"
+    time_file="unsat_cuser_$n.log"
 else
     unsat_flag=""
-    time_file="sat_cprovider_$n.log"
+    time_file="sat_cuser_$n.log"
 fi
 
 # Check for the third argument (-s) equal to "debug"
-if [ "$3" = "debug" ] || [ "$4" = "debug" ]; then
+if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ]; then
     debugger_flag="-m ipdb"
 else
     debugger_flag=""
 fi
 
-if [ "$3" = "single" ] || [ "$4" = "single" ]; then
+if [ "$3" = "verbose" ] || [ "$4" = "verbose" ] || [ "$5" = "verbose" ]; then
+    verbose_flag="--verbose"
+else
+    verbose_flag=""
+fi
+
+if [ "$3" = "single" ] || [ "$4" = "single" ] || [ "$5" = "single" ]; then
     single=true
 else
     single=false
@@ -56,22 +62,22 @@ if $single; then
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
     for ((ite=1; ite<=10; ite++)); do
-        python3 run_provider.py -n $n $unsat_flag -inventory inventory.json --time -it $ite >> $time_file &
+        python3.11 run_provider.py -n $n $unsat_flag -inventory inventory.json --time &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
-                python3 run_user.py -n $n -i $i $unsat_flag -inventory inventory.json --time -it $ite >> $time_file &
+                python3.11 run_user.py -n $n -i $i $unsat_flag -inventory inventory.json --time &
             done
         fi
         wait
     done
 else
     # Run provider
-    gnome-terminal -- bash -c "python3 $debugger_flag run_provider.py -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python3.11 $debugger_flag run_provider.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
     # Check if n is not equal to 0
     if [ "$n" -ne 0 ]; then
         for ((i=1; i<=$n; i++)); do
             # Execute the run_user.py script with the current value of i and unsat flag
-            gnome-terminal -- bash -c "python3 $debugger_flag run_user.py -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+            gnome-terminal -- bash -c "python3.11 $debugger_flag run_user.py $verbose_flag -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no parallel user to run"

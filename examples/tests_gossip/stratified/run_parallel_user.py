@@ -1,41 +1,43 @@
-from gossip.gossip import gossip, timed_gossip
+from gossip.gossip import gossip
 from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, cr_local_timed, cr_final_timed
 from ballet.assembly.concertod.components.basics.parallel_user import ParallelUser
 from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
-import argparse
 import json
+import argparse
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
-parser.add_argument('-i', type=int, default=1, help='Id of intermediate user')
-parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
-parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
-
-parser.add_argument('--time', action='store_true', help='Indicate if the time flag is set')
+parser.add_argument('-i', type=int, default=1, help='ID of user')
 parser.add_argument('-it', type=int, default=0, help='Iteration')
+parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
+parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
+parser.add_argument('--time', action='store_true', help='Indicate if the time flag is set')
+parser.add_argument('--verbose', action='store_true', help='Indicate if the time debug is set')
 
 args = parser.parse_args()
-ctime = True if args.time else False
-it = args.it
+
 n = args.n
-i = args.i
+id = args.i
+it = args.it
 sat = False if args.unsat else True
+ctime = True if args.time else False
+verbose = True if args.verbose else False
 inventory_file = args.inventory
 
 ADDRESS = 'localhost'
 PROVIDER_PORT = 3000
 ENDUSER_PORT = 3001
-PORT = ENDUSER_PORT + 1 + i
+PORT = ENDUSER_PORT + 1 + id
 
-node_name = "node_user" + str(i)
-devops = "DevOpsUser" + str(i)
+node_name = "node_user" + str(id)
+devops = "DevOpsUser" + str(id)
 
-nprovider = 1 if i < 3 else 3
+nprovider = 1 if id < 3 else 3
 user = ParallelUser(nprovider)
-local_user = f"user{i}"
+local_user = f"user{id}"
 user.set_name(local_user)
 
 inventory = {}
@@ -51,47 +53,47 @@ else:
 
 connections = []
 if n != 0:
-    if i < 3: 
+    if id < 3: 
         # The current user is in the first layer from provider, then we need to connect it to provider
-        connect_service_provider = ("provider", "service", f"user{i}", "service0")
+        connect_service_provider = ("provider", "service", f"user{id}", "service")
         connections.append(connect_service_provider)
-        connect_config_provider = ("provider", "config", f"user{i}", "config0")
+        connect_config_provider = ("provider", "config", f"user{id}", "config")
         connections.append(connect_config_provider)
     else: 
         # The user is not in the first layer from provider. 
         # 1. Then we must connect to all user from previous layer
-        m = ((i - 3) // 3) * 3
+        m = ((id - 3) // 3) * 3
         # Layer l-1 , top user
-        connect_service_prev_user0 = (f"user{m}", "service", f"user{i}", "service0")
+        connect_service_prev_user0 = (f"user{m}", "service", f"user{id}", "service")
         connections.append(connect_service_prev_user0)
-        connect_config_prev_user0 = (f"user{m}", "config", f"user{i}", "config0")
+        connect_config_prev_user0 = (f"user{m}", "config", f"user{id}", "config")
         connections.append(connect_config_prev_user0)
         # Layer l-1 , mid user
-        connect_service_prev_user1 = (f"user{m+1}", "service", f"user{i}", "service1")
+        connect_service_prev_user1 = (f"user{m+1}", "service", f"user{id}", "service")
         connections.append(connect_service_prev_user1)
-        connect_config_prev_user1 = (f"user{m+1}", "config", f"user{i}", "config1")
+        connect_config_prev_user1 = (f"user{m+1}", "config", f"user{id}", "config")
         connections.append(connect_config_prev_user1)
         # Layer l-1 , bot user
-        connect_service_prev_user2 = (f"user{m+2}", "service", f"user{i}", "service2")
+        connect_service_prev_user2 = (f"user{m+2}", "service", f"user{id}", "service")
         connections.append(connect_service_prev_user2)
-        connect_config_prev_user2 = (f"user{m+2}", "config", f"user{i}", "config2")
+        connect_config_prev_user2 = (f"user{m+2}", "config", f"user{id}", "config")
         connections.append(connect_config_prev_user2)
         
     # 2. Then connect to all user from next layer
-    k_port = i % 3
-    r = range(((i//3)+1)*3 , min(((i//3)+2)*3, n))
+    k_port = id % 3
+    r = range(((id//3)+1)*3 , min(((id//3)+2)*3, n))
     for k in r:
-        connect_service_next_user = (f"user{i}", "service", f"user{k}", f"service{k_port}")
+        connect_service_next_user = (f"user{id}", "service", f"user{k}", f"service")
         connections.append(connect_service_next_user)
-        connect_config_next_user = (f"user{i}", "config", f"user{k}", f"config{k_port}")
+        connect_config_next_user = (f"user{id}", "config", f"user{k}", f"config")
         connections.append(connect_config_next_user)
         
-    if i >= ((n - 1) // 3) * 3:
+    if id >= ((n - 1) // 3) * 3:
         # The user is on the last layer
-        enduser_port = i % 3
-        connect_service_next_enduser = (f"user{i}", "service", f"enduser", f"service{enduser_port}")
+        enduser_port = id % 3
+        connect_service_next_enduser = (f"user{id}", "service", f"enduser", f"service")
         connections.append(connect_service_next_enduser)
-        connect_config_next_enduser = (f"user{i}", "config", f"enduser", f"config{enduser_port}")
+        connect_config_next_enduser = (f"user{id}", "config", f"enduser", f"config")
         connections.append(connect_config_next_enduser)
     
 active = {user: 'running'}
@@ -114,12 +116,15 @@ inventory=inventory)
 # roots
 roots=['provider','enduser']
     
+# -----------------------------------------------------------------------
+#  PLAN
+# -----------------------------------------------------------------------
 
 if ctime:
-    plan = timed_gossip(node, roots, cr_init, cr_local_timed, cr_msg, cr_enrich, cr_ack, cr_final_timed, iteration=it)
+  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, timed=True, iteration=it)
 else:
-  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-  if plan != None and len(plan.instructions()):
-    print("LOCAL PLAN:")
-    for instruction in plan.instructions():
-      print(instruction)
+  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=verbose)
+if plan != None and len(plan.instructions()):
+  print("LOCAL PLAN:")
+  for instruction in plan.instructions():
+    print(instruction)

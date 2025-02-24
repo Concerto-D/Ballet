@@ -65,8 +65,7 @@ if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
-    for ((ite=1; ite<=1; ite++)); do
-    # for ((ite=1; ite<=10; ite++)); do
+    for ((ite=1; ite<=10; ite++)); do
         # python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json --time -it $ite # >> $time_file &
         python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json &
         if [ "$n" -ne 0 ]; then

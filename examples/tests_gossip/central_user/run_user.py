@@ -17,7 +17,6 @@ import sys
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
-parser.add_argument('-i', type=int, default=1, help='ID of user')
 parser.add_argument('-it', type=int, default=0, help='Iteration')
 parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')

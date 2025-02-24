@@ -1,4 +1,4 @@
-from gossip.gossip import gossip, timed_gossip
+from gossip.gossip import gossip
 from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, cr_local_timed, cr_final_timed
 from ballet.assembly.concertod.components.basics.parallel_user import ParallelUser
 from ballet.planner.goal import *
@@ -10,18 +10,19 @@ import argparse
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
-parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
-parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
-
-parser.add_argument('--time', action='store_true', help='Indicate if the time flag is set')
 parser.add_argument('-it', type=int, default=0, help='Iteration')
+parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
+parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
+parser.add_argument('--time', action='store_true', help='Indicate if the time flag is set')
+parser.add_argument('--verbose', action='store_true', help='Indicate if the time debug is set')
 
 
 args = parser.parse_args()
-ctime = True if args.time else False
-it = args.it
 n = args.n
+it = args.it
 sat = False if args.unsat else True
+ctime = True if args.time else False
+verbose = True if args.verbose else False
 inventory_file = args.inventory
 
 ADDRESS = 'localhost'
@@ -48,17 +49,17 @@ else:
 
 connections = []
 if n == 0:
-    service_enduser = ("provider", "service", "enduser", "service0")
+    service_enduser = ("provider", "service", "enduser", "service")
     connections.append(service_enduser)
-    config_enduser = ("provider", "config", "enduser", "config0")
+    config_enduser = ("provider", "config", "enduser", "config")
     connections.append(config_enduser)
 else:
     for i in range(n):
         u_id = f"user{i}"
         if i >= ((n - 1) // 3) * 3:
-            service_enduser = (u_id, "service", "enduser", "service" + str(i % 3))
+            service_enduser = (u_id, "service", "enduser", "service")
             connections.append(service_enduser)
-            config_enduser = (u_id, "config", "enduser", "config" + str(i % 3))
+            config_enduser = (u_id, "config", "enduser", "config")
             connections.append(config_enduser)
     
 active = {enduser: 'running'}
@@ -78,12 +79,15 @@ inventory=inventory)
 # roots
 roots=['provider','enduser']
     
+# -----------------------------------------------------------------------
+#  PLAN
+# -----------------------------------------------------------------------
 
 if ctime:
-    plan = timed_gossip(node, roots, cr_init, cr_local_timed, cr_msg, cr_enrich, cr_ack, cr_final_timed, iteration=it)
+  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, timed=True, iteration=it)
 else:
-  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
-  if plan != None and len(plan.instructions()):
-    print("LOCAL PLAN:")
-    for instruction in plan.instructions():
-      print(instruction)
+  plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=verbose)
+if plan != None and len(plan.instructions()):
+  print("LOCAL PLAN:")
+  for instruction in plan.instructions():
+    print(instruction)

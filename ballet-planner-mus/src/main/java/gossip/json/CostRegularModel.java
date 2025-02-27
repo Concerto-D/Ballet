@@ -266,8 +266,8 @@ public class CostRegularModel {
         // Getters and Setters
         public List<String> getPorts() { return ports; }
 
-        public void setPort(List<String> port) {
-            this.ports = ports;
+        public void setPort(List<String> new_ports) {
+            this.ports = new_ports;
         }
 
         public String getStatus() {

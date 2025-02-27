@@ -9,9 +9,6 @@ import java.util.stream.Collectors;
 
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.constraints.Constraint;
-import org.chocosolver.solver.constraints.ReificationConstraint;
-import org.chocosolver.solver.exception.SolverException;
-import org.chocosolver.solver.search.SearchState;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 
@@ -137,7 +134,7 @@ public class Model2Choco {
                 // Charle's style to add this clause:  model.addClausesBoolOrArrayEqVar(states_bool_var, port_boolvar);
                 BoolVar orVar = model.or(states_bool_var).reify();
                 Constraint c = model.arithm(orVar, "=", port_boolvar);
-                String at = (i == seq_length) ? "the end of the reconfiguration" : "i="+i;
+                // String at = (i == seq_length) ? "the end of the reconfiguration" : "i="+i;
                 String places = String.join("%", cr_model.getPorts().get(port)); // TODO make a list
                 String c_tracker = "model("+port+","+places+")";
                 addTracker(c,  c_tracker, tracker);

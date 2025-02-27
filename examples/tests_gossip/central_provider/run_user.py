@@ -1,6 +1,6 @@
 from gossip.gossip import gossip
 from gossip.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, cr_local_timed, cr_final_timed
-from ballet.assembly.concertod.components.basics.parallel_user import ParallelUser
+from ballet.assembly.concertod.components.basics.simple_user import SimpleUser
 from ballet.planner.goal import *
 from ballet.utils.dict_utils import *
 
@@ -36,7 +36,7 @@ PROVIDER_PORT = 3000
 PORT = PROVIDER_PORT + id
 
 # instances
-user = ParallelUser(1)
+user = SimpleUser()
 user.set_name(f"user{id-1}")
 
 # inventory

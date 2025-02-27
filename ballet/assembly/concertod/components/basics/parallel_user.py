@@ -40,8 +40,8 @@ class ParallelUser(Component):
             self.transitions[f'deploy3{i}'] = (f'sconf{i}', f'configured', 'deploy', 0, lambda _: self.deploy3(i))
             self.transitions[f'suspend1{i}'] = ('running', f'suspended{i}', 'suspend', 0, lambda _: self.suspend1(i))
             self.transitions[f'suspend2{i}'] = (f'suspended{i}', 'configured', 'suspend', 0, lambda _: self.suspend2(i))
-            # self.dependencies[f'service{i}'] = (DepType.USE, ['running', f'suspended{i}'])
-            # self.dependencies[f'config{i}'] = (DepType.USE, [f'sconf{i}', f'configured', 'running', f'suspended{i}'])
+            self.dependencies[f'service{i}'] = (DepType.USE, ['running', f'suspended{i}'])
+            self.dependencies[f'config{i}'] = (DepType.USE, [f'sconf{i}', f'configured', 'running', f'suspended{i}'])
         
         self.initial_place = "uninstalled"
         

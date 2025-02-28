@@ -153,6 +153,7 @@ def gossip (node: Node, roots: list[str],
         f_final: Model -> Solution 
             When gossip ends, make a final resolution
     """
+    start_time = time.time()
     # Init a CP model from Node
     node.set_roots(roots)
     model = f_init(node)
@@ -165,6 +166,7 @@ def gossip (node: Node, roots: list[str],
     is_unsat = False
     has_fail_ack = False
     has_sent_global_ack = False
+    num_of_wait = 0
     while not ended_resolution:
         # Check if all global acks have been sent
         # And if there is a global "failed acked"
@@ -264,7 +266,8 @@ def gossip (node: Node, roots: list[str],
             node.print_status()
             print(f"ENDED RESOLUTION : {ended_resolution}")
             print(f"====================================================")
-        time.sleep(0.5)    
+        time.sleep(0.5)  
+        num_of_wait += 1  
     if debug:
         print(f"====================================================")
         print(f"At the end :")
@@ -282,11 +285,17 @@ def gossip (node: Node, roots: list[str],
         result = f_final(model)
     # node.global_synchro()
 
+    end_time = time.time()  # Record end time
+    elapsed_time = end_time - start_time  # Compute elapsed time
+    total_time = f"{elapsed_time:.6f}"
+
     if timed:
         total_messages = node.get_len_messages()
         model_constraints = model.get_constraints()
         (min_key, min_size), (max_key, max_size) = min_max_set_size_with_keys(model_constraints)
         # component|key|iteration|value
+        print(f"{node.id}|total_time|{iteration-1}|{total_time}")
+        print(f"{node.id}|waits|{iteration-1}|{num_of_wait}")
         print(f"{node.id}|messages|{iteration-1}|{total_messages}")
         print(f"{min_key}|min_constraint|{iteration-1}|{min_size}")
         print(f"{max_key}|max_constraint|{iteration-1}|{max_size}")

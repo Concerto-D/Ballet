@@ -15,10 +15,12 @@ fi
 # Check for the second argument (-s) equal to "unsat"
 if [ "$2" = "unsat" ]; then
     unsat_flag="--unsat"
-    time_file="unsat_cuser_$n.log"
+    time_file="unsat_cprovider_$n.log"
+    mzn_dir=mzn_unsat_cprovider_$n
 else
     unsat_flag=""
-    time_file="sat_cuser_$n.log"
+    time_file="sat_cprovider_$n.log"
+    mzn_dir=mzn_sat_cprovider_$n
 fi
 # Check if we want debug mode
 if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ] || [ "$6" = "debug" ]; then
@@ -74,7 +76,6 @@ if $single; then
         fi
         wait
     done
-    mzn_dir=mzn_sat_cuser_$n
     if [ -d results/$mzn_dir ]; then
     rm -rf results/$mzn_dir
     fi

@@ -15,10 +15,12 @@ fi
 # Check for the second argument (-s) equal to "unsat"
 if [ "$2" = "unsat" ]; then
     unsat_flag="--unsat"
-    time_file="unsat_cuser_$n.log"
+    time_file="unsat_linear_$n.log"
+    mzn_dir=mzn_unsat_linear_$n
 else
     unsat_flag=""
-    time_file="sat_cuser_$n.log"
+    time_file="sat_linear_$n.log"
+    mzn_dir=mzn_sat_linear_$n
 fi
 # Check if we want debug mode
 if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ] || [ "$6" = "debug" ]; then
@@ -67,7 +69,7 @@ if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
-    for ((ite=1; ite<=10; ite++)); do
+    for ((ite=1; ite<=1; ite++)); do
         python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
@@ -76,7 +78,6 @@ if $single; then
         fi
         wait
     done
-    mzn_dir=mzn_sat_cuser_$n
     if [ -d results/$mzn_dir ]; then
     rm -rf results/$mzn_dir
     fi

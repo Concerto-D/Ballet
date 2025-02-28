@@ -17,9 +17,11 @@ fi
 if [ "$2" = "unsat" ]; then
     unsat_flag="--unsat"
     time_file="unsat_cuser_$n.log"
+    mzn_dir=mzn_sat_stratified_$n
 else
     unsat_flag=""
     time_file="sat_cuser_$n.log"
+    mzn_dir=mzn_sat_stratified_$n
 fi
 # Check if we want debug mode
 if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ] || [ "$6" = "debug" ]; then
@@ -69,7 +71,7 @@ echo "$inventory" > inventory.json
 if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
-    for ((ite=1; ite<=10; ite++)); do
+    for ((ite=1; ite<=1; ite++)); do
         python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         python run_end_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
@@ -79,7 +81,6 @@ if $single; then
         fi
         wait
     done
-    mzn_dir=mzn_sat_cuser_$n
     if [ -d results/$mzn_dir ]; then
     rm -rf results/$mzn_dir
     fi

@@ -44,6 +44,7 @@ class ParallelUser(Component):
             self.dependencies[f'config{i}'] = (DepType.USE, [f'sconf{i}', f'configured', 'running', f'suspended{i}'])
         
         self.initial_place = "uninstalled"
+        self.running_place = "running"
         
 
     def deploy1(self):

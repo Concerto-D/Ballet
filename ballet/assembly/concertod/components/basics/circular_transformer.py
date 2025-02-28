@@ -30,6 +30,7 @@ class CircularTransformer (Component):
         }
         
         self.initial_place = "uninstalled"
+        self.running_place = "running"
 
     def deploy1(self):
         pass

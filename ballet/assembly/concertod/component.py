@@ -150,6 +150,7 @@ class Component(object, metaclass=ABCMeta):
         self.groups: Dict[str, List[str]] = {}
         self.dependencies: Dict[str, Tuple] = {}
         self.initial_place: Optional[str] = None
+        self.running_place: Optional[str] = None
         self.component_type: str = type(self).__name__  # In order to reinstanciate it later
 
         self.st_places: Dict[str, Place] = {}
@@ -516,6 +517,23 @@ class Component(object, metaclass=ABCMeta):
                 "Trying to set place %s as intial place of component %s while %s is already the intial place." % (
                     name, self.get_name(), self.initial_place))
         self.initial_place = name
+
+    def set_running_place(self, name: str):
+        """
+        This method allows to set the (unique) initial place of the component, if not already done
+        using the parameter of add_place and add_places.
+
+        :param name: the name of the place to mark initial
+        """
+
+        if name not in self.st_places:
+            raise Exception(
+                "Trying to set non-existant place %s as running place of component %s." % (name, self.get_name()))
+        if self.running_place is not None:
+            raise Exception(
+                "Trying to set place %s as running place of component %s while %s is already the running place." % (
+                    name, self.get_name(), self.running_place))
+        self.running_place = name
 
     def get_places(self):
         """
@@ -1081,6 +1099,9 @@ class Component(object, metaclass=ABCMeta):
 
     def get_initial_places(self):
         return [self.initial_place]
+    
+    def get_running_places(self):
+        return [self.running_place]
 
     def get_accessible_places_from(self, origin_places: List[str], behavior_list: List[str]):
         from copy import deepcopy

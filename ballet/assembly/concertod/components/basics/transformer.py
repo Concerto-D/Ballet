@@ -29,6 +29,7 @@ class Transformer(Component):
         }
         
         self.initial_place = "uninstalled"
+        self.running_place = "running"
 
     def install1(self):
         pass

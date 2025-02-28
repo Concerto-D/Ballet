@@ -20,6 +20,7 @@ class UserProvider (Component):
             }
         
         self.initial_place = "uninstalled"
+        self.running_place = "running"
         
     def config(self):
         pass

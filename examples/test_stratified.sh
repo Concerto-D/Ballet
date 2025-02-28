@@ -16,11 +16,11 @@ fi
 # Check for the second argument (-s) equal to "unsat"
 if [ "$2" = "unsat" ]; then
     unsat_flag="--unsat"
-    time_file="unsat_cuser_$n.log"
-    mzn_dir=mzn_sat_stratified_$n
+    time_file="unsat_stratified_$n.log"
+    mzn_dir=mzn_unsat_stratified_$n
 else
     unsat_flag=""
-    time_file="sat_cuser_$n.log"
+    time_file="sat_stratified_$n.log"
     mzn_dir=mzn_sat_stratified_$n
 fi
 # Check if we want debug mode
@@ -75,7 +75,7 @@ if $single; then
         python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         python run_end_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
-            for ((i=1; i<=$n; i++)); do
+            for ((i=0; i<$n; i++)); do
                 python run_parallel_user.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
             done
         fi

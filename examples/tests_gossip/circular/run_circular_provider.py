@@ -66,7 +66,7 @@ else:
 # Node
 active = {provider: 'running'}
 if sat:
-    goals = {provider: [StateReconfigurationGoal("running", final=True), BehaviorReconfigurationGoal("interrupt")]}
+    goals = {provider: [StateReconfigurationGoal("running", final=True), BehaviorReconfigurationGoal("suspend")]}
 else:
     goals = {}
 

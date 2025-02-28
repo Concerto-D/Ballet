@@ -78,7 +78,7 @@ if $single; then
         python run_circular_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         python run_circular_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
-            for ((i=1; i<=$n; i++)); do
+            for ((i=0; i<$n; i++)); do
                 python run_circular_transformer.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
             done
         fi
@@ -89,6 +89,7 @@ if $single; then
     fi
     mkdir results/$mzn_dir
     mv *mzn results/$mzn_dir
+    mv ^(?!inventory\.json$).*\.json$ results/$mzn_dir
     mv $time_file results/
 else
 

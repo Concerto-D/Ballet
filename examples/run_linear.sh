@@ -83,6 +83,7 @@ if $single; then
     fi
     mkdir results/$mzn_dir
     mv *mzn results/$mzn_dir
+    mv ^(?!inventory\.json$).*\.json$ results/$mzn_dir
     mv $time_file results/
 else
     # Check if n is not equal to 0

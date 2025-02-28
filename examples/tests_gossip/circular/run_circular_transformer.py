@@ -79,7 +79,6 @@ if sat:
 else:
     goals = {}
 
-
 node = CostRegularNode(id=node_name,
 admin=devops, components=[transformer], 
 connections=connections,

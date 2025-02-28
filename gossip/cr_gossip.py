@@ -577,7 +577,8 @@ class CostRegularNode(Node):
         for (_, message_ack) in self.__out_message.items():
             for (_, ack) in message_ack.items():
                 if ack != None and isinstance(ack, AckFailure):
-                    results.append(f"{count}. {ack.cause}\n")
+                    cause = ack.cause.replace('_9_', ',').replace('/\\', '\n \t & ')
+                    results.append(f"{count}. {cause}\n")
                     count = count + 1
         return '\n'.join(results)
     

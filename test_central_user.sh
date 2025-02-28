@@ -15,7 +15,6 @@ if [ -z "$1" ]; then
 else
     n=$1
 fi
-
 # Check for the second argument (-s) equal to "unsat"
 if [ "$2" = "unsat" ]; then
     unsat_flag="--unsat"
@@ -24,24 +23,29 @@ else
     unsat_flag=""
     time_file="sat_cuser_$n.log"
 fi
-
-# Check for the third argument (-s) equal to "debug"
-if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ]; then
+# Check if we want debug mode
+if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ] || [ "$6" = "debug" ]; then
     debugger_flag="-m ipdb"
 else
     debugger_flag=""
 fi
-
-if [ "$3" = "verbose" ] || [ "$4" = "verbose" ] || [ "$5" = "verbose" ]; then
+# Check if we want verbosity
+if [ "$3" = "verbose" ] || [ "$4" = "verbose" ] || [ "$5" = "verbose" ] || [ "$6" = "verbose" ]; then
     verbose_flag="--verbose"
 else
     verbose_flag=""
 fi
-
-if [ "$3" = "single" ] || [ "$4" = "single" ] || [ "$5" = "single" ]; then
+# Check if we want to run all programs in a single terminal
+if [ "$3" = "single" ] || [ "$4" = "single" ] || [ "$5" = "single" ] || [ "$6" = "single" ]; then
     single=true
 else
     single=false
+fi
+# Check if we want to record time of calculation
+if [ "$3" = "time" ] || [ "$4" = "time" ] || [ "$5" = "time" ] || [ "$6" = "time" ]; then
+    timeflag="--time"
+else
+    timeflag=""
 fi
 
 cp "$tests_dir/run_provider.py" .
@@ -66,16 +70,21 @@ if $single; then
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
     for ((ite=1; ite<=10; ite++)); do
-        # python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json --time -it $ite # >> $time_file &
-        python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json &
+        python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
-                # python3.11 run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json --time -it $ite # >> $time_file &
-                python3.11 run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json &
+                python3.11 run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
             done
         fi
         wait
     done
+    mzn_dir=mzn_sat_cuser_$n
+    if [ -d results/$mzn_dir ]; then
+    rm -rf results/$mzn_dir
+    fi
+    mkdir results/$mzn_dir
+    mv *mzn results/$mzn_dir
+    mv $time_file results/
 else
     # Run provider
     gnome-terminal -- bash -c "python3.11 $debugger_flag run_user.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"

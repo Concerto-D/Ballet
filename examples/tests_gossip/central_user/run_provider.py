@@ -85,10 +85,10 @@ roots=[f'provider{i}' for i in range(n)]
 # -----------------------------------------------------------------------
 
 if ctime:
-    plan =  gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, iteration=it, timed=True)
+    plan =  gossip(node, roots, cr_init, cr_local_timed, cr_msg, cr_enrich, cr_ack, cr_final_timed, iteration=it, timed=True)
 else:
   plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=verbose)
-if plan != None and len(plan.instructions()):
-  print("LOCAL PLAN:")
-  for instruction in plan.instructions():
-    print(instruction)
+  if plan != None and len(plan.instructions()):
+    print("LOCAL PLAN:")
+    for instruction in plan.instructions():
+      print(instruction)

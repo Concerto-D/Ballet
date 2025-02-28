@@ -12,19 +12,37 @@ if [ -z "$1" ]; then
 else
     n=$1
 fi
-
 # Check for the second argument (-s) equal to "unsat"
 if [ "$2" = "unsat" ]; then
     unsat_flag="--unsat"
+    time_file="unsat_cuser_$n.log"
 else
     unsat_flag=""
+    time_file="sat_cuser_$n.log"
 fi
-
-# Check for the third argument (-s) equal to "debug"
-if [ "$3" = "debug" ]; then
+# Check if we want debug mode
+if [ "$3" = "debug" ] || [ "$4" = "debug" ] || [ "$5" = "debug" ] || [ "$6" = "debug" ]; then
     debugger_flag="-m ipdb"
 else
     debugger_flag=""
+fi
+# Check if we want verbosity
+if [ "$3" = "verbose" ] || [ "$4" = "verbose" ] || [ "$5" = "verbose" ] || [ "$6" = "verbose" ]; then
+    verbose_flag="--verbose"
+else
+    verbose_flag=""
+fi
+# Check if we want to run all programs in a single terminal
+if [ "$3" = "single" ] || [ "$4" = "single" ] || [ "$5" = "single" ] || [ "$6" = "single" ]; then
+    single=true
+else
+    single=false
+fi
+# Check if we want to record time of calculation
+if [ "$3" = "time" ] || [ "$4" = "time" ] || [ "$5" = "time" ] || [ "$6" = "time" ]; then
+    timeflag="--time"
+else
+    timeflag=""
 fi
 
 cp "$tests_dir/run_master.py" .

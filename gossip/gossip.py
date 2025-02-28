@@ -264,14 +264,14 @@ def gossip (node: Node, roots: list[str],
             node.print_status()
             print(f"ENDED RESOLUTION : {ended_resolution}")
             print(f"====================================================")
-            time.sleep(1)    
+        time.sleep(0.5)    
     if debug:
         print(f"====================================================")
         print(f"At the end :")
         node.print_status()
         print(f"====================================================")
 
-    if has_fail_ack:
+    if has_fail_ack and not timed:
         if node_is_root:
             print(node.get_failing_reasons())
         else:
@@ -287,8 +287,8 @@ def gossip (node: Node, roots: list[str],
         model_constraints = model.get_constraints()
         (min_key, min_size), (max_key, max_size) = min_max_set_size_with_keys(model_constraints)
         # component|key|iteration|value
-        print(f"{node.id}|messages|{iteration}|{total_messages}")
-        print(f"{min_key}|min_constraint|{iteration}|{min_size}")
-        print(f"{max_key}|max_constraint|{iteration}|{max_size}")
+        print(f"{node.id}|messages|{iteration-1}|{total_messages}")
+        print(f"{min_key}|min_constraint|{iteration-1}|{min_size}")
+        print(f"{max_key}|max_constraint|{iteration-1}|{max_size}")
 
     return result

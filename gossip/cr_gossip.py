@@ -1104,7 +1104,6 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
                             validating_states.add(place)
             for state in validating_states:
                 model.add_transition(message.target, transition_name, state, state)
-            
             wait_constraint = TransitionConstraint(transition_name, source=msg_source)
             node.add_origin_of_constraint(wait_constraint, message)
             model.add_constraint(message.target, wait_constraint) # remove message

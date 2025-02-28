@@ -34,7 +34,7 @@ node_name = "node_enduser"
 devops = "DevOpsEndUser"
 
 m = 1 if n == 0 else ((n - 1) % 3) + 1
-enduser = SimpleUser(m)
+enduser = SimpleUser()
 enduser.set_name(f"enduser")
 
 inventory = {}
@@ -57,16 +57,16 @@ else:
     for i in range(n):
         u_id = f"user{i}"
         if i >= ((n - 1) // 3) * 3:
-            service_enduser = (u_id, "service", "enduser", "service")
+            service_enduser = (u_id, "serviceOut", "enduser", "service")
             connections.append(service_enduser)
-            config_enduser = (u_id, "config", "enduser", "config")
+            config_enduser = (u_id, "configOut", "enduser", "config")
             connections.append(config_enduser)
     
 active = {enduser: 'running'}
 
 # Goals
 
-goals = {enduser: [BehaviorReconfigurationGoal('suspend'), StateReconfigurationGoal("initial", final=True)]}
+goals = {enduser: [BehaviorReconfigurationGoal('suspend'), StateReconfigurationGoal("running", final=True)]}
     
 node = CostRegularNode(id=node_name,
 admin=devops, components=[enduser], 
@@ -75,7 +75,8 @@ active=active,
 goals=goals,
 port=PORT,
 inventory=inventory)
-    
+
+
 # roots
 roots=['provider','enduser']
     

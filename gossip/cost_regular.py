@@ -5,6 +5,7 @@ from gossip.gossip import Model, Solution
 from ballet.planner.goal import *
 from ballet.assembly.concertod.component import Component
 import subprocess, json
+import minizinc
 import time
 
 class FindMUSException(Exception):
@@ -831,7 +832,7 @@ minimize scost;
         else:
             r = result.solution
             return CRSolution(r, sat=True)
-         
+        
     def solve_choco(self,findmus=False, write_file=False, filename="mode.json", print_model=False):
         if findmus:
             # TODO Change model.json into model_component.json

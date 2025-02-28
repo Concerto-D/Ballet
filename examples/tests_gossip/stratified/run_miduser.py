@@ -101,7 +101,7 @@ active = {user: 'running'}
 
 # Goals
 if sat:
-    goals = {user: [StateReconfigurationGoal("initial", final=True)]}
+    goals = {user: [StateReconfigurationGoal("running", final=True)]}
 else:
     goals = {}
 
@@ -113,7 +113,7 @@ active=active,
 goals=goals,
 port=PORT,
 inventory=inventory)
-    
+
 # roots
 roots=['provider','enduser']
     

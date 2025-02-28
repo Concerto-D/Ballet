@@ -50,7 +50,7 @@ fi
 
 cp "$tests_dir/run_provider.py" .
 cp "$tests_dir/run_end_user.py" .
-cp "$tests_dir/run_parallel_user.py" .
+cp "$tests_dir/run_miduser.py" .
 
 # Start building the JSON structure using jq
 inventory=$(jq -n --arg address "$ADDRESS" --argjson port_planner "$PROVIDER_PORT" \
@@ -72,11 +72,11 @@ if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
     for ((ite=1; ite<=1; ite++)); do
-        python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
-        python run_end_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+        python3.11 run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+        python3.11 run_end_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=0; i<$n; i++)); do
-                python run_parallel_user.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+                python3.11 run_miduser.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
             done
         fi
         wait
@@ -92,9 +92,9 @@ else
     # Check if n is not equal to 0
     if [ "$n" -ne 0 ]; then
         for ((i=0; i<$n; i++)); do
-            # Execute the run_parallel_user.py script with the current value of i and unsat flag
+            # Execute the run_miduser.py script with the current value of i and unsat flag
             # if [ "$i" -ne 0 ]; then
-            gnome-terminal -- bash -c "python $debugger_flag run_parallel_user.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+            gnome-terminal -- bash -c "python3.11 $debugger_flag run_miduser.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
             # fi
         done
     else
@@ -102,9 +102,9 @@ else
     fi
 
     # Run provider
-    gnome-terminal -- bash -c "python $debugger_flag run_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python3.11 $debugger_flag run_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
     # Run end user
-    gnome-terminal -- bash -c "python $debugger_flag run_end_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python3.11 $debugger_flag run_end_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
 
     echo "Press any key for cleaning local environment"; read -n 1 key
 
@@ -126,5 +126,5 @@ else
     fi
 fi
 rm "run_provider.py"
-rm "run_parallel_user.py"
+rm "run_miduser.py"
 rm "run_end_user.py"

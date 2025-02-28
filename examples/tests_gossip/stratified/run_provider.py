@@ -64,7 +64,7 @@ active = {provider: 'running'}
 
 # Goals
 if sat:
-    goals = {provider: [BehaviorReconfigurationGoal('update'), StateReconfigurationGoal("initial", final=True)]}
+    goals = {provider: [BehaviorReconfigurationGoal('update'), StateReconfigurationGoal("running", final=True)]}
 else:
     goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
     
@@ -76,7 +76,6 @@ active=active,
 goals=goals,
 port=PORT,
 inventory=inventory)
-    
     
 # roots
 roots=['provider','enduser']

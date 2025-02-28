@@ -13,8 +13,8 @@ class UserProvider (Component):
         }
         
         self.dependencies = {
-            'configIn': (DepType.USE, ['configured']),
-            'configOut': (DepType.PROVIDE, ['configured']),
+            'configIn': (DepType.USE, ['configured', 'running']),
+            'configOut': (DepType.PROVIDE, ['configured', 'running']),
             'serviceIn': (DepType.USE, ['running']),
             'serviceOut': (DepType.PROVIDE, ['running'])
             }

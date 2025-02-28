@@ -127,6 +127,6 @@ else
     fi
 fi
 
-rm "run_circular_provider.py" .
-rm "run_circular_user.py" .
-rm "run_circular_transformer.py" .
+rm "run_circular_provider.py" 
+rm "run_circular_user.py" 
+rm "run_circular_transformer.py" 

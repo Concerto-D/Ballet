@@ -68,10 +68,10 @@ if $single; then
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
     for ((ite=1; ite<=10; ite++)); do
-        python3.11 run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+        python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
-                python3.11 run_transformer.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+                python run_transformer.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
             done
         fi
         wait
@@ -88,14 +88,14 @@ else
     if [ "$n" -ne 0 ]; then
         for ((i=1; i<=$n; i++)); do
             # Execute the run_user.py script with the current value of i and unsat flag
-            gnome-terminal -- bash -c "python3.11 $debugger_flag run_transformer.py -n $n -i $i $verbose_flag $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+            gnome-terminal -- bash -c "python $debugger_flag run_transformer.py -n $n -i $i $verbose_flag $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no chained transformer to run"
     fi
 
     # Run provider
-    gnome-terminal -- bash -c "python3.11 $debugger_flag run_provider.py -n $n $verbose_flag $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python $debugger_flag run_provider.py -n $n $verbose_flag $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
 
     echo "Press any key for cleaning local environment"; read -n 1 key
 

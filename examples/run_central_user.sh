@@ -70,10 +70,10 @@ if $single; then
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
     for ((ite=1; ite<=10; ite++)); do
-        python3.11 run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+        python run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
-                python3.11 run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+                python run_provider.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
             done
         fi
         wait
@@ -87,13 +87,13 @@ if $single; then
     mv $time_file results/
 else
     # Run provider
-    gnome-terminal -- bash -c "python3.11 $debugger_flag run_user.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python $debugger_flag run_user.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
 
     # Check if n is not equal to 0
     if [ "$n" -ne 0 ]; then
         for ((i=1; i<=$n; i++)); do
             # Execute the run_user.py script with the current value of i and unsat flag
-            gnome-terminal -- bash -c "python3.11 $debugger_flag run_provider.py $verbose_flag -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+            gnome-terminal -- bash -c "python $debugger_flag run_provider.py $verbose_flag -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no parallel user to run"

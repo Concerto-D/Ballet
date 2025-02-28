@@ -73,11 +73,11 @@ if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
     for ((ite=1; ite<=10; ite++)); do
-        python3.11 run_circular_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
-        python3.11 run_circular_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+        python run_circular_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+        python run_circular_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
-                python3.11 run_circular_transformer.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
+                python run_circular_transformer.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
             done
         fi
         wait
@@ -94,16 +94,16 @@ else
     # Check if n is not equal to 0
     if [ "$n" -ne 0 ]; then
         for ((i=0; i<$n; i++)); do
-            gnome-terminal -- bash -c "python3.11 $debugger_flag run_circular_transformer.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+            gnome-terminal -- bash -c "python $debugger_flag run_circular_transformer.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no chained user to run"
     fi
 
     # Run provider
-    gnome-terminal -- bash -c "python3.11 $debugger_flag run_circular_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python $debugger_flag run_circular_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
     # Run end user
-    gnome-terminal -- bash -c "python3.11 $debugger_flag run_circular_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal -- bash -c "python $debugger_flag run_circular_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
 
     echo "Press any key for cleaning local environment"; read -n 1 key
 

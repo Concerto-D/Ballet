@@ -4,7 +4,7 @@ include "regular.mzn";
 int: seq_length = 27;
 
 enum STATE = {uninstalled,configured,running};
-enum BEHAVIOR = {deploy,stop,suspend,skip,wait_provider10_update,wait_provider6_update,wait_provider12_update,wait_provider13_update,wait_provider0_update,wait_provider7_update,wait_provider4_update,wait_provider1_update,wait_provider9_update,wait_provider5_update,wait_provider3_update,wait_provider8_update,wait_provider11_update,wait_provider2_update,wait_provider14_update}; 
+enum BEHAVIOR = {deploy,stop,suspend,skip,wait_provider10_update,wait_provider2_update,wait_provider0_update,wait_provider4_update,wait_provider5_update,wait_provider7_update,wait_provider9_update,wait_provider3_update,wait_provider1_update,wait_provider14_update,wait_provider8_update,wait_provider13_update,wait_provider11_update,wait_provider12_update,wait_provider6_update}; 
 enum STATUS = {enabled, disabled};
 
 array[STATE, BEHAVIOR] of opt STATE: transitions = 
@@ -39,36 +39,36 @@ constraint regular(sequence, transitions, running, {uninstalled,configured,runni
 % Reconfiguration goals as constraints
 constraint count(service_status, disabled) > 0; % inferred
 constraint count(sequence, wait_provider9_update) = 1; % inferred
-constraint count(sequence, wait_provider12_update) = 1; % inferred
-constraint count(sequence, wait_provider0_update) = 1; % inferred
-constraint count(sequence, wait_provider1_update) = 1; % inferred
-constraint count(sequence, wait_provider11_update) = 1; % inferred
-constraint count(sequence, wait_provider14_update) = 1; % inferred
+constraint states[seq_length+1] = running; % goal
+constraint count (states, running) > 0; % goal
 constraint count(service_status, disabled) > 0; % inferred
-constraint count(sequence, wait_provider8_update) = 1; % inferred
+constraint count(service_status, disabled) > 0; % inferred
 constraint count(sequence, wait_provider4_update) = 1; % inferred
 constraint count(service_status, disabled) > 0; % inferred
 constraint count(service_status, disabled) > 0; % inferred
-constraint count(sequence, wait_provider2_update) = 1; % inferred
 constraint count(service_status, disabled) > 0; % inferred
 constraint count(service_status, disabled) > 0; % inferred
+constraint count(sequence, wait_provider14_update) = 1; % inferred
 constraint count(service_status, disabled) > 0; % inferred
-constraint count(sequence, wait_provider6_update) = 1; % inferred
-constraint states[seq_length+1] = running; % goal
-constraint count (states, running) > 0; % goal
 constraint count(sequence, wait_provider7_update) = 1; % inferred
 constraint count(service_status, disabled) > 0; % inferred
 constraint count(service_status, disabled) > 0; % inferred
-constraint count(sequence, wait_provider10_update) = 1; % inferred
-constraint count(service_status, disabled) > 0; % inferred
-constraint count(service_status, disabled) > 0; % inferred
-constraint count(sequence, wait_provider5_update) = 1; % inferred
-constraint count(service_status, disabled) > 0; % inferred
 constraint count(sequence, wait_provider3_update) = 1; % inferred
 constraint count(service_status, disabled) > 0; % inferred
+constraint count(service_status, disabled) > 0; % inferred
+constraint count(service_status, disabled) > 0; % inferred
+constraint count(sequence, wait_provider2_update) = 1; % inferred
+constraint count(sequence, wait_provider6_update) = 1; % inferred
+constraint count(sequence, wait_provider0_update) = 1; % inferred
+constraint count(service_status, disabled) > 0; % inferred
+constraint count(sequence, wait_provider10_update) = 1; % inferred
+constraint count(sequence, wait_provider5_update) = 1; % inferred
+constraint count(sequence, wait_provider8_update) = 1; % inferred
+constraint count(sequence, wait_provider1_update) = 1; % inferred
 constraint count(sequence, wait_provider13_update) = 1; % inferred
+constraint count(sequence, wait_provider11_update) = 1; % inferred
 constraint count(service_status, disabled) > 0; % inferred
-constraint count(service_status, disabled) > 0; % inferred
+constraint count(sequence, wait_provider12_update) = 1; % inferred
 
 
 % Goal

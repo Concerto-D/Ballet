@@ -37,10 +37,10 @@ constraint states[1]=running;
 constraint regular(sequence, transitions, running, {uninstalled,configured,running});
 
 % Reconfiguration goals as constraints
-constraint count(service_status, disabled) > 0; % inferred
-constraint count(sequence, wait_provider_update) = 1; % inferred
 constraint states[seq_length+1] = running; % goal
 constraint count (states, running) > 0; % goal
+constraint count(service_status, disabled) > 0; % inferred
+constraint count(sequence, wait_provider_update) = 1; % inferred
 
 
 % Goal

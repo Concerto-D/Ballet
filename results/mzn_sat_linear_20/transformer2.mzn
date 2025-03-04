@@ -43,10 +43,10 @@ constraint states[1]=running;
 constraint regular(sequence, transitions, running, {uninstalled,installed,configured,running});
 
 % Reconfiguration goals as constraints
-constraint configIn_status[seq_length+1] = disabled; % inferred
-constraint count(configIn_status, disabled) > 0; % inferred
 constraint serviceIn_status[seq_length+1] = disabled; % inferred
 constraint count(serviceIn_status, disabled) > 0; % inferred
+constraint configIn_status[seq_length+1] = disabled; % inferred
+constraint count(configIn_status, disabled) > 0; % inferred
 
 
 % Goal

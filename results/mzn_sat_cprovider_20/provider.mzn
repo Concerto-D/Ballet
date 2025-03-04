@@ -37,38 +37,12 @@ constraint states[1]=running;
 constraint regular(sequence, transitions, running, {uninstalled,installed,running});
 
 % Reconfiguration goals as constraints
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
 constraint service_status[seq_length+1] = enabled; % inferred
 constraint count(service_status, enabled) > 0; % inferred
 constraint config_status[seq_length+1] = enabled; % inferred
 constraint count(config_status, enabled) > 0; % inferred
 constraint config_status[seq_length+1] = enabled; % inferred
 constraint count(config_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
 constraint service_status[seq_length+1] = enabled; % inferred
 constraint count(service_status, enabled) > 0; % inferred
 constraint config_status[seq_length+1] = enabled; % inferred
@@ -81,16 +55,6 @@ constraint service_status[seq_length+1] = enabled; % inferred
 constraint count(service_status, enabled) > 0; % inferred
 constraint config_status[seq_length+1] = enabled; % inferred
 constraint count(config_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
-constraint states[seq_length+1] = running; % goal
-constraint count (states, running) > 0; % goal
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
 constraint service_status[seq_length+1] = enabled; % inferred
 constraint count(service_status, enabled) > 0; % inferred
 constraint service_status[seq_length+1] = enabled; % inferred
@@ -101,12 +65,6 @@ constraint service_status[seq_length+1] = enabled; % inferred
 constraint count(service_status, enabled) > 0; % inferred
 constraint config_status[seq_length+1] = enabled; % inferred
 constraint count(config_status, enabled) > 0; % inferred
-constraint service_status[seq_length+1] = enabled; % inferred
-constraint count(service_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
-constraint config_status[seq_length+1] = enabled; % inferred
-constraint count(config_status, enabled) > 0; % inferred
 constraint config_status[seq_length+1] = enabled; % inferred
 constraint count(config_status, enabled) > 0; % inferred
 constraint service_status[seq_length+1] = enabled; % inferred
@@ -115,11 +73,53 @@ constraint config_status[seq_length+1] = enabled; % inferred
 constraint count(config_status, enabled) > 0; % inferred
 constraint service_status[seq_length+1] = enabled; % inferred
 constraint count(service_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
 constraint config_status[seq_length+1] = enabled; % inferred
 constraint count(config_status, enabled) > 0; % inferred
 constraint service_status[seq_length+1] = enabled; % inferred
 constraint count(service_status, enabled) > 0; % inferred
 constraint count(sequence, update) > 0; % goal
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint states[seq_length+1] = running; % goal
+constraint count (states, running) > 0; % goal
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
+constraint service_status[seq_length+1] = enabled; % inferred
+constraint count(service_status, enabled) > 0; % inferred
+constraint config_status[seq_length+1] = enabled; % inferred
+constraint count(config_status, enabled) > 0; % inferred
 
 
 % Goal

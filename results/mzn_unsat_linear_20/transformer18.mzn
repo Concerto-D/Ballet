@@ -43,10 +43,10 @@ constraint states[1]=running;
 constraint regular(sequence, transitions, running, {uninstalled,installed,configured,running});
 
 % Reconfiguration goals as constraints
-constraint configOut_status[seq_length+1] = enabled; % inferred
-constraint count(configOut_status, enabled) > 0; % inferred
 constraint serviceOut_status[seq_length+1] = enabled; % inferred
 constraint count(serviceOut_status, enabled) > 0; % inferred
+constraint configOut_status[seq_length+1] = enabled; % inferred
+constraint count(configOut_status, enabled) > 0; % inferred
 
 
 % Goal

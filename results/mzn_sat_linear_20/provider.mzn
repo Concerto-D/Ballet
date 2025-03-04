@@ -37,9 +37,9 @@ constraint states[1]=running;
 constraint regular(sequence, transitions, running, {uninstalled,installed,running});
 
 % Reconfiguration goals as constraints
-constraint count(sequence, update) > 0; % goal
 constraint states[seq_length+1] = running; % goal
 constraint count (states, running) > 0; % goal
+constraint count(sequence, update) > 0; % goal
 
 
 % Goal

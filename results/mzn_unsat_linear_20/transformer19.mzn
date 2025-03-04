@@ -4,14 +4,14 @@ include "regular.mzn";
 int: seq_length = 20;
 
 enum STATE = {uninstalled,installed,configured,running};
-enum BEHAVIOR = {install,stop,suspend,update,skip}; 
+enum BEHAVIOR = {install,stop,update,suspend,skip}; 
 enum STATUS = {enabled, disabled};
 
 array[STATE, BEHAVIOR] of opt STATE: transitions = 
 [|running,uninstalled,<>,<>,uninstalled
-|running,uninstalled,installed,<>,installed
-|running,uninstalled,<>,configured,configured
-|running,uninstalled,installed,configured,running|];
+|running,uninstalled,<>,installed,installed
+|running,uninstalled,configured,<>,configured
+|running,uninstalled,configured,installed,running|];
 
 array[STATE, BEHAVIOR] of int: costs = 
 [|3,100000,100000,100000,0
@@ -43,9 +43,9 @@ constraint states[1]=running;
 constraint regular(sequence, transitions, running, {uninstalled,installed,configured,running});
 
 % Reconfiguration goals as constraints
-constraint count(sequence, update) > 0; % goal
 constraint states[seq_length+1] = running; % goal
 constraint count (states, running) > 0; % goal
+constraint count(sequence, update) > 0; % goal
 
 
 % Goal

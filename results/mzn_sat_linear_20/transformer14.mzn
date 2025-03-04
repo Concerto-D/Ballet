@@ -4,14 +4,14 @@ include "regular.mzn";
 int: seq_length = 20;
 
 enum STATE = {uninstalled,installed,configured,running};
-enum BEHAVIOR = {install,stop,suspend,update,skip}; 
+enum BEHAVIOR = {install,stop,update,suspend,skip}; 
 enum STATUS = {enabled, disabled};
 
 array[STATE, BEHAVIOR] of opt STATE: transitions = 
 [|running,uninstalled,<>,<>,uninstalled
-|running,uninstalled,installed,<>,installed
-|running,uninstalled,<>,configured,configured
-|running,uninstalled,installed,configured,running|];
+|running,uninstalled,<>,installed,installed
+|running,uninstalled,configured,<>,configured
+|running,uninstalled,configured,installed,running|];
 
 array[STATE, BEHAVIOR] of int: costs = 
 [|3,100000,100000,100000,0

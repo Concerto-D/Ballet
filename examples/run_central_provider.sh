@@ -67,7 +67,7 @@ if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
     echo "id|key|iteration|value" >> $time_file
-    for ((ite=1; ite<=1; ite++)); do
+    for ((ite=1; ite<=10; ite++)); do
         python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> $time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
@@ -81,7 +81,7 @@ if $single; then
     fi
     mkdir results/$mzn_dir
     mv *mzn results/$mzn_dir
-    mv ^(?!inventory\.json$).*\.json$ results/$mzn_dir
+    # mv ^(?!inventory\.json$).*\.json$ results/$mzn_dir
     mv $time_file results/
 else
     # Run provider

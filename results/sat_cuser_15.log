@@ -121,7 +121,7 @@ provider7|min_constraint|0|4
 provider7|max_constraint|0|4
 user|flocal|0|0.8620386123657227
 user|ffinal|0|0.8942139148712158
-node_user|total_time|0|3.829139
+node_user|total_time|0|18.29139
 node_user|waits|0|4
 node_user|messages|0|30
 user|min_constraint|0|31

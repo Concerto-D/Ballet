@@ -1,0 +1,58 @@
+try
+OK enduser
+enduser|flocal|0|0.4952397346496582
+enduser|flocal|0|0.44841933250427246
+enduser|flocal|0|0.4353921413421631
+enduser|ffinal|0|0.4586832523345947
+node_enduser|total_time|0|2.433369
+node_enduser|loops|0|12684
+node_enduser|messages|0|18
+enduser|min_constraint|0|8
+enduser|max_constraint|0|8
+try
+OK user1
+user1|flocal|0|0.5789046287536621
+user1|flocal|0|0.43314075469970703
+user1|flocal|0|0.4626281261444092
+user1|ffinal|0|0.4853541851043701
+node_user1|total_time|0|2.520403
+node_user1|loops|0|49834
+node_user1|messages|0|6
+user1|min_constraint|0|5
+user1|max_constraint|0|5
+try
+OK user0
+user0|flocal|0|0.5081815719604492
+user0|flocal|0|0.4129517078399658
+user0|flocal|0|0.41686177253723145
+user0|flocal|0|0.46337008476257324
+user0|ffinal|0|0.4590487480163574
+node_user0|total_time|0|2.818481
+node_user0|loops|0|49853
+node_user0|messages|0|9
+user0|min_constraint|0|5
+user0|max_constraint|0|5
+try
+OK provider
+provider|flocal|0|0.5568735599517822
+provider|flocal|0|0.4290645122528076
+provider|flocal|0|0.39207911491394043
+provider|flocal|0|0.44735002517700195
+provider|ffinal|0|0.4688534736633301
+node_provider|total_time|0|2.928235
+node_provider|loops|0|16837
+node_provider|messages|0|9
+provider|min_constraint|0|2
+provider|max_constraint|0|2
+try
+OK user2
+user2|flocal|0|0.5303404331207275
+user2|flocal|0|0.40423035621643066
+user2|flocal|0|0.4154808521270752
+user2|flocal|0|0.45241713523864746
+user2|ffinal|0|0.4760732650756836
+node_user2|total_time|0|2.807857
+node_user2|loops|0|56250
+node_user2|messages|0|9
+user2|min_constraint|0|5
+user2|max_constraint|0|5

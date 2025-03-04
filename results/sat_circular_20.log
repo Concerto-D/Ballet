@@ -227,12 +227,12 @@ transformer0|min_constraint|1|4
 transformer0|max_constraint|1|4
 provider|flocal|0|0.33943819999694824
 provider|ffinal|0|0.28494882583618164
-node_user|total_time|1|2.674048
-node_user|waits|1|4
+node_user|total_time|1|24.450
+node_user|waits|1|47
 node_user|messages|1|2
 provider|min_constraint|1|2
 provider|max_constraint|1|2
-user|ffinal|0|0.3523435592651367
+user|ffinal|1|0.3523435592651367
 node_provider|total_time|1|0.352751
 node_provider|waits|1|0
 node_provider|messages|1|0
@@ -371,7 +371,7 @@ node_transformer5|waits|2|47
 node_transformer5|messages|2|0
 transformer5|min_constraint|2|0
 transformer5|max_constraint|2|0
-user|ffinal|0|0.4044032096862793
+user|ffinal|2|0.4044032096862793
 node_provider|total_time|2|23.933146
 node_provider|waits|2|47
 node_provider|messages|2|0
@@ -452,7 +452,7 @@ node_transformer3|waits|3|4
 node_transformer3|messages|3|0
 transformer3|min_constraint|3|0
 transformer3|max_constraint|3|0
-user|ffinal|0|0.33060693740844727
+user|ffinal|3|0.33060693740844727
 node_provider|total_time|3|2.333457
 node_provider|waits|3|4
 node_provider|messages|3|0
@@ -479,7 +479,7 @@ transformer1|min_constraint|3|0
 transformer1|max_constraint|3|0
 provider|flocal|0|0.32569313049316406
 provider|ffinal|0|0.2327277660369873
-node_user|total_time|3|2.601536
+node_user|total_time|3|26.01536
 node_user|waits|3|4
 node_user|messages|3|2
 provider|min_constraint|3|2
@@ -580,7 +580,7 @@ node_transformer11|waits|4|3
 node_transformer11|messages|4|0
 transformer11|min_constraint|4|0
 transformer11|max_constraint|4|0
-user|ffinal|0|0.38681745529174805
+user|ffinal|4|0.38681745529174805
 node_provider|total_time|4|1.889150
 node_provider|waits|4|3
 node_provider|messages|4|0
@@ -721,7 +721,7 @@ node_transformer3|waits|5|2
 node_transformer3|messages|5|0
 transformer3|min_constraint|5|0
 transformer3|max_constraint|5|0
-user|ffinal|0|0.38937878608703613
+user|ffinal|5|0.38937878608703613
 node_provider|total_time|5|1.391048
 node_provider|waits|5|2
 node_provider|messages|5|0
@@ -808,7 +808,7 @@ node_user|waits|5|46
 node_user|messages|5|2
 provider|min_constraint|5|2
 provider|max_constraint|5|2
-user|ffinal|0|0.2900044918060303
+user|ffinal|6|0.2900044918060303
 node_provider|total_time|6|0.790987
 node_provider|waits|6|1
 node_provider|messages|6|0
@@ -977,7 +977,7 @@ transformer0|min_constraint|7|4
 transformer0|max_constraint|7|4
 provider|flocal|0|0.21584630012512207
 provider|ffinal|0|0.20058894157409668
-node_user|total_time|7|2.465940
+node_user|total_time|7|24.65940
 node_user|waits|7|4
 node_user|messages|7|2
 provider|min_constraint|7|2
@@ -1018,7 +1018,7 @@ node_transformer19|waits|7|0
 node_transformer19|messages|7|0
 transformer19|min_constraint|7|0
 transformer19|max_constraint|7|0
-user|ffinal|0|0.3800537586212158
+user|ffinal|7|0.3800537586212158
 node_provider|total_time|7|0.380450
 node_provider|waits|7|0
 node_provider|messages|7|0
@@ -1120,7 +1120,7 @@ node_transformer9|waits|8|2
 node_transformer9|messages|8|0
 transformer9|min_constraint|8|0
 transformer9|max_constraint|8|0
-user|ffinal|0|0.41243934631347656
+user|ffinal|8|0.41243934631347656
 node_provider|total_time|8|1.414274
 node_provider|waits|8|2
 node_provider|messages|8|0
@@ -1239,7 +1239,7 @@ node_transformer14|waits|9|5
 node_transformer14|messages|9|0
 transformer14|min_constraint|9|0
 transformer14|max_constraint|9|0
-user|ffinal|0|0.3881099224090576
+user|ffinal|9|0.3881099224090576
 node_provider|total_time|9|2.891414
 node_provider|waits|9|5
 node_provider|messages|9|0
@@ -1325,7 +1325,7 @@ transformer2|min_constraint|9|0
 transformer2|max_constraint|9|0
 provider|flocal|0|0.30519604682922363
 provider|ffinal|0|0.28777122497558594
-node_user|total_time|9|3.139720
+node_user|total_time|9|21.39720
 node_user|waits|9|5
 node_user|messages|9|2
 provider|min_constraint|9|2

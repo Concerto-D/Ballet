@@ -1325,7 +1325,7 @@ transformer19|min_constraint|8|2
 transformer19|max_constraint|8|2
 transformer9|funsat|0|1.2225875854492188
 transformer9|funsat|0|1.4257097244262695
-node_transformer9|total_time|8|9.665191
+node_transformer9|total_time|8|29.665191
 node_transformer9|waits|8|14
 node_transformer9|messages|8|0
 transformer9|min_constraint|8|4

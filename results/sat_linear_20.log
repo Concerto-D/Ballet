@@ -1016,7 +1016,7 @@ transformer13|min_constraint|6|2
 transformer13|max_constraint|6|2
 transformer2|flocal|0|0.3205699920654297
 transformer2|ffinal|0|0.3062574863433838
-node_transformer2|total_time|6|16.656633
+node_transformer2|total_time|6|29.656633
 node_transformer2|waits|6|32
 node_transformer2|messages|6|2
 transformer2|min_constraint|6|2

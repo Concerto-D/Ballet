@@ -166,7 +166,7 @@ def gossip (node: Node, roots: list[str],
     is_unsat = False
     has_fail_ack = False
     has_sent_global_ack = False
-    num_of_wait = 0
+    num_of_loop = 0
     while not ended_resolution:
         # Check if all global acks have been sent
         # And if there is a global "failed acked"
@@ -266,8 +266,8 @@ def gossip (node: Node, roots: list[str],
             node.print_status()
             print(f"ENDED RESOLUTION : {ended_resolution}")
             print(f"====================================================")
-        time.sleep(0.5)  
-        num_of_wait += 1  
+        # time.sleep(0.5)  
+        num_of_loop += 1  
     if debug:
         print(f"====================================================")
         print(f"At the end :")
@@ -295,7 +295,7 @@ def gossip (node: Node, roots: list[str],
         (min_key, min_size), (max_key, max_size) = min_max_set_size_with_keys(model_constraints)
         # component|key|iteration|value
         print(f"{node.id}|total_time|{iteration-1}|{total_time}")
-        print(f"{node.id}|waits|{iteration-1}|{num_of_wait}")
+        print(f"{node.id}|loops|{iteration-1}|{num_of_loop}")
         print(f"{node.id}|messages|{iteration-1}|{total_messages}")
         print(f"{min_key}|min_constraint|{iteration-1}|{min_size}")
         print(f"{max_key}|max_constraint|{iteration-1}|{max_size}")

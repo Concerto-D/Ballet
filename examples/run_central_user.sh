@@ -85,8 +85,10 @@ if $single; then
     fi
     mkdir results/$mzn_dir
     mv *mzn results/$mzn_dir
-    # mv ^(?!inventory\.json$).*\.json$ results/$mzn_dir
+    mv *json results/$mzn_dir
     mv $time_file results/
+    sleep 2
+    find . -name "__pycache__" -exec rm -r {} +
 else
     # Run provider
     gnome-terminal -- bash -c "python $debugger_flag run_user.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"

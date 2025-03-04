@@ -1,19 +1,5 @@
 import csv
-
-
-"""
-Schema of data:
-
-iteration
-    component
-        local time
-    node
-        name node
-            waits
-            total time
-            messages
-
-"""
+import math
 
 class Entry:
 
@@ -27,6 +13,7 @@ class Entry:
 def load_results(files):
     res = {}
     for file in files:
+        print(file)
         res[file] = load_result(file)
     return res
 
@@ -58,12 +45,15 @@ def build_analysis(input):
         for iteration in results[file].keys():
             max_entry = max(results[file][iteration], key=lambda x: x[1])
             max_entries.append(max_entry[1])
-            print(f"On itration {iteration} -> Maximum value: {max_entry[1]}, found at: {max_entry[0]}")
+            print(f"On itration {iteration} of {file} -> Maximum value: {max_entry[1]}, found at: {max_entry[0]}")
         average = sum(max_entries) / len(max_entries) if max_entries else 0
-        print(f"Average time for {filename} is {average} sec") 
+        variance = sum((x - average) ** 2 for x in max_entries) / len(max_entries) if max_entries else 0
+        std_deviation = math.sqrt(variance)
+        print(f"Average time for {file} is {average} sec (V={variance}, σ={std_deviation})") 
 
 if __name__ == "__main__":
-    prefix = "/home/jolan/Documents/Projects/Ballet/results/"
-    files = [prefix+"sat_circular_20.log"]
+    prefix = "results/"
+    files = [prefix+"sat_circular_20.log", prefix+"sat_linear_20.log", prefix+"sat_cprovider_20.log", prefix+"sat_cuser_15.log"]
+    files = files + [prefix+"unsat_circular_20.log", prefix+"unsat_linear_20.log", prefix+"unsat_cprovider_20.log", prefix+"unsat_cuser_15.log"]
     results = load_results(files)
     build_analysis(results)

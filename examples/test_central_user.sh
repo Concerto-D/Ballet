@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the tests directory
-tests_dir="examples/tests_gossip/central_user"
+tests_dir="$(dirname $0)/tests_gossip/central_user"
 
 ADDRESS='localhost'
 USER_PORT=3000
@@ -87,14 +87,14 @@ if $single; then
     mv *mzn results/$mzn_dir
     mv $time_file results/
 else
-    # Run provider
-    gnome-terminal -- bash -c "python $debugger_flag run_user.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+    # Run user
+    gnome-terminal --title user -- bash -c "python $debugger_flag run_user.py $verbose_flag -n $n $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
 
     # Check if n is not equal to 0
     if [ "$n" -ne 0 ]; then
         for ((i=1; i<=$n; i++)); do
-            # Execute the run_user.py script with the current value of i and unsat flag
-            gnome-terminal -- bash -c "python $debugger_flag run_provider.py $verbose_flag -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+            # Execute the run_provider.py script with the current value of i and unsat flag
+            gnome-terminal --title provider$((i - 1)) -- bash -c "python $debugger_flag run_provider.py $verbose_flag -n $n -i $i $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no parallel user to run"

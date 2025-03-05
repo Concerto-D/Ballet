@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the tests directory
-tests_dir="examples/tests_gossip/stratified"
+tests_dir="$(dirname $0)/tests_gossip/stratified"
 
 ADDRESS="localhost"
 PROVIDER_PORT=3000
@@ -94,7 +94,7 @@ else
         for ((i=0; i<$n; i++)); do
             # Execute the run_miduser.py script with the current value of i and unsat flag
             # if [ "$i" -ne 0 ]; then
-            gnome-terminal -- bash -c "python $debugger_flag run_miduser.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+            gnome-terminal --title miduser$i -- bash -c "python $debugger_flag run_miduser.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
             # fi
         done
     else
@@ -102,9 +102,9 @@ else
     fi
 
     # Run provider
-    gnome-terminal -- bash -c "python $debugger_flag run_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal --title provider -- bash -c "python $debugger_flag run_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
     # Run end user
-    gnome-terminal -- bash -c "python $debugger_flag run_end_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal --title end_user -- bash -c "python $debugger_flag run_end_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
 
     echo "Press any key for cleaning local environment"; read -n 1 key
 

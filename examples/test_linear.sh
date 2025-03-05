@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the tests directory
-tests_dir="examples/tests_gossip/linear"
+tests_dir="$(dirname $0)/tests_gossip/linear"
 
 ADDRESS='localhost'
 PROVIDER_PORT=3000
@@ -89,14 +89,14 @@ else
     if [ "$n" -ne 0 ]; then
         for ((i=1; i<=$n; i++)); do
             # Execute the run_user.py script with the current value of i and unsat flag
-            gnome-terminal -- bash -c "python $debugger_flag run_transformer.py -n $n -i $i $verbose_flag $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
+            gnome-terminal --title transformer$((i - 1)) -- bash -c "python $debugger_flag run_transformer.py -n $n -i $i $verbose_flag $unsat_flag -inventory inventory.json; echo ""; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no chained transformer to run"
     fi
 
     # Run provider
-    gnome-terminal -- bash -c "python $debugger_flag run_provider.py -n $n $verbose_flag $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal --title provider -- bash -c "python $debugger_flag run_provider.py -n $n $verbose_flag $unsat_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
 
     echo "Press any key for cleaning local environment"; read -n 1 key
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the tests directory
-tests_dir="examples/tests_gossip/circular"
+tests_dir="$(dirname $0)/tests_gossip/circular"
 
 ADDRESS="localhost"
 PROVIDER_PORT=3000
@@ -90,16 +90,16 @@ else
     # Check if n is not equal to 0
     if [ "$n" -ne 0 ]; then
         for ((i=0; i<$n; i++)); do
-            gnome-terminal -- bash -c "python3 $debugger_flag run_circular_transformer.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+            gnome-terminal --title transformer$i -- bash -c "python3 $debugger_flag run_circular_transformer.py -n $n -i $i $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
         done
     else
         echo "n is equal to 0, no chained user to run"
     fi
 
     # Run provider
-    gnome-terminal -- bash -c "python3 $debugger_flag run_circular_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal --title provider -- bash -c "python3 $debugger_flag run_circular_provider.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
     # Run end user
-    gnome-terminal -- bash -c "python3 $debugger_flag run_circular_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
+    gnome-terminal --title user -- bash -c "python3 $debugger_flag run_circular_user.py -n $n $unsat_flag $verbose_flag -inventory inventory.json; echo ''; read -n 1; exec bash"
 
     echo "Press any key for cleaning local environment"; read -n 1 key
 
@@ -121,6 +121,6 @@ else
     fi
 fi
 
-rm "run_circular_provider.py" 
-rm "run_circular_user.py" 
-rm "run_circular_transformer.py" 
+rm "run_circular_provider.py"
+rm "run_circular_user.py"
+rm "run_circular_transformer.py"

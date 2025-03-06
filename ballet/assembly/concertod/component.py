@@ -384,9 +384,9 @@ class Component(object, metaclass=ABCMeta):
             raise Exception("Trying to add '%s' as a transition while it is already a transition" % name)
         if name in self.st_groups:
             raise Exception("Trying to add '%s' as a transition while it is already a group" % name)
-        if name is "_init":
+        if name == "_init":
             raise Exception("Cannot name a transition '_init' (used internally)")
-        if bhv is "_init":
+        if bhv == "_init":
             raise Exception("Cannot name a behavior '_init' (used internally)")
         if src_name not in self.st_places:
             raise Exception("Trying to add transition '%s' starting from unexisting place '%s'" % (name, src_name))

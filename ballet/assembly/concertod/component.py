@@ -683,7 +683,7 @@ class Component(object, metaclass=ABCMeta):
     # old_my_connections
 
     def init(self):
-        from concerto.utility import empty_transition
+        from ballet.utils.executor_utils import empty_transition
         """
         This method initializes the component and returns the set of active places
         """

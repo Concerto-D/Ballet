@@ -72,11 +72,11 @@ if $single; then
     [ -f $time_file ] && rm $time_file
     touch $time_file
     for ((ite=1; ite<=10; ite++)); do
-        python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite & #>> pr_$time_file &
-        python run_end_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite & #>> eu_$time_file &
+        python run_provider.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> pr_$time_file &
+        python run_end_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite >> eu_$time_file &
         if [ "$n" -ne 0 ]; then
             for ((i=1; i<=$n; i++)); do
-                python run_miduser.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite & #>> user$i$time_file &
+                python run_miduser.py -n $n -i $i $unsat_flag -inventory inventory.json $timeflag -it $ite >> user$i$time_file &
             done
         fi
         wait

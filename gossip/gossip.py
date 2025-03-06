@@ -294,10 +294,10 @@ def gossip (node: Node, roots: list[str],
         model_constraints = model.get_constraints()
         (min_key, min_size), (max_key, max_size) = min_max_set_size_with_keys(model_constraints)
         # component|key|iteration|value
-        print(f"{node.id}|total_time|{iteration-1}|{total_time}")
-        print(f"{node.id}|loops|{iteration-1}|{num_of_loop}")
-        print(f"{node.id}|messages|{iteration-1}|{total_messages}")
-        print(f"{min_key}|min_constraint|{iteration-1}|{min_size}")
-        print(f"{max_key}|max_constraint|{iteration-1}|{max_size}")
+        print(f"{node.id}|total_time|{iteration-1}|{total_time}", flush=True)
+        print(f"{node.id}|loops|{iteration-1}|{num_of_loop}", flush=True)
+        print(f"{node.id}|messages|{iteration-1}|{total_messages}", flush=True)
+        print(f"{min_key}|min_constraint|{iteration-1}|{min_size}", flush=True)
+        print(f"{max_key}|max_constraint|{iteration-1}|{max_size}", flush=True)
 
     return result

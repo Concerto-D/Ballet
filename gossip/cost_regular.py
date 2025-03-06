@@ -261,7 +261,7 @@ class CostRegular(Model):
                 assert constraint.transition in transitions
             if constraint.isStateConstraint():
                 if not (constraint.state in states):
-                    print(f"{constraint.state} is not in {states} (component = {ports})")
+                    print(f"{constraint.state} is not in {states} (component = {ports})", flush=True)
                 assert constraint.state in states
     
     @staticmethod
@@ -842,7 +842,7 @@ minimize scost;
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 return CRSolution(result.stdout, sat=False)
             except subprocess.CalledProcessError as e:
-                print(f"An error occurred: {e}")
+                print(f"An error occurred: {e}", flush=True)
                 print("Output:\n", e.stdout)
                 print("Error:\n", e.stderr)
         else:
@@ -850,7 +850,7 @@ minimize scost;
             modelfile = "TestModel.java"
             choco_str_model = self.__make_choco_model(classname="TestModel")
             if print_model:
-                print(choco_str_model)
+                print(choco_str_model, flush=True)
             if wf:
                 with open(modelfile, 'w') as f:
                     f.write(choco_str_model)
@@ -885,7 +885,7 @@ class MultiCostRegular(Model):
                     skip_value = solution.get("sequence")[-1]
                     self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
             except FindMUSException:
-                print(f"{key} 's model is unsat. Qx running")
+                print(f"{key} 's model is unsat. Qx running", flush=True)
                 self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
         return self._solutions
     
@@ -907,7 +907,7 @@ class MultiCostRegular(Model):
                 end_time = time.time()
                 rstep = "funsat"
             cmp_time = end_time - start_time
-            print(f"{key}|{rstep}|{iteration}|{cmp_time}")
+            print(f"{key}|{rstep}|{iteration}|{cmp_time}", flush=True)
         return self._solutions
 
     def get_constraints(self):

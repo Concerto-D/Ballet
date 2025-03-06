@@ -620,10 +620,10 @@ class CostRegularNode(Node):
         return number_of_messages
     
     def print_status(self):
-        print(f"PASSED BY: [{','.join(self._passed_by)}]")
-        print("OUT_MESSAGES:")
+        print(f"PASSED BY: [{','.join(self._passed_by)}]", flush=True)
+        print("OUT_MESSAGES:", flush=True)
         for comp_name in self.__out_message.keys():
-            print(f"\t- {comp_name}:")
+            print(f"\t- {comp_name}:", flush=True)
             for message in self.__out_message[comp_name].keys():
                 if self.__out_message[comp_name][message] != None and isinstance(self.__out_message[comp_name][message], AckSuccess):
                     acked = "ACKED SUCCESS"
@@ -632,11 +632,11 @@ class CostRegularNode(Node):
                 else:
                     acked = str(self.__out_message[comp_name][message])
                 str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, [{','.join(message.passed_by)}], {message.final})"
-                print(f"\t\t* {str_message}: {acked}")
+                print(f"\t\t* {str_message}: {acked}", flush=True)
             
-        print("IN_MESSAGES:")
+        print("IN_MESSAGES:", flush=True)
         for comp_name in self.__in_message.keys():
-            print(f"\t- {comp_name}")
+            print(f"\t- {comp_name}", flush=True)
             for message in self.__in_message[comp_name].keys():
                 if self.__in_message[comp_name][message] != None and isinstance(self.__in_message[comp_name][message], AckSuccess):
                     acked = "ACKED SUCCESS"
@@ -646,7 +646,7 @@ class CostRegularNode(Node):
                     acked = str(self.__in_message[comp_name][message])
                     
                 str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, [{','.join(message.passed_by)}], {message.final})"
-                print(f"\t\t* {str_message}: {acked}")
+                print(f"\t\t* {str_message}: {acked}", flush=True)
         
     def new_received_messages(self):
         all_new_messages = set()
@@ -678,7 +678,7 @@ class CostRegularNode(Node):
                 if not self.__root_processed():
                     __sec_send_message(message)
                 else:
-                    print(f"UNREACHABLE HOST FOR SENDING {message}")
+                    print(f"UNREACHABLE HOST FOR SENDING {message}", flush=True)
                     time.sleep(10)
                     raise e
         __sec_send_message(message)
@@ -696,7 +696,7 @@ class CostRegularNode(Node):
                 if not self.__root_processed():
                     __sec_send_ack(ack)
                 else:
-                    print(f"UNREACHABLE HOST FOR SENDING {ack}")
+                    print(f"UNREACHABLE HOST FOR SENDING {ack}", flush=True)
                     time.sleep(10)
                     raise e
         # print(f"---------- MARK ---------")
@@ -970,20 +970,20 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
         if result.is_sat:
             sequence = cr_model.get_sequence(comp_name)
             if debug:
-                print(f"{comp_name}:")
-                print(f"Raw: {result}")
-                print("\tstates = ", cr_model.get_states(comp_name))
-                print("\tsequence = ", sequence)
+                print(f"{comp_name}:", flush=True, flush=True)
+                print(f"Raw: {result}", flush=True, flush=True)
+                print("\tstates = ", cr_model.get_states(comp_name), flush=True)
+                print("\tsequence = ", sequence, flush=True)
             for (port_name, _) in cr_model.get_port_statuses(comp_name).items():
                 port_status = cr_model.get_port_status(comp_name, port_name)
                 port_status_str = list(map(lambda v: "enabled" if v == 1 or v == "enabled" else "disabled", port_status))
                 if debug:
-                    print(f"\t{port_name}: {port_status_str}")
+                    print(f"\t{port_name}: {port_status_str}", flush=True)
                 component = node.components_from_str(comp_name)
                 msgs = make_messages(sequence, port_name, port_status, node.passed_by, component)
                 out_messages = out_messages | msgs
             if debug:
-                print("\n")
+                print("\n", flush=True)
         else:
             all_reasons = [s for s in result.result.split('\n') if s.strip()]
             # print(f"Model is unsat. Here are all reasons \n \t {all_reasons}")

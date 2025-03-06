@@ -970,8 +970,8 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
         if result.is_sat:
             sequence = cr_model.get_sequence(comp_name)
             if debug:
-                print(f"{comp_name}:", flush=True, flush=True)
-                print(f"Raw: {result}", flush=True, flush=True)
+                print(f"{comp_name}:", flush=True)
+                print(f"Raw: {result}", flush=True)
                 print("\tstates = ", cr_model.get_states(comp_name), flush=True)
                 print("\tsequence = ", sequence, flush=True)
             for (port_name, _) in cr_model.get_port_statuses(comp_name).items():

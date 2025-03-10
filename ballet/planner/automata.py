@@ -71,9 +71,13 @@ def reduce_automata(automata: dict[str, dict[str, list[str]]], label_in: dict[st
         result_input = add_if_no_exist(result_input, label)
         curr = vertex
         # while a vertex can be reach with this label
+        start_vertex = vertex
         while automata[curr][label]:
             acc = acc + cost[(curr, label)]
             curr = automata[curr][label][0]
+            if curr == start_vertex:
+                msg = f"loop in lifecycle behaviour {label}"
+                raise Exception(msg)
             if curr in roots:
                 result_transit[vertex][label] = curr
                 result_cost[(vertex, label)] = acc

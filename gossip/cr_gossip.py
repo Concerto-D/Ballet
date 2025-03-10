@@ -373,7 +373,7 @@ class CRServer:
                         self.__ping(address)
                         to_ping[address] = False
                         n = n-1
-                    except:
+                    except Exception:
                         pass
             
             

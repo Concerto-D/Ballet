@@ -374,6 +374,7 @@ class CRServer:
                         to_ping[address] = False
                         n = n-1
                     except Exception:
+                        time.sleep(1)
                         pass
             
             

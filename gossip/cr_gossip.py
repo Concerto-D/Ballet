@@ -375,7 +375,6 @@ class CRServer:
                         n = n-1
                     except:
                         pass
-                time.sleep(1)
             
             
 class CRClient:

@@ -1099,7 +1099,7 @@ class Component(object, metaclass=ABCMeta):
 
     def get_initial_places(self):
         return [self.initial_place]
-    
+
     def get_running_places(self):
         return [self.running_place]
 
@@ -1121,3 +1121,45 @@ class Component(object, metaclass=ABCMeta):
                     if bhv in behavior_list and src_name == place:
                         accessible_places.add(dst_name)
         return accessible_places
+
+def make_custom_component(name: str, places: [str], transitions: dict[str, tuple], dependencies: dict[str, tuple]):
+	"""
+		Build a custom component class with the given attributes.
+
+		places is the list of places in the component
+
+		transitions is a dict where the key is the name of the transition and the value is a tuple with the following fields:
+		- starting place
+		- ending place
+		- behaviour name
+		- cost
+
+		dependencies is a dict where the key is the name of the transition and the value is a tuple with the following fields:
+		- DepType.USE or DepType.PROVIDE
+		- the list of places that use/provide this port
+
+	"""
+	ptr = transitions
+	class CustomComponent(Component):
+		def __init__(self):
+			super().__init__()
+
+		def create(self):
+			self.name = name
+			setattr(self, "places", places)
+
+			def make_transition_func(name: str):
+				def transition_func(self):
+					pass
+				setattr(self, name, transition_func)
+
+			transitions_with_func = {
+				name: (tr[0], tr[1], tr[2], tr[3], make_transition_func(name)) if len(tr) == 4 else tr
+				for name, tr in ptr.items()
+			}
+			transitions = transitions_with_func
+			setattr(self, "transitions", transitions)
+
+			setattr(self, "dependencies", dependencies)
+
+	return CustomComponent

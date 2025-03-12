@@ -65,8 +65,10 @@ connections = []
 for i in range(n):
     connect_config = (f'provider{i}','config',f'user',f'config')
     connections.append(connect_config)
+    print(connect_config)
     connect_service = (f'provider{i}','service',f'user',f'service')
     connections.append(connect_service)
+    print(connect_service)
 
 ## Active
 active = {user: 'running'}

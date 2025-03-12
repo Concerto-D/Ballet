@@ -15,9 +15,9 @@ minizinc = f"/home/{username}/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin
 def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
-_COMPONENT=1    
-_NEXPE = 2
-_DEFAULT_TIME = "01:00:00"
+_COMPONENT=15    
+_NEXPE = 30
+_DEFAULT_TIME = "08:00:00"
 _DEFAULT_START = "now"
 
 # _SCENARIOS = ["stratified"]
@@ -370,4 +370,7 @@ if __name__ == "__main__":
         p.shell(f"mkdir -p {result_dir}")
     for ite in range(_NEXPE):
         for scenario in _SCENARIOS:
-            run(scenario, roles, ite, result_dir)
+            try:
+                run(scenario, roles, ite, result_dir)
+            except:
+                print(f"{scenario}({ite}) FAILED !")

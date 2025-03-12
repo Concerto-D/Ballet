@@ -334,7 +334,7 @@ def run_stratified(roles, ite, result_dir):
     #2.1 Sat
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_STRATIFIED_MIDUSER+str(i), roles=roles, run_as=username) as p:
-            p.shell(f"{minizinc_path()}; python {project_dir}run_miduser.py -n {_COMPONENT} -i {id_user} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_sat_miduser{i}.log 2>> {result_dir}stratified_sat_miduser{i}.err", background=True)
+            p.shell(f"{minizinc_path()}; python {project_dir}run_miduser.py -n {_COMPONENT} -i {i} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_sat_miduser{i}.log 2>> {result_dir}stratified_sat_miduser{i}.err", background=True)
     with play_on(pattern_hosts=_STRATIFIED_PROVIDER, roles=roles, run_as=username) as p:
         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_sat_provider.log 2>> {result_dir}stratified_sat_provider.err", background=True)
     with play_on(pattern_hosts=_STRATIFIED_USER, roles=roles, run_as=username) as p:
@@ -342,7 +342,7 @@ def run_stratified(roles, ite, result_dir):
     #2.2 Unsat
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_STRATIFIED_MIDUSER+str(i), roles=roles, run_as=username) as p:
-            p.shell(f"{minizinc_path()}; python {project_dir}run_miduser.py --unsat -n {_COMPONENT} -i {id_user} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_unsat_miduser{i}.log 2>> {result_dir}stratified_unsat_miduser{i}.err", background=True)
+            p.shell(f"{minizinc_path()}; python {project_dir}run_miduser.py --unsat -n {_COMPONENT} -i {i} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_unsat_miduser{i}.log 2>> {result_dir}stratified_unsat_miduser{i}.err", background=True)
     with play_on(pattern_hosts=_STRATIFIED_PROVIDER, roles=roles, run_as=username) as p:
         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unsat  -n {_COMPONENT} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_unsat_provider.log 2>> {result_dir}stratified_unsat_provider.err", background=True)
     with play_on(pattern_hosts=_STRATIFIED_USER, roles=roles, run_as=username) as p:

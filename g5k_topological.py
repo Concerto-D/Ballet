@@ -217,7 +217,7 @@ def run_stratified(roles):
 if __name__ == "__main__":
     timestamp="0"
     result_dir = f"/tmp/{timestamp}/"
-    roles, networks = book(site="rennes", cluster="paravance")
+    roles, networks = book(site="rennes", cluster="parasilo")
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
         p.shell(f"mkdir {result_dir}")
     for ite in range(10):

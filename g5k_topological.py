@@ -83,15 +83,13 @@ def book(site, cluster, time=_DEFAULT_TIME, start=_DEFAULT_START):
         g5k = G5kConf.from_settings(job_type="allow_classic_ssh", job_name=f"plan_inference_ballet", walltime=time, reservation=start)
     else:
         g5k = G5kConf.from_settings(job_type="allow_classic_ssh", job_name=f"plan_inference_ballet", walltime=time)
-
+    g5k.add_network_conf(my_network)
     # Machine 1: cuser_user; cprovider_provider; linear_provider; circular_provider; stratified_provider
-    g5k.add_network_conf(my_network)\
-        .add_machine(roles=[_BALLET, _CUSER_USER, _CPROVIDER_PROVIDER, _LINEAR_PROVIDER, _CIRCULAR_PROVIDER, _STRATIFIED_PROVIDER],
-                      cluster=cluster, nodes=1, primary_network=my_network)
+    g5k.add_machine(roles=[_BALLET, _CUSER_USER, _CPROVIDER_PROVIDER, _LINEAR_PROVIDER, _CIRCULAR_PROVIDER, _STRATIFIED_PROVIDER],
+                    cluster=cluster, nodes=1, primary_network=my_network)
     # Machine 2: circular_user; stratified_user
-    g5k.add_network_conf(my_network)\
-        .add_machine(roles=[_BALLET, _CIRCULAR_USER, _STRATIFIED_USER],
-                      cluster=cluster, nodes=1, primary_network=my_network)
+    g5k.add_machine(roles=[_BALLET, _CIRCULAR_USER, _STRATIFIED_USER],
+                    cluster=cluster, nodes=1, primary_network=my_network)
     # Machine | i ∈ [0;_COMPONENT[ : cuser_provider_i; cprovider_user_i; linear_transformer_i; circular_transformer_i; stratified_miduser_i
     for i in range(_COMPONENT):
         g5k.add_machine(roles=[_BALLET, 

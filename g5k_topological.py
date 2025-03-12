@@ -183,13 +183,13 @@ def run_cuser(roles, ite, result_dir):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
             p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}user_sat_provider{i}.log", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}cuser_sat_user.log")
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}cuser_sat_user.log 2> {result_dir}cuser_sat_user.err")
     #2.2 run UNSAT
     # for i in range(_COMPONENT):
-    #     with play_on(pattern_hosts=_CUSER_PROVIDER, roles=roles, run_as=username) as p:
+    #     with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
     #         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT}  >> {result_dir}cuser_unsat_provider{i}.log", background=True)
-    # with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-    #     p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT} >> {result_dir}cuser_unsat_user.log")
+    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT} >> {result_dir}cuser_unsat_user.log")
     #3 Get results and clean
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
@@ -198,13 +198,14 @@ def run_cuser(roles, ite, result_dir):
             p.shell(f"rm {project_dir}run_provider.py ")
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}cuser_sat_user.log", dest="~")
+        p.fetch(src=f"{result_dir}cuser_sat_user.err", dest="~")
         p.fetch(src=f"{result_dir}cuser_unsat_user.log", dest="~")
         p.shell(f"rm {project_dir}run_user.py ")
 
-def run_cprovider(roles):
+def run_cprovider(roles, ite, result_dir):
     pass
 
-def run_linear(roles):
+def run_linear(roles, ite, result_dir):
     pass
 
 def run_circular(roles):

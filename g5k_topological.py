@@ -225,23 +225,23 @@ def run_cprovider(roles, ite, result_dir):
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CPROVIDER_USER+str(i), roles=roles, run_as=username) as p:
             id_user = i + 1
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -i {id_user} -inventory {project_dir}cprovider_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cprovider_sat_provider{i}.log 2>> {result_dir}cprovider_sat_provider{i}.err", background=True)
-    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -inventory {project_dir}cprovider_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cprovider_sat_user.log 2>> {result_dir}cprovider_sat_user.err")
+            p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -i {id_user} -inventory {project_dir}cprovider_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cprovider_sat_provider{i}.log 2>> {result_dir}cprovider_sat_provider{i}.err", background=True)
+    with play_on(pattern_hosts=_CPROVIDER_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -inventory {project_dir}cprovider_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cprovider_sat_user.log 2>> {result_dir}cprovider_sat_user.err")
     #2.2 run UNSAT
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CPROVIDER_USER+str(i), roles=roles, run_as=username) as p:
             id_user = i + 1
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -i {id_user} -inventory {project_dir}cprovider_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cprovider_unsat_provider{i}.log 2>> {result_dir}cprovider_unsat_provider{i}.err", background=True)
-    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -inventory {project_dir}cprovider_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cprovider_unsat_user.log 2>> {result_dir}cprovider_unsat_user.err")
+            p.shell(f"{minizinc_path()}; python {project_dir}run_user.py --unsat -n {_COMPONENT} -i {id_user} -inventory {project_dir}cprovider_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cprovider_unsat_provider{i}.log 2>> {result_dir}cprovider_unsat_provider{i}.err", background=True)
+    with play_on(pattern_hosts=_CPROVIDER_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unsat -n {_COMPONENT} -inventory {project_dir}cprovider_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cprovider_unsat_user.log 2>> {result_dir}cprovider_unsat_user.err")
     #get results
     for i in range(_COMPONENT):
-        with play_on(pattern_hosts=_CUSER_USER+str(i), roles=roles, run_as=username) as p:
+        with play_on(pattern_hosts=_CPROVIDER_USER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}cprovider_sat_user{i}.log", dest="~")
             p.fetch(src=f"{result_dir}cprovider_unsat_user{i}.log", dest="~")
             p.shell(f"rm {project_dir}run_user.py ")
-    with play_on(pattern_hosts=_CUSER_PROVIDER, roles=roles, run_as=username) as p:
+    with play_on(pattern_hosts=_CPROVIDER_PROVIDER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}cprovider_sat_provider.log", dest="~")
         p.fetch(src=f"{result_dir}cprovider_unsat_provider.log", dest="~")
         p.shell(f"rm {project_dir}run_provider.py ")

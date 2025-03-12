@@ -148,6 +148,7 @@ def make_inventory_content(roles, scenario):
     return inventory
 
 def make_inventory(roles, scenario):
+    print(f"LET'S MAKE AN INVENTORY FOR {scenario} SCENARIO")
     inventory = make_inventory_content(roles, scenario)
     content = str(inventory)
     # content = json.dump(inventory)
@@ -159,16 +160,16 @@ def make_inventory(roles, scenario):
 
 def run(scenario, roles, ite, result_dir):
     make_inventory(roles, scenario)
-    if scenario == "cuser":
-        run_cuser(roles, ite, result_dir)
-    if scenario == "cprovider":
-        run_cprovider(roles, ite, result_dir)
-    if scenario == "linear":
-        run_linear(roles, ite, result_dir)
-    if scenario == "circular":
-        run_circular(roles, ite, result_dir)
-    if scenario == "stratified":
-        run_stratified(roles, ite, result_dir)
+    # if scenario == "cuser":
+    #     run_cuser(roles, ite, result_dir)
+    # if scenario == "cprovider":
+    #     run_cprovider(roles, ite, result_dir)
+    # if scenario == "linear":
+    #     run_linear(roles, ite, result_dir)
+    # if scenario == "circular":
+    #     run_circular(roles, ite, result_dir)
+    # if scenario == "stratified":
+    #     run_stratified(roles, ite, result_dir)
 
 def run_cuser(roles, ite, result_dir):
     #1 Copy right python file
@@ -226,7 +227,7 @@ if __name__ == "__main__":
 
     # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_user.py -n 15 -inventory cuser_inventory.json --time -it 0 >> cuser_sat_user.log 2> cuser_sat_user.err"
 
-    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python-m ipdb  /home/jphilippe/Project/Ballet/run_user.py -n 1 --time -it 0"
+    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python -m ipdb  /home/jphilippe/Project/Ballet/run_user.py -n 1 --time -it 0"
 
 
     # run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite 

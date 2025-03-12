@@ -181,15 +181,15 @@ def run_cuser(roles, ite, result_dir):
     #2.1 run SAT 
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}user_sat_provider{i}.log", background=True)
+            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}cuser_sat_user.log 2> {result_dir}cuser_sat_user.err")
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2> {result_dir}cuser_sat_user.err")
     #2.2 run UNSAT
     # for i in range(_COMPONENT):
     #     with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
-    #         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT}  >> {result_dir}cuser_unsat_provider{i}.log", background=True)
+    #         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} --unsat -inventory cuser_inventory.json --time -it {ite} -port {_PORT}  >> {result_dir}cuser_unsat_provider{i}.log", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT} >> {result_dir}cuser_unsat_user.log")
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cuser_unsat_user.log")
     #3 Get results and clean
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
@@ -223,3 +223,12 @@ if __name__ == "__main__":
     for ite in range(10):
         for scenario in _SCENARIOS:
             run(scenario, roles, ite, result_dir)
+
+
+
+            # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_user.py -n 15 -inventory cuser_inventory.json --time -it 0 >> cuser_sat_user.log 2> cuser_sat_user.err"
+
+            # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python -m ipdb /home/jphilippe/Project/Ballet/run_user.py -n 1 --time -it 0"
+
+
+            # run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite 

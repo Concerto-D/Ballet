@@ -190,9 +190,9 @@ def run_cuser(roles, ite, result_dir):
     #2.1 run SAT 
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log", background=True)
+            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log 2>> {result_dir}cuser_sat_provider{i}.err", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2> {result_dir}cuser_sat_user.err")
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2>> {result_dir}cuser_sat_user.err")
     #2.2 run UNSAT
     # for i in range(_COMPONENT):
     #     with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:

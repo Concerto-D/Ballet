@@ -16,7 +16,7 @@ def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
 _COMPONENT=15    
-_NEXPE = 30
+_NEXPE = 15
 _DEFAULT_TIME = "08:00:00"
 _DEFAULT_START = "now"
 
@@ -368,8 +368,8 @@ if __name__ == "__main__":
     roles, networks = book(site="nancy", cluster="gros")
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
         p.shell(f"mkdir -p {result_dir}")
-    for ite in range(_NEXPE):
-        for scenario in _SCENARIOS:
+    for scenario in _SCENARIOS:
+        for ite in range(_NEXPE):    
             try:
                 run(scenario, roles, ite, result_dir)
             except:

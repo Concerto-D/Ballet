@@ -19,7 +19,8 @@ _COMPONENT=1
 _DEFAULT_TIME = "01:00:00"
 _DEFAULT_START = "now"
 
-_SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
+_SCENARIOS = ["cuser"]
+# _SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
 
 _PORT = 40001
 
@@ -88,8 +89,8 @@ def book(site, cluster, time=_DEFAULT_TIME, start=_DEFAULT_START):
     g5k.add_machine(roles=[_BALLET, _CUSER_USER, _CPROVIDER_PROVIDER, _LINEAR_PROVIDER, _CIRCULAR_PROVIDER, _STRATIFIED_PROVIDER],
                     cluster=cluster, nodes=1, primary_network=my_network)
     # Machine 2: circular_user; stratified_user
-    # g5k.add_machine(roles=[_BALLET, _CIRCULAR_USER, _STRATIFIED_USER],
-                    # cluster=cluster, nodes=1, primary_network=my_network)
+    g5k.add_machine(roles=[_BALLET, _CIRCULAR_USER, _STRATIFIED_USER],
+                    cluster=cluster, nodes=1, primary_network=my_network)
     # Machine | i ∈ [0;_COMPONENT[ : cuser_provider_i; cprovider_user_i; linear_transformer_i; circular_transformer_i; stratified_miduser_i
     for i in range(_COMPONENT):
         g5k.add_machine(roles=[_BALLET, 
@@ -156,7 +157,7 @@ def make_inventory(roles, scenario):
     print(content) 
     filename = f"{scenario}_inventory.json"
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
-        p.shell("echo \"" + content + "\" >> " + filename )
+        p.shell("echo \"" + content + "\" >> " + project_dir + filename )
 
 def run(scenario, roles, ite, result_dir):
     make_inventory(roles, scenario)
@@ -182,15 +183,15 @@ def run_cuser(roles, ite, result_dir):
     #2.1 run SAT 
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log", background=True)
+            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2> {result_dir}cuser_sat_user.err")
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2> {result_dir}cuser_sat_user.err")
     #2.2 run UNSAT
     # for i in range(_COMPONENT):
     #     with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
     #         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} --unsat -inventory cuser_inventory.json --time -it {ite} -port {_PORT}  >> {result_dir}cuser_unsat_provider{i}.log", background=True)
-    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cuser_unsat_user.log")
+    # with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
+    #     p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cuser_unsat_user.log")
     #3 Get results and clean
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:

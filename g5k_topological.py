@@ -220,11 +220,9 @@ if __name__ == "__main__":
     roles, networks = book(site="rennes", cluster="parasilo")
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
         p.shell(f"mkdir {result_dir}")
-    for ite in range(10):
+    for ite in range(1):
         for scenario in _SCENARIOS:
             run(scenario, roles, ite, result_dir)
-
-
 
             # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_user.py -n 15 -inventory cuser_inventory.json --time -it 0 >> cuser_sat_user.log 2> cuser_sat_user.err"
 

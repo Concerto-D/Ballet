@@ -151,8 +151,8 @@ def make_inventory_content(roles, scenario):
 def inventory_format_json(data):
     addresses = []
     for comp in data.keys():
-        address = data["address"]
-        port = data["port_planner"]
+        address = data[comp]["address"]
+        port = data[comp]["port_planner"]
         addresses.append(f"\"{comp}\": {{\"address\": \"{address}\", \"port_planner\": {port}}}")
     return "{"+', '.join(addresses)+"}"
 

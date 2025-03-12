@@ -66,26 +66,20 @@ if id == 0:
     # Connect to provider
     connect_inservice_provider = ("provider","serviceOut",f"transformer{id}","serviceIn")
     connections.append(connect_inservice_provider)
-    print(connect_inservice_provider)
     connect_outconfig_provider = (f"transformer{id}","configOut","provider","configIn")
     connections.append(connect_outconfig_provider)
-    print(connect_outconfig_provider)
 if n != 1:
     # Connect to next transformer if exists
     connect_outservice_next_transformer = (f"transformer{id}","serviceOut",f"transformer{id+1}","serviceIn")
     connections.append(connect_outservice_next_transformer)
-    print(connect_outservice_next_transformer)
     connect_inconfig_next_transformer = (f"transformer{id+1}","configOut",f"transformer{id}","configIn")
     connections.append(connect_inconfig_next_transformer)
-    print(connect_inconfig_next_transformer)
 else:
     # Connect to end user otherwise
     connect_outservice_user = (f"transformer{id}","serviceOut","user","serviceIn")
     connections.append(connect_outservice_user)
-    print(connect_outservice_user)
     connect_inconfig_user = (f"user","configOut",f"transformer{id}","configIn")
     connections.append(connect_inconfig_user)
-    print(connect_inconfig_user)
 
 # Node
 active = {transformer: 'running'}
@@ -93,9 +87,6 @@ if sat:
     goals = {}
 else:
     goals = {}
-
-print(f"START ON {PORT}")
-print(inventory)
 
 node = CostRegularNode(id=node_name,
 admin=devops, components=[transformer], 
@@ -105,7 +96,6 @@ goals=goals,
 port=PORT,
 inventory=inventory)
 
-print("pinged all")
 
 # roots
 roots=['provider']

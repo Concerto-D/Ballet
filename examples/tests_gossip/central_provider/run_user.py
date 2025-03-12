@@ -63,10 +63,8 @@ else:
 connections = []
 connect_config = ('provider','config',f'user{id-1}','config')
 connections.append(connect_config)
-print(connect_config)
 connect_service = ('provider','service',f'user{id-1}','service')
 connections.append(connect_service)
-print(connect_service)
 
 ## Active
 active = {user: 'running'}
@@ -74,8 +72,6 @@ active = {user: 'running'}
 ## Goal
 goals = {user: [StateReconfigurationGoal("initial", final=True)]}
     
-print(f"START ON {PORT}")
-print(inventory)
 
 node = CostRegularNode(id=f"node_user{id}",
   admin=f"DevOpsUser{id}", components=[user], 
@@ -84,8 +80,6 @@ node = CostRegularNode(id=f"node_user{id}",
   goals=goals,
   port=PORT,
   inventory=inventory)
-
-print("pinged all")
 
 # roots
 roots=['provider']

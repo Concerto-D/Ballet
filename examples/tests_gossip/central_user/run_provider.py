@@ -74,9 +74,6 @@ if sat:
     goals = {provider: [BehaviorReconfigurationGoal('update'), StateReconfigurationGoal("initial", final=True)]}
 else:
     goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
-        
-print(f"START ON {PORT}")
-print(inventory)
 
 node = CostRegularNode(id=node_name,
   admin=devops, components=[provider], 
@@ -86,7 +83,6 @@ node = CostRegularNode(id=node_name,
   port=PORT,
   inventory=inventory)
 
-print(f"pinged all")
 # roots
 roots=[f'provider{i}' for i in range(n)]
 

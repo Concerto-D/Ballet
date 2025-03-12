@@ -66,10 +66,8 @@ if n != 0:
         # The current user is in the first layer from provider, then we need to connect it to provider
         connect_service_provider = ("provider", "service", f"user{id}", "serviceIn")
         connections.append(connect_service_provider)
-        print(connect_service_provider)
         connect_config_provider = ("provider", "config", f"user{id}", "configIn")
         connections.append(connect_config_provider)
-        print(connect_config_provider)
     else: 
         # The user is not in the first layer from provider. 
         # 1. Then we must connect to all user from previous layer
@@ -77,24 +75,18 @@ if n != 0:
         # Layer l-1 , top user
         connect_service_prev_user0 = (f"user{m}", "serviceOut", f"user{id}", "serviceIn")
         connections.append(connect_service_prev_user0)
-        print(connect_service_prev_user0)
         connect_config_prev_user0 = (f"user{m}", "configOut", f"user{id}", "configIn")
         connections.append(connect_config_prev_user0)
-        print(connect_config_prev_user0)
         # Layer l-1 , mid user
         connect_service_prev_user1 = (f"user{m+1}", "serviceOut", f"user{id}", "serviceIn")
         connections.append(connect_service_prev_user1)
-        print(connect_service_prev_user1)
         connect_config_prev_user1 = (f"user{m+1}", "configOut", f"user{id}", "configIn")
         connections.append(connect_config_prev_user1)
-        print(connect_config_prev_user1)
         # Layer l-1 , bot user
         connect_service_prev_user2 = (f"user{m+2}", "serviceOut", f"user{id}", "serviceIn")
         connections.append(connect_service_prev_user2)
-        print(connect_service_prev_user2)
         connect_config_prev_user2 = (f"user{m+2}", "configOut", f"user{id}", "configIn")
         connections.append(connect_config_prev_user2)
-        print(connect_config_prev_user2)
         
     # 2. Then connect to all user from next layer
     k_port = id % 3
@@ -102,20 +94,16 @@ if n != 0:
     for k in r:
         connect_service_next_user = (f"user{id}", "serviceOut", f"user{k}", f"serviceIn")
         connections.append(connect_service_next_user)
-        print(connect_service_next_user)
         connect_config_next_user = (f"user{id}", "configOut", f"user{k}", f"configIn")
         connections.append(connect_config_next_user)
-        print(connect_config_next_user)
         
     if id >= ((n - 1) // 3) * 3:
         # The user is on the last layer
         enduser_port = id % 3
         connect_service_next_enduser = (f"user{id}", "serviceOut", f"enduser", f"service")
         connections.append(connect_service_next_enduser)
-        print(connect_service_next_enduser)
         connect_config_next_enduser = (f"user{id}", "configOut", f"enduser", f"config")
         connections.append(connect_config_next_enduser)
-        print(connect_config_next_enduser)
     
 active = {user: 'running'}
 
@@ -125,9 +113,6 @@ if sat:
 else:
     goals = {}
 
-print(f"START ON {PORT}")
-print(inventory)   
-
 node = CostRegularNode(id=node_name,
 admin=devops, components=[user], 
 connections=connections,
@@ -135,8 +120,6 @@ active=active,
 goals=goals,
 port=PORT,
 inventory=inventory)
-
-print("pinged all")
 
 # roots
 roots=['provider','enduser']

@@ -60,10 +60,8 @@ connections = []
 for i in range(n):
     connect_config = ('provider','config',f'user{i}','config')
     connections.append(connect_config)
-    print(connect_config)
     connect_service = ('provider','service',f'user{i}','service')
     connections.append(connect_service)
-    print(connect_service)
 
 ## Active
 active = {provider: 'running'}
@@ -74,8 +72,6 @@ if sat:
 else:
     goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
 
-print(f"START ON {PORT}")
-print(inventory)
 
 node = CostRegularNode(id="node0",
   admin="DevOps0", components=[provider], 
@@ -84,8 +80,6 @@ node = CostRegularNode(id="node0",
   goals=goals,
   port=PORT,
   inventory=inventory)
-
-print("pinged all")
 
 # roots
 roots=['provider']

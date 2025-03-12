@@ -326,7 +326,7 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
 
 class CRServer:
     
-    def __init__(self, servicer=CRServicer(), port=3000, max_workers=32, inventory: dict[str, dict[str, str]]={}):
+    def __init__(self, servicer=CRServicer(), port=3000, max_workers=16, inventory: dict[str, dict[str, str]]={}):
         self.__inventory = inventory
         self._full_address = {}
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))

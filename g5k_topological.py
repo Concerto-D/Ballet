@@ -313,12 +313,12 @@ def run_circular(roles, ite, result_dir):
             p.fetch(src=f"{result_dir}circular_unsat_transformer{i}.log", dest="~")
             p.shell(f"rm {project_dir}run_circular_transformer.py ")
     with play_on(pattern_hosts=_CIRCULAR_PROVIDER, roles=roles, run_as=username) as p:
-        p.fetch(src=f"{result_dir}linear_sat_provider.log", dest="~")
-        p.fetch(src=f"{result_dir}linear_unsat_provider.log", dest="~")
+        p.fetch(src=f"{result_dir}circular_sat_provider.log", dest="~")
+        p.fetch(src=f"{result_dir}circular_unsat_provider.log", dest="~")
         p.shell(f"rm {project_dir}run_circular_provider.py")
     with play_on(pattern_hosts=_CIRCULAR_USER, roles=roles, run_as=username) as p:
-        p.fetch(src=f"{result_dir}linear_sat_user.log", dest="~")
-        p.fetch(src=f"{result_dir}linear_unsat_user.log", dest="~")
+        p.fetch(src=f"{result_dir}circular_sat_user.log", dest="~")
+        p.fetch(src=f"{result_dir}circular_unsat_user.log", dest="~")
         p.shell(f"rm {project_dir}run_circular_user.py")
 
 def run_stratified(roles, ite, result_dir):

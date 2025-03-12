@@ -15,7 +15,7 @@ minizinc = f"/home/{username}/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin
 def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
-_COMPONENT=2
+_COMPONENT=5
 _DEFAULT_TIME = "00:02:00"
 _DEFAULT_START = "now"
 
@@ -185,11 +185,11 @@ def run_cuser(roles, ite, result_dir):
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
         p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}cuser_sat_user.log")
     #2.2 run UNSAT
-    for i in range(_COMPONENT):
-        with play_on(pattern_hosts=_CUSER_PROVIDER, roles=roles, run_as=username) as p:
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT}  >> {result_dir}cuser_unsat_provider{i}.log", background=True)
-    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT} >> {result_dir}cuser_unsat_user.log")
+    # for i in range(_COMPONENT):
+    #     with play_on(pattern_hosts=_CUSER_PROVIDER, roles=roles, run_as=username) as p:
+    #         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT}  >> {result_dir}cuser_unsat_provider{i}.log", background=True)
+    # with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
+    #     p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory cuser_inventory.json --time -it {ite} --port {_PORT} >> {result_dir}cuser_unsat_user.log")
     #3 Get results and clean
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER, roles=roles, run_as=username) as p:

@@ -4,6 +4,7 @@ from ballet.utils.dict_utils import min_max_set_size_with_keys
 
 import time
 import sys
+import random
 
 class Acknowledgement(ABC):
     
@@ -168,6 +169,7 @@ def gossip (node: Node, roots: list[str],
     has_sent_global_ack = False
     num_of_loop = 0
     while not ended_resolution:
+        time.sleep(random.uniform(0, 2.0))  
         # Check if all global acks have been sent
         # And if there is a global "failed acked"
         all_acked, has_fail_ack = check_global_acks(node, roots)
@@ -266,7 +268,7 @@ def gossip (node: Node, roots: list[str],
             node.print_status()
             print(f"ENDED RESOLUTION : {ended_resolution}")
             print(f"====================================================")
-        # time.sleep(0.5)  
+            time.sleep(3)  
         num_of_loop += 1  
     if debug:
         print(f"====================================================")

@@ -7,6 +7,7 @@ from ballet.assembly.concertod.component import Component
 import subprocess, json
 import minizinc
 import time
+import concurrent.futures
 
 class FindMUSException(Exception):
     
@@ -874,41 +875,100 @@ class MultiCostRegular(Model):
         self._port_status = {k: None for k in models.keys()}
         self.__first_skip = {k: -1 for k in models.keys()}
         
-    def solve(self, mode="minizinc", print_model=False, write_file=True):
-        for (key, model) in self._models.items():
+    # def solve(self, mode="minizinc", print_model=False, write_file=True):
+    #     for (key, model) in self._models.items():
+    #         try:
+    #             print("start solve", key)
+    #             real_mode = "minizinc" if mode == "minizinc-test" else mode
+    #             solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
+    #             if mode != "minizinc-global" and mode != "minizinc-test":
+    #                 self._solutions[key] = solution
+    #                 self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+    #                 skip_value = solution.get("sequence")[-1]
+    #                 self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
+    #         except FindMUSException:
+    #             print(f"{key} 's model is unsat. Qx running", flush=True)
+    #             self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
+    #     return self._solutions
+
+    def solve(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
+        def process_model(key, model):
             try:
                 real_mode = "minizinc" if mode == "minizinc-test" else mode
-                solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
-                if mode != "minizinc-global" and mode != "minizinc-test":
+                solution = model.solve(real_mode, file_name=f"{key}.mzn", print_model=print_model, write_file=write_file)
+            
+                if mode not in ["minizinc-global", "minizinc-test"]:
                     self._solutions[key] = solution
-                    self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+                    self._port_status[key] = {port_name: solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
                     skip_value = solution.get("sequence")[-1]
                     self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
             except FindMUSException:
                 print(f"{key} 's model is unsat. Qx running", flush=True)
                 self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
+            
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = {executor.submit(process_model, key, model): key for key, model in self._models.items()}
+            for future in concurrent.futures.as_completed(futures):
+                future.result()  # Wait for all threads to complete
+
         return self._solutions
-    
+
+
+
+    # def solve_timed(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
+    #     for (key, model) in self._models.items():
+    #         try:
+    #             real_mode = "minizinc" if mode == "minizinc-test" else mode
+    #             start_time = time.time()
+    #             solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
+    #             if mode != "minizinc-global" and mode != "minizinc-test":
+    #                 self._solutions[key] = solution
+    #                 self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+    #                 skip_value = solution.get("sequence")[-1]
+    #                 self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
+    #                 end_time = time.time()
+    #                 rstep = step
+    #         except FindMUSException:
+    #             self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
+    #             end_time = time.time()
+    #             rstep = "funsat"
+    #         cmp_time = end_time - start_time
+    #         print(f"{key}|{rstep}|{iteration}|{cmp_time}", flush=True)
+    #     return self._solutions
+
+
     def solve_timed(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
-        for (key, model) in self._models.items():
+        start_times = {}
+        def process_model(key, model):
             try:
                 real_mode = "minizinc" if mode == "minizinc-test" else mode
-                start_time = time.time()
-                solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
-                if mode != "minizinc-global" and mode != "minizinc-test":
+                start_times[key] = time.time()
+                solution = model.solve(real_mode, file_name=f"{key}.mzn", print_model=print_model, write_file=write_file)
+                
+                if mode not in ["minizinc-global", "minizinc-test"]:
                     self._solutions[key] = solution
-                    self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+                    self._port_status[key] = {port_name: solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
                     skip_value = solution.get("sequence")[-1]
                     self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
                     end_time = time.time()
                     rstep = step
+                else:
+                    rstep = step
             except FindMUSException:
                 self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
-                end_time = time.time()
                 rstep = "funsat"
-            cmp_time = end_time - start_time
+            
+            cmp_time = time.time() - start_times[key]
             print(f"{key}|{rstep}|{iteration}|{cmp_time}", flush=True)
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = {executor.submit(process_model, key, model): key for key, model in self._models.items()}
+            for future in concurrent.futures.as_completed(futures):
+                future.result()  # Wait for all threads to complete
+
         return self._solutions
+
+
 
     def get_constraints(self):
         constraints = {}

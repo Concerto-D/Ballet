@@ -150,14 +150,13 @@ def make_inventory_content(roles, scenario):
 
 def make_inventory(roles, scenario):
     print(f"LET'S MAKE AN INVENTORY FOR {scenario} SCENARIO")
-    inventory = make_inventory_content(roles, scenario)
-    content = str(inventory)
-    # content = json.dump(inventory)
+    data = make_inventory_content(roles, scenario)
+    content = json.dumps(data)
     print(f"Inventory for {scenario}") 
-    print(content) 
-    filename = f"{scenario}_inventory.json"
+    print(data) 
+    filename = f"{project_dir}{scenario}_inventory.json"
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
-        p.shell("echo \"" + content + "\" > " + project_dir + filename )
+        p.shell("echo \"" + content + "\" > " + filename )
 
 def run(scenario, roles, ite, result_dir):
     make_inventory(roles, scenario)

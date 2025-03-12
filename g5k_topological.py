@@ -157,20 +157,20 @@ def make_inventory(roles, scenario):
     print(content) 
     filename = f"{scenario}_inventory.json"
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
-        p.shell("echo \"" + content + "\" >> " + project_dir + filename )
+        p.shell("echo \"" + content + "\" > " + project_dir + filename )
 
 def run(scenario, roles, ite, result_dir):
     make_inventory(roles, scenario)
-    # if scenario == "cuser":
-    #     run_cuser(roles, ite, result_dir)
-    # if scenario == "cprovider":
-    #     run_cprovider(roles, ite, result_dir)
-    # if scenario == "linear":
-    #     run_linear(roles, ite, result_dir)
-    # if scenario == "circular":
-    #     run_circular(roles, ite, result_dir)
-    # if scenario == "stratified":
-    #     run_stratified(roles, ite, result_dir)
+    if scenario == "cuser":
+        run_cuser(roles, ite, result_dir)
+    if scenario == "cprovider":
+        run_cprovider(roles, ite, result_dir)
+    if scenario == "linear":
+        run_linear(roles, ite, result_dir)
+    if scenario == "circular":
+        run_circular(roles, ite, result_dir)
+    if scenario == "stratified":
+        run_stratified(roles, ite, result_dir)
 
 def run_cuser(roles, ite, result_dir):
     #1 Copy right python file

@@ -16,6 +16,7 @@ def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
 _COMPONENT=1    
+_NEXPE = 1
 _DEFAULT_TIME = "01:00:00"
 _DEFAULT_START = "now"
 
@@ -191,7 +192,7 @@ def run_cuser(roles, ite, result_dir):
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
             id_provider = i + 1
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -i {id_provider} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log 2>> {result_dir}cuser_sat_provider{i}.err", background=True)
+            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -i {id_provider} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cuser_sat_provider{i}.log 2>> {result_dir}cuser_sat_provider{i}.err", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
         p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2>> {result_dir}cuser_sat_user.err")
     #2.2 run UNSAT
@@ -201,6 +202,7 @@ def run_cuser(roles, ite, result_dir):
             p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unsat -n {_COMPONENT} -i {id_provider} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cuser_unsat_provider{i}.log 2>> {result_dir}cuser_unsat_provider{i}.err", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
         p.shell(f"{minizinc_path()}; python {project_dir}run_user.py --unsat -n {_COMPONENT} -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_unsat_user.log 2>> {result_dir}cuser_unsat_user.err")
+    #get results
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}cuser_sat_provider{i}.log", dest="~")
@@ -208,44 +210,166 @@ def run_cuser(roles, ite, result_dir):
             p.shell(f"rm {project_dir}run_provider.py ")
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}cuser_sat_user.log", dest="~")
-        p.fetch(src=f"{result_dir}cuser_sat_user.err", dest="~")
         p.fetch(src=f"{result_dir}cuser_unsat_user.log", dest="~")
         p.shell(f"rm {project_dir}run_user.py ")
 
 def run_cprovider(roles, ite, result_dir):
-    pass
+    #1 Copy right python file
+    script_place = f"{project_dir}examples/tests_gossip/central_provider/"
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CPROVIDER_USER+str(i), roles=roles, run_as=username) as p:
+            p.shell(f"cp {script_place}run_user.py {project_dir}")
+    with play_on(pattern_hosts=_CPROVIDER_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"cp {script_place}run_provider.py {project_dir}")
+    #2.1 run SAT 
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CPROVIDER_USER+str(i), roles=roles, run_as=username) as p:
+            id_user = i + 1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -i {id_user} -inventory {project_dir}cprovider_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cprovider_sat_provider{i}.log 2>> {result_dir}cprovider_sat_provider{i}.err", background=True)
+    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -inventory {project_dir}cprovider_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cprovider_sat_user.log 2>> {result_dir}cprovider_sat_user.err")
+    #2.2 run UNSAT
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CPROVIDER_USER+str(i), roles=roles, run_as=username) as p:
+            id_user = i + 1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -i {id_user} -inventory {project_dir}cprovider_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cprovider_unsat_provider{i}.log 2>> {result_dir}cprovider_unsat_provider{i}.err", background=True)
+    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n {_COMPONENT} -inventory {project_dir}cprovider_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cprovider_unsat_user.log 2>> {result_dir}cprovider_unsat_user.err")
+    #get results
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CUSER_USER+str(i), roles=roles, run_as=username) as p:
+            p.fetch(src=f"{result_dir}cprovider_sat_user{i}.log", dest="~")
+            p.fetch(src=f"{result_dir}cprovider_unsat_user{i}.log", dest="~")
+            p.shell(f"rm {project_dir}run_user.py ")
+    with play_on(pattern_hosts=_CUSER_PROVIDER, roles=roles, run_as=username) as p:
+        p.fetch(src=f"{result_dir}cprovider_sat_provider.log", dest="~")
+        p.fetch(src=f"{result_dir}cprovider_unsat_provider.log", dest="~")
+        p.shell(f"rm {project_dir}run_provider.py ")
 
 def run_linear(roles, ite, result_dir):
-    pass
+    #1 Copy right python file
+    script_place = f"{project_dir}examples/tests_gossip/linear/"
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_LINEAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            p.shell(f"cp {script_place}run_transformer.py {project_dir}")
+    with play_on(pattern_hosts=_LINEAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"cp {script_place}run_provider.py {project_dir}")
+    #2.1 run SAT
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_LINEAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            id_tr = i + 1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_transformer.py -n {_COMPONENT} -i {id_tr} -inventory {project_dir}linear_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}linear_sat_transformer{i}.log 2>> {result_dir}linear_sat_transformer{i}.err", background=True)
+    with play_on(pattern_hosts=_LINEAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -inventory {project_dir}linear_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}linear_sat_provider.log 2>> {result_dir}linear_sat_provider.err")
+    #2.2 run UNSAT
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_LINEAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            id_tr = i + 1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_transformer.py --unsat -n {_COMPONENT} -i {id_tr} -inventory {project_dir}linear_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}linear_unsat_transformer{i}.log 2>> {result_dir}linear_unsat_transformer{i}.err", background=True)
+    with play_on(pattern_hosts=_LINEAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unast -n {_COMPONENT} -inventory {project_dir}linear_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}linear_unsat_provider.log 2>> {result_dir}linear_unsat_provider.err")
+    #get results
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_LINEAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            p.fetch(src=f"{result_dir}linear_sat_transformer{i}.log", dest="~")
+            p.fetch(src=f"{result_dir}linear_unsat_transformer{i}.log", dest="~")
+            p.shell(f"rm {project_dir}run_transformer.py ")
+    with play_on(pattern_hosts=_LINEAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.fetch(src=f"{result_dir}linear_sat_provider.log", dest="~")
+        p.fetch(src=f"{result_dir}linear_unsat_provider.log", dest="~")
+        p.shell(f"rm {project_dir}run_provider.py")
+
 
 def run_circular(roles):
-    pass
+    #1 Copy right python file
+    script_place = f"{project_dir}examples/tests_gossip/circular/"
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CIRCULAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            p.shell(f"cp {script_place}run_circular_transformer.py {project_dir}")
+    with play_on(pattern_hosts=_CIRCULAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"cp {script_place}run_circular_provider.py {project_dir}")
+    with play_on(pattern_hosts=_CIRCULAR_USER, roles=roles, run_as=username) as p:
+        p.shell(f"cp {script_place}run_circular_user.py {project_dir}")
+    #2.1 Sat
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CIRCULAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            p.shell(f"{minizinc_path()}; python {project_dir}run_circular_transformer.py -n {_COMPONENT} -i {i} -inventory {project_dir}circular_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}circular_sat_transformer{i}.log 2>> {result_dir}circular_sat_transformer{i}.err", background=True)
+    with play_on(pattern_hosts=_CIRCULAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_circular_provider.py -n {_COMPONENT} -inventory {project_dir}circular_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}circular_sat_provider.log 2>> {result_dir}circular_sat_provider.err", background=True)
+    with play_on(pattern_hosts=_CIRCULAR_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_circular_user.py -n {_COMPONENT} -inventory {project_dir}circular_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}circular_sat_user.log 2>> {result_dir}circular_sat_user.err")
+    #2.2 Unsat
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CIRCULAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            p.shell(f"{minizinc_path()}; python {project_dir}run_circular_transformer.py --unsat -n {_COMPONENT} -i {i} -inventory {project_dir}circular_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}circular_unsat_transformer{i}.log 2>> {result_dir}circular_unsat_transformer{i}.err", background=True)
+    with play_on(pattern_hosts=_CIRCULAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_circular_provider.py --unsat -n {_COMPONENT} -inventory {project_dir}circular_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}circular_unsat_provider.log 2>> {result_dir}circular_unsat_provider.err", background=True)
+    with play_on(pattern_hosts=_CIRCULAR_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_circular_user.py --unsat -n {_COMPONENT} -inventory {project_dir}circular_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}circular_unsat_user.log 2>> {result_dir}circular_unsat_user.err")
+    #get result
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CIRCULAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
+            p.fetch(src=f"{result_dir}circular_sat_transformer{i}.log", dest="~")
+            p.fetch(src=f"{result_dir}circular_unsat_transformer{i}.log", dest="~")
+            p.shell(f"rm {project_dir}run_circular_transformer.py ")
+    with play_on(pattern_hosts=_CIRCULAR_PROVIDER, roles=roles, run_as=username) as p:
+        p.fetch(src=f"{result_dir}linear_sat_provider.log", dest="~")
+        p.fetch(src=f"{result_dir}linear_unsat_provider.log", dest="~")
+        p.shell(f"rm {project_dir}run_circular_provider.py")
+    with play_on(pattern_hosts=_CIRCULAR_USER, roles=roles, run_as=username) as p:
+        p.fetch(src=f"{result_dir}linear_sat_user.log", dest="~")
+        p.fetch(src=f"{result_dir}linear_unsat_user.log", dest="~")
+        p.shell(f"rm {project_dir}run_circular_user.py")
 
 def run_stratified(roles):
-    pass
+    #1 Copy right python file
+    script_place = f"{project_dir}examples/tests_gossip/stratified/"
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_STRATIFIED_MIDUSER+str(i), roles=roles, run_as=username) as p:
+            p.shell(f"cp {script_place}run_miduser.py {project_dir}")
+    with play_on(pattern_hosts=_STRATIFIED_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"cp {script_place}run_provider.py {project_dir}")
+    with play_on(pattern_hosts=_STRATIFIED_USER, roles=roles, run_as=username) as p:
+        p.shell(f"cp {script_place}run_end_user.py {project_dir}")
+    #2.1 Sat
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_STRATIFIED_MIDUSER+str(i), roles=roles, run_as=username) as p:
+            id_user = i+1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_miduser.py -n {_COMPONENT} -i {id_user} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_sat_miduser{i}.log 2>> {result_dir}stratified_sat_miduser{i}.err", background=True)
+    with play_on(pattern_hosts=_STRATIFIED_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n {_COMPONENT} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_sat_provider.log 2>> {result_dir}stratified_sat_provider.err", background=True)
+    with play_on(pattern_hosts=_STRATIFIED_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_end_user.py -n {_COMPONENT} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_sat_user.log 2>> {result_dir}stratified_sat_user.err")
+    #2.2 Unsat
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_STRATIFIED_MIDUSER+str(i), roles=roles, run_as=username) as p:
+            id_user = i+1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_miduser.py --unsat -n {_COMPONENT} -i {id_user} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_unsat_miduser{i}.log 2>> {result_dir}stratified_unsat_miduser{i}.err", background=True)
+    with play_on(pattern_hosts=_STRATIFIED_PROVIDER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unsat  -n {_COMPONENT} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_unsat_provider.log 2>> {result_dir}stratified_unsat_provider.err", background=True)
+    with play_on(pattern_hosts=_STRATIFIED_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_end_user.py --unsat -n {_COMPONENT} -inventory {project_dir}stratified_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}stratified_unsat_user.log 2>> {result_dir}stratified_unsat_user.err")
+    #get result
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_STRATIFIED_MIDUSER+str(i), roles=roles, run_as=username) as p:
+            p.fetch(src=f"{result_dir}stratified_sat_miduser{i}.log", dest="~")
+            p.fetch(src=f"{result_dir}stratified_unsat_miduser{i}.log", dest="~")
+            p.shell(f"rm {project_dir}run_miduser.py ")
+    with play_on(pattern_hosts=_STRATIFIED_PROVIDER, roles=roles, run_as=username) as p:
+        p.fetch(src=f"{result_dir}stratified_sat_provider.log", dest="~")
+        p.fetch(src=f"{result_dir}stratified_unsat_provider.log", dest="~")
+        p.shell(f"rm {project_dir}run_provider.py")
+    with play_on(pattern_hosts=_STRATIFIED_USER, roles=roles, run_as=username) as p:
+        p.fetch(src=f"{result_dir}stratified_sat_user.log", dest="~")
+        p.fetch(src=f"{result_dir}stratified_unsat_user.log", dest="~")
+        p.shell(f"rm {project_dir}run_end_user.py")
 
 if __name__ == "__main__":
-    timestamp="0"
+    timestamp="1"
     result_dir = f"/tmp/{timestamp}/"
     roles, networks = book(site="nancy", cluster="gros")
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
         p.shell(f"mkdir -p {result_dir}")
-    for ite in range(10):
+    for ite in range(_NEXPE):
         for scenario in _SCENARIOS:
             run(scenario, roles, ite, result_dir)
-
-    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_user.py -n 1 -inventory cuser_inventory.json --time -it 0 -port 40001 >> cuser_sat_user.log 2> cuser_sat_user.err"
-
-    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_provider.py -n 1 -i 0 -inventory cuser_inventory.json --time -it 0 -port 40001 >> cuser_sat_user.log 2> cuser_sat_user.err"
-
-    # python -m ipdb /home/jphilippe/Project/Ballet/run_user.py -n 1 -inventory /home/jphilippe/Project/Ballet/cuser_inventory.json --verbose -it 0 -port 40001 
-    # python -m ipdb /home/jphilippe/Project/Ballet/run_provider.py -n 1 -i 0 -inventory /home/jphilippe/Project/Ballet/cuser_inventory.json --verbose -it 0 -port 40001 
-
-
-    # run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite 
-
-
-
-
-
-    "{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2>> {result_dir}cuser_sat_user.err"

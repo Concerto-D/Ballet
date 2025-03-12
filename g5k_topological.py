@@ -178,7 +178,7 @@ def run_cuser(roles, ite, result_dir):
             p.shell(f"cp {script_place}run_provider.py {project_dir}")
             p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}user_sat_provider{i}.log", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-            p.shell(f"cp {script_place}run_user.py {project_dir}")
+        p.shell(f"cp {script_place}run_user.py {project_dir}")
         p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory cuser_inventory.json --time -it {ite}  --port {_PORT} >> {result_dir}cuser_sat_user.log")
     # run UNSAT
     for i in range(_COMPONENT):

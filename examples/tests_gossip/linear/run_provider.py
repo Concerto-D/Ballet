@@ -59,8 +59,10 @@ connections = []
 if n > 0:
     connect_config = (f'provider','config',f'transformer{0}',f'configIn')
     connections.append(connect_config)
+    print(connect_config)
     connect_service = (f'provider','service',f'transformer{0}',f'serviceIn')
     connections.append(connect_service)
+    print(connect_service)
     
 active = {provider: 'running'}
 
@@ -70,6 +72,9 @@ if sat:
 else:
     goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
     
+print(f"START ON {PORT}")
+print(inventory)   
+
 node = CostRegularNode(id=node_name,
   admin=devops, components=[provider], 
   connections=connections,
@@ -77,6 +82,8 @@ node = CostRegularNode(id=node_name,
   goals=goals,
   port=PORT,
   inventory=inventory)
+
+print("pinged all")
 
 # roots
 if sat or n == 0:

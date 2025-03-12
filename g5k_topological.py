@@ -20,8 +20,8 @@ _NEXPE = 1
 _DEFAULT_TIME = "01:00:00"
 _DEFAULT_START = "now"
 
-# _SCENARIOS = ["cuser"]
-_SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
+_SCENARIOS = ["cprovider"]
+# _SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
 
 _PORT = 40001
 

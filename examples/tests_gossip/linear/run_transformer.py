@@ -61,19 +61,25 @@ connections = []
 if id == 1:
     connect_config = (f'provider','config',f'transformer{0}',f'configIn')
     connections.append(connect_config)
+    print(connect_config)
     connect_service = (f'provider','service',f'transformer{0}',f'serviceIn')
     connections.append(connect_service)
+    print(connect_service)
 else: 
     connect_config = (f'transformer{id-2}','configOut',f'transformer{id-1}',f'configIn')
     connections.append(connect_config)
+    print(connect_config)
     connect_service = (f'transformer{id-2}','serviceOut',f'transformer{id-1}',f'serviceIn')
     connections.append(connect_service)
+    print(connect_service)
 # Connection to the right
 if id != n:
     connect_config = (f'transformer{id-1}','configOut',f'transformer{id}',f'configIn')
     connections.append(connect_config)
+    print(connect_config)
     connect_service = (f'transformer{id-1}','serviceOut',f'transformer{id}',f'serviceIn')
     connections.append(connect_service)
+    print(connect_service)
     
 active = {transformer: 'running'}
 
@@ -85,6 +91,10 @@ if not sat and id==n:
 else: 
     goals[transformer] = []
 
+    
+print(f"START ON {PORT}")
+print(inventory)   
+
 node = CostRegularNode(id=node_name,
   admin=devops, components=[transformer], 
   connections=connections,
@@ -92,6 +102,8 @@ node = CostRegularNode(id=node_name,
   goals=goals,
   port=PORT,
   inventory=inventory)
+
+print("pinged all")
 
 # roots
 if sat or n == 0:

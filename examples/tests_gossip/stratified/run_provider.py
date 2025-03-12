@@ -58,16 +58,20 @@ connections = []
 if n == 0:
     service_enduser = ("provider", "service", "enduser", "service")
     connections.append(service_enduser)
+    print(service_enduser)
     config_enduser = ("provider", "config", "enduser", "config")
     connections.append(config_enduser)
+    print(config_enduser)
 else:
     bound = n if n < 3 else 3
     for i in range(bound):
         u_id = f"user{i}"
         service_enduser = ("provider", "service", u_id, "service")
         connections.append(service_enduser)
+        print(service_enduser)
         config_enduser = ("provider", "config", u_id, "config")
         connections.append(config_enduser)
+        print(config_enduser)
     
 active = {provider: 'running'}
 
@@ -77,6 +81,8 @@ if sat:
 else:
     goals = {provider: [StateReconfigurationGoal("uninstalled", final=True)]}
     
+print(f"START ON {PORT}")
+print(inventory)   
     
 node = CostRegularNode(id=node_name,
 admin=devops, components=[provider], 
@@ -86,6 +92,8 @@ goals=goals,
 port=PORT,
 inventory=inventory)
     
+print("pinged all")
+
 # roots
 roots=['provider','enduser']
     

@@ -148,15 +148,24 @@ def make_inventory_content(roles, scenario):
             inventory[f'user{i}'] = {'address': miduser_address, 'port_planner': miduser_address}
     return inventory
 
+def inventory_format_json(data):
+    res = "{"
+    addresses = []
+    for comp in data.keys():
+        address = data["address"]
+        port = data["port_planner"]
+        addresses.append(f"\"{comp}\": {{\"address\": \"{address}\", \"port_planner\": {port}}}")
+    return ', '.join(addresses)+"}"
+
 def make_inventory(roles, scenario):
     print(f"LET'S MAKE AN INVENTORY FOR {scenario} SCENARIO")
     data = make_inventory_content(roles, scenario)
-    content = json.dumps(data)
+    content = inventory_format_json(data)
     print(f"Inventory for {scenario}") 
     print(data) 
     filename = f"{project_dir}{scenario}_inventory.json"
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
-        p.shell("echo \"" + content + "\" > " + filename )
+        p.shell("echo '" + content + "' > " + filename )
 
 def run(scenario, roles, ite, result_dir):
     make_inventory(roles, scenario)

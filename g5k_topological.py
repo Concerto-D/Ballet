@@ -208,6 +208,8 @@ if __name__ == "__main__":
     timestamp="0"
     result_dir = f"/tmp/{timestamp}/"
     roles, networks = book(site="nancy", cluster="gros")
+    with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
+        p.shell(f"mkdir {result_dir}")
     for ite in range(10):
         for scenario in _SCENARIOS:
             run(scenario, roles, ite, result_dir)

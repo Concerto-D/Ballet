@@ -149,7 +149,7 @@ def make_inventory_content(roles, scenario):
 
 def make_inventory(roles, scenario):
     inventory = make_inventory_content(roles, scenario)
-    content = json.dump(inventory, indent=2)
+    content = json.dump(inventory)
     print(f"Inventory for {scenario}") 
     print(content) 
     filename = f"{scenario}_inventory.json"

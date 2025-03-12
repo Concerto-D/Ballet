@@ -6,6 +6,7 @@ import gossip.json.Model2Choco;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.search.strategy.Search;
 
 import java.util.Arrays;
 import java.util.List;
@@ -26,15 +27,16 @@ public class Main {
 
 
         Solver solver = choco_model.getSolver();
-            solver.reset();
-            List<Constraint> mus = solver.findMinimumConflictingSet(Arrays.asList(choco_model.getCstrs()));
-            @SuppressWarnings("unchecked")
-            Map<Object, List<String>> tracker = (Map<Object, List<String>>) choco_model.getHook("tracker");
-            mus.forEach(c -> {
-                if (tracker.containsKey(c)) {
-                    System.out.println(tracker.get(c));
-                }
-            });
+        solver.reset();
+        // solver.setSearch(Search.inputOrderLBSearch(choco_model.retrieveIntVars(true)));
+        List<Constraint> mus = solver.findMinimumConflictingSet(Arrays.asList(choco_model.getCstrs()));
+        @SuppressWarnings("unchecked")
+        Map<Object, List<String>> tracker = (Map<Object, List<String>>) choco_model.getHook("tracker");
+        mus.forEach(c -> {
+            if (tracker.containsKey(c)) {
+                System.out.println(tracker.get(c));
+            }
+        });
 //        }
     }
 }

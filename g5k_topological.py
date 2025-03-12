@@ -20,7 +20,7 @@ _NEXPE = 1
 _DEFAULT_TIME = "01:00:00"
 _DEFAULT_START = "now"
 
-_SCENARIOS = ["linear"]
+_SCENARIOS = ["circular"]
 # _SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
 
 _PORT = 40001
@@ -280,7 +280,7 @@ def run_linear(roles, ite, result_dir):
         p.shell(f"rm {project_dir}run_provider.py")
 
 
-def run_circular(roles):
+def run_circular(roles, ite, result_dir):
     #1 Copy right python file
     script_place = f"{project_dir}examples/tests_gossip/circular/"
     for i in range(_COMPONENT):
@@ -321,7 +321,7 @@ def run_circular(roles):
         p.fetch(src=f"{result_dir}linear_unsat_user.log", dest="~")
         p.shell(f"rm {project_dir}run_circular_user.py")
 
-def run_stratified(roles):
+def run_stratified(roles, ite, result_dir):
     #1 Copy right python file
     script_place = f"{project_dir}examples/tests_gossip/stratified/"
     for i in range(_COMPONENT):

@@ -16,12 +16,12 @@ def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
 _COMPONENT=1    
-_NEXPE = 1
+_NEXPE = 2
 _DEFAULT_TIME = "01:00:00"
 _DEFAULT_START = "now"
 
-_SCENARIOS = ["stratified"]
-# _SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
+# _SCENARIOS = ["stratified"]
+_SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
 
 _PORT = 40001
 
@@ -363,7 +363,7 @@ def run_stratified(roles, ite, result_dir):
         p.shell(f"rm {project_dir}run_end_user.py")
 
 if __name__ == "__main__":
-    timestamp="1"
+    timestamp="2"
     result_dir = f"/tmp/{timestamp}/"
     roles, networks = book(site="nancy", cluster="gros")
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:

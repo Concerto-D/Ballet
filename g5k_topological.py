@@ -146,7 +146,7 @@ def make_inventory_content(roles, scenario):
         inventory["enduser"] =  {'address': user_address, 'port_planner': _PORT}
         for i in range(_COMPONENT):
             miduser_address = roles[_STRATIFIED_MIDUSER+str(i)][0].address
-            inventory[f'user{i}'] = {'address': miduser_address, 'port_planner': miduser_address}
+            inventory[f'user{i}'] = {'address': miduser_address, 'port_planner': _PORT}
     return inventory
 
 def inventory_format_json(data):

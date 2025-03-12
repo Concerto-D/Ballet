@@ -18,6 +18,7 @@ import sys
 parser = argparse.ArgumentParser(description="Run gossip node script")
 parser.add_argument('-n', type=int, default=1, help='Number of users')
 parser.add_argument('-it', type=int, default=0, help='Iteration')
+parser.add_argument('-port', type=int, default=-1, help='port')
 parser.add_argument('-inventory', type=str, default=None, help='JSON file with inventory')
 parser.add_argument('--unsat', action='store_true', help='Indicate if the unsat flag is set')
 parser.add_argument('--time', action='store_true', help='Indicate if the time flag is set')
@@ -27,15 +28,21 @@ args = parser.parse_args()
 
 n = args.n
 it = args.it
+port = args.port
 sat = False if args.unsat else True
 ctime = True if args.time else False
 verbose = True if args.verbose else False
 inventory_file = args.inventory
 
 ADDRESS = 'localhost'
-USER_PORT = 3000
-PORT = USER_PORT
 
+if port == -1:
+    USER_PORT = 3000
+    PORT = USER_PORT
+else:
+    USER_PORT = port
+    PORT = port
+    
 node_name = "node_user"
 devops = "DevOpsUser"
 

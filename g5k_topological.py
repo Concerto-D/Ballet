@@ -15,8 +15,8 @@ minizinc = f"/home/{username}/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin
 def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
-_COMPONENT=5    
-_DEFAULT_TIME = "00:02:00"
+_COMPONENT=1    
+_DEFAULT_TIME = "01:00:00"
 _DEFAULT_START = "now"
 
 _SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]

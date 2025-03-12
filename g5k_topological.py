@@ -190,16 +190,17 @@ def run_cuser(roles, ite, result_dir):
     #2.1 run SAT 
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
-            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log 2>> {result_dir}cuser_sat_provider{i}.err", background=True)
+            id_provider = i + 1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {id_provider} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}user_sat_provider{i}.log 2>> {result_dir}cuser_sat_provider{i}.err", background=True)
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
         p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2>> {result_dir}cuser_sat_user.err")
     #2.2 run UNSAT
-    # for i in range(_COMPONENT):
-    #     with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
-    #         p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py -n 15 -i {i} --unsat -inventory cuser_inventory.json --time -it {ite} -port {_PORT}  >> {result_dir}cuser_unsat_provider{i}.log", background=True)
-    # with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
-    #     p.shell(f"{minizinc_path()}; python {project_dir}run_user.py -n 15  --unsat -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cuser_unsat_user.log")
-    #3 Get results and clean
+    for i in range(_COMPONENT):
+        with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
+            id_provider = i + 1
+            p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unsat -n 15 -i {id_provider} -inventory {project_dir}cuser_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}cuser_unsat_provider{i}.log 2>> {result_dir}cuser_unsat_provider{i}.err", background=True)
+    with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
+        p.shell(f"{minizinc_path()}; python {project_dir}run_user.py --unsat -n 15 -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_unsat_user.log 2>> {result_dir}cuser_unsat_user.err")
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}cuser_sat_provider{i}.log", dest="~")
@@ -229,13 +230,22 @@ if __name__ == "__main__":
     roles, networks = book(site="nancy", cluster="gros")
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
         p.shell(f"mkdir -p {result_dir}")
-    for ite in range(1):
+    for ite in range(10):
         for scenario in _SCENARIOS:
             run(scenario, roles, ite, result_dir)
 
-    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_user.py -n 15 -inventory cuser_inventory.json --time -it 0 >> cuser_sat_user.log 2> cuser_sat_user.err"
+    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_user.py -n 1 -inventory cuser_inventory.json --time -it 0 -port 40001 >> cuser_sat_user.log 2> cuser_sat_user.err"
 
-    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python -m ipdb  /home/jphilippe/Project/Ballet/run_user.py -n 1 --time -it 0"
+    # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_provider.py -n 1 -i 0 -inventory cuser_inventory.json --time -it 0 -port 40001 >> cuser_sat_user.log 2> cuser_sat_user.err"
+
+    # python -m ipdb /home/jphilippe/Project/Ballet/run_user.py -n 1 -inventory /home/jphilippe/Project/Ballet/cuser_inventory.json --verbose -it 0 -port 40001 
+    # python -m ipdb /home/jphilippe/Project/Ballet/run_provider.py -n 1 -i 0 -inventory /home/jphilippe/Project/Ballet/cuser_inventory.json --verbose -it 0 -port 40001 
 
 
     # run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite 
+
+
+
+
+
+    "{minizinc_path()}; python {project_dir}run_user.py -n 15 -inventory {project_dir}cuser_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}cuser_sat_user.log 2>> {result_dir}cuser_sat_user.err"

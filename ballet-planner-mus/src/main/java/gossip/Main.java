@@ -28,7 +28,7 @@ public class Main {
 
         Solver solver = choco_model.getSolver();
         solver.reset();
-        // solver.setSearch(Search.inputOrderLBSearch(choco_model.retrieveIntVars(true)));
+        solver.setSearch(Search.inputOrderLBSearch(choco_model.retrieveIntVars(true)));
         List<Constraint> mus = solver.findMinimumConflictingSet(Arrays.asList(choco_model.getCstrs()));
         @SuppressWarnings("unchecked")
         Map<Object, List<String>> tracker = (Map<Object, List<String>>) choco_model.getHook("tracker");

@@ -217,7 +217,7 @@ def run_stratified(roles):
 if __name__ == "__main__":
     timestamp="0"
     result_dir = f"/tmp/{timestamp}/"
-    roles, networks = book(site="nancy", cluster="gros")
+    roles, networks = book(site="rennes", cluster="paravance")
     with play_on(pattern_hosts=_BALLET, roles=roles, run_as=username) as p:
         p.shell(f"mkdir {result_dir}")
     for ite in range(10):
@@ -228,7 +228,7 @@ if __name__ == "__main__":
 
             # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python /home/jphilippe/Project/Ballet/run_user.py -n 15 -inventory cuser_inventory.json --time -it 0 >> cuser_sat_user.log 2> cuser_sat_user.err"
 
-            # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python -m ipdb /home/jphilippe/Project/Ballet/run_user.py -n 1 --time -it 0"
+            # "export PATH=/home/jphilippe/Software/MiniZincIDE-2.7.6-bundle-linux-x86_64/bin:$PATH; python-m ipdb  /home/jphilippe/Project/Ballet/run_user.py -n 1 --time -it 0"
 
 
             # run_user.py -n $n $unsat_flag -inventory inventory.json $timeflag -it $ite 

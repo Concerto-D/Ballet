@@ -20,7 +20,7 @@ _NEXPE = 1
 _DEFAULT_TIME = "01:00:00"
 _DEFAULT_START = "now"
 
-_SCENARIOS = ["cprovider"]
+_SCENARIOS = ["linear"]
 # _SCENARIOS = ["cuser","cprovider","linear","circular","stratified"]
 
 _PORT = 40001
@@ -267,7 +267,7 @@ def run_linear(roles, ite, result_dir):
             id_tr = i + 1
             p.shell(f"{minizinc_path()}; python {project_dir}run_transformer.py --unsat -n {_COMPONENT} -i {id_tr} -inventory {project_dir}linear_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}linear_unsat_transformer{i}.log 2>> {result_dir}linear_unsat_transformer{i}.err", background=True)
     with play_on(pattern_hosts=_LINEAR_PROVIDER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unast -n {_COMPONENT} -inventory {project_dir}linear_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}linear_unsat_provider.log 2>> {result_dir}linear_unsat_provider.err")
+        p.shell(f"{minizinc_path()}; python {project_dir}run_provider.py --unsat -n {_COMPONENT} -inventory {project_dir}linear_inventory.json --time -it {ite}  -port {_PORT} >> {result_dir}linear_unsat_provider.log 2>> {result_dir}linear_unsat_provider.err")
     #get results
     for i in range(_COMPONENT):
         with play_on(pattern_hosts=_LINEAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:

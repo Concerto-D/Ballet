@@ -34,8 +34,12 @@ node_name = f"node_neutron{i}"
 devops = f"DevOpsNeutron{i}"
 
 ADDRESS = 'localhost'
-MASTER_PORT = 3000
-PORT =  MASTER_PORT + 10 * (i + 1) + 2
+if port == -1:
+    MASTER_PORT = 3000
+    PORT =  MASTER_PORT + 10 * (i + 1) + 2
+else:
+    MASTER_PORT = port
+    PORT =  port
  
 
 # instances

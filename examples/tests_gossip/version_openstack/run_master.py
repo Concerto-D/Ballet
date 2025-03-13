@@ -39,8 +39,13 @@ node_name = f"node_master"
 devops = f"DevOpsMaster"
 
 ADDRESS = 'localhost'
-MASTER_PORT = 3000
-PORT = MASTER_PORT
+
+if port == -1:
+    MASTER_PORT = 3000
+    PORT = MASTER_PORT
+else:
+    MASTER_PORT = port
+    PORT =  port
 
 
 

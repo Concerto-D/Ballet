@@ -42,8 +42,12 @@ node_name = f"node_worker{i}"
 devops = f"DevOpsWorker{i}"
 
 ADDRESS = 'localhost'
-MASTER_PORT = 3000
-PORT =  MASTER_PORT + 10 * (i + 1) 
+if port == -1:
+    MASTER_PORT = 3000
+    PORT =  MASTER_PORT + 10 * (i + 1) 
+else:
+    MASTER_PORT = port
+    PORT =  port
  
 
 # instances

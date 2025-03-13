@@ -16,8 +16,8 @@ def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
 _NWORKER = 1    
-_NEXPE = 15
-_DEFAULT_TIME = "02:00:00"
+_NEXPE = 1
+_DEFAULT_TIME = "00:15:00"
 _DEFAULT_START = "now"
 
 
@@ -82,7 +82,7 @@ def make_inventory_content(roles):
         worker_neutron_address = roles[_WORKER_NEUTRON+str(wid)][0].address
         inventory[f'novaworker{wid}'] = {'address': worker_neutron_address, 'port_planner': _PORT} 
         # WORKER NOVA COMPONENT
-        worker_nova_address = roles[_WORKER_NEUTRON+str(wid)][0].address
+        worker_nova_address = roles[_WORKER_NOVA+str(wid)][0].address
         inventory[f'neutronworker{wid}'] = {'address': worker_nova_address, 'port_planner': _PORT} 
     return inventory
 

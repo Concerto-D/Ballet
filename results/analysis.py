@@ -53,7 +53,7 @@ def build_analysis(input):
 
 if __name__ == "__main__":
     prefix = "results/"
-    files = [prefix+"sat_circular_20.log", prefix+"sat_linear_20.log", prefix+"sat_cprovider_20.log", prefix+"sat_cuser_15.log"]
-    files = files + [prefix+"unsat_circular_20.log", prefix+"unsat_linear_20.log", prefix+"unsat_cprovider_20.log", prefix+"unsat_cuser_15.log"]
+    files = [prefix+"sat_circular_20.log", prefix+"sat_linear_20.log", prefix+"sat_cprovider_20.log", prefix+"sat_cuser_15.log", prefix+"sat_stratified_20.log"]
+    files = files + [prefix+"unsat_circular_20.log", prefix+"unsat_linear_20.log", prefix+"unsat_cprovider_20.log", prefix+"unsat_cuser_15.log", prefix+"unsat_stratified_20.log", prefix+"ttt_stratified_20.log"]
     results = load_results(files)
     build_analysis(results)

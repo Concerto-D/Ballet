@@ -17,7 +17,7 @@ def minizinc_path():
 
 _NWORKER = 1    
 _NEXPE = 15
-_DEFAULT_TIME = "00:40:00"
+_DEFAULT_TIME = "00:35:00"
 _DEFAULT_START = "now"
 
 
@@ -125,7 +125,7 @@ def run(roles, ite, result_dir):
         with play_on(pattern_hosts=_WORKER_NOVA+str(i), roles=roles, run_as=username) as p:
             p.shell(f"{minizinc_path()}; python {project_dir}run_worker_nova.py -worker {_NWORKER} -i {i} -inventory {project_dir}openstack_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}{ite}openstack_sat_wnova{i}.log 2>> {result_dir}{ite}openstack_sat_wnova{i}.err", background=True)
     with play_on(pattern_hosts=_MASTER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_master.py -worker {_NWORKER} -inventory {project_dir}openstack_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}{ite}openstack_sat_master.log 2>> {result_dir}{ite}openstack_sat_master.err", background=True)
+        p.shell(f"{minizinc_path()}; python {project_dir}run_master.py -worker {_NWORKER} -inventory {project_dir}openstack_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}{ite}openstack_sat_master.log 2>> {result_dir}{ite}openstack_sat_master.err")
     #2.2 run UNSAT
     for i in range(_NWORKER):
         with play_on(pattern_hosts=_WORKER_MDB+str(i), roles=roles, run_as=username) as p:
@@ -135,7 +135,7 @@ def run(roles, ite, result_dir):
         with play_on(pattern_hosts=_WORKER_NOVA+str(i), roles=roles, run_as=username) as p:
             p.shell(f"{minizinc_path()}; python {project_dir}run_worker_nova.py --unsat -worker {_NWORKER} -i {i} -inventory {project_dir}openstack_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}{ite}openstack_unsat_wnova{i}.log 2>> {result_dir}{ite}openstack_unsat_wnova{i}.err", background=True)
     with play_on(pattern_hosts=_MASTER, roles=roles, run_as=username) as p:
-        p.shell(f"{minizinc_path()}; python {project_dir}run_master.py --unsat -worker {_NWORKER} -inventory {project_dir}openstack_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}{ite}openstack_unsat_master.log 2>> {result_dir}{ite}openstack_unsat_master.err", background=True)
+        p.shell(f"{minizinc_path()}; python {project_dir}run_master.py --unsat -worker {_NWORKER} -inventory {project_dir}openstack_inventory.json --time -it {ite} -port {_PORT} >> {result_dir}{ite}openstack_unsat_master.log 2>> {result_dir}{ite}openstack_unsat_master.err")
     #get results
     for i in range(_NWORKER):
         with play_on(pattern_hosts=_WORKER_MDB+str(i), roles=roles, run_as=username) as p:

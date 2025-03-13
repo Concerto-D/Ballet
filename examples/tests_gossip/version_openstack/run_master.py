@@ -111,9 +111,6 @@ for version in versions:
     for wid in range(n):
         connections.append(('mariadbmaster',f'servicev{version}',f'mariadbworker{wid}',f'masterservicev{version}'))
     
-for connect in connections:
-    print(connect)    
-
 ## Active
 active = {
     mariadb_master: 'deployedv1', 
@@ -130,9 +127,6 @@ active = {
 goals = {comp : [PortReconfigurationGoal("service", True, final=True)] for comp in components}
 goals[common_master].append(StateReconfigurationGoal('deployedv2'))
 
-print(f"Run on port {PORT}")
-print(inventory)
-
 node = CostRegularNode(id=node_name,
   admin=devops, components=components, 
   connections=connections,
@@ -141,7 +135,6 @@ node = CostRegularNode(id=node_name,
   port=PORT,
   inventory=inventory)
 
-print("pinged ALL")
 
 # roots
 if sat:

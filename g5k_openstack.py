@@ -16,13 +16,12 @@ def minizinc_path():
     return f"export PATH={minizinc}:$PATH"  
 
 _NWORKER = 1    
-_NEXPE = 1
-_DEFAULT_TIME = "00:15:00"
+_NEXPE = 15
+_DEFAULT_TIME = "04:00:00"
 _DEFAULT_START = "now"
 
 
 _PORT = 40001
-
 
 
 # -------------

@@ -17,7 +17,7 @@ def minizinc_path():
 
 _NWORKER = 1    
 _NEXPE = 15
-_DEFAULT_TIME = "01:00:00"
+_DEFAULT_TIME = "00:40:00"
 _DEFAULT_START = "now"
 
 

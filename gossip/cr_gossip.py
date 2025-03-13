@@ -766,17 +766,19 @@ class CostRegularNode(Node):
             self.send_global_ack(ack)
 
     def send_global_ack(self, ack):
-        def __sec_send_global_ack(ack):
+        def __sec_send_global_ack(ack, count):
+            if count == 0:
+                return
             try:
                 self._p2p_service.send_global_ack(ack)
             except Exception as e:
                 if not self.__root_processed():
-                    __sec_send_global_ack(ack)
+                    __sec_send_global_ack(ack, count - 1)
                 else:
                     # print(f"UNREACHABLE HOST FOR SENDING {ack}")
                     time.sleep(10)
                     raise e
-        __sec_send_global_ack(ack)
+        __sec_send_global_ack(ack, 10)
 
     def sync_global_acks(self):
         acks = self._p2p_service.get_global_acks()

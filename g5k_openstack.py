@@ -105,6 +105,7 @@ def make_inventory(roles):
         p.shell("echo '" + content + "' > " + filename )
 
 def run(roles, ite, result_dir):
+    make_inventory(roles)
     #1 Copy right python file
     script_place = f"{project_dir}examples/tests_gossip/version_openstack/"
     for i in range(_NWORKER):

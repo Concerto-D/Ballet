@@ -17,7 +17,7 @@ def minizinc_path():
 
 _COMPONENT=15    
 _NEXPE = 15
-_DEFAULT_TIME = "08:00:00"
+_DEFAULT_TIME = "02:00:00"
 _DEFAULT_START = "now"
 
 # _SCENARIOS = ["stratified"]

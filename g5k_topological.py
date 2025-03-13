@@ -176,11 +176,11 @@ def run_cuser(roles, ite, result_dir):
         with play_on(pattern_hosts=_CUSER_PROVIDER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}{ite}cuser_sat_provider{i}.log", dest="~")
             p.fetch(src=f"{result_dir}{ite}cuser_unsat_provider{i}.log", dest="~")
-            p.shell(f"rm {project_dir}run_provider.py ")
+            # p.shell(f"rm {project_dir}run_provider.py ")
     with play_on(pattern_hosts=_CUSER_USER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}{ite}cuser_sat_user.log", dest="~")
         p.fetch(src=f"{result_dir}{ite}cuser_unsat_user.log", dest="~")
-        p.shell(f"rm {project_dir}run_user.py ")
+        # p.shell(f"rm {project_dir}run_user.py ")
 
 def run_cprovider(roles, ite, result_dir):
     #1 Copy right python file
@@ -209,11 +209,11 @@ def run_cprovider(roles, ite, result_dir):
         with play_on(pattern_hosts=_CPROVIDER_USER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}{ite}cprovider_sat_user{i}.log", dest="~")
             p.fetch(src=f"{result_dir}{ite}cprovider_unsat_user{i}.log", dest="~")
-            p.shell(f"rm {project_dir}run_user.py ")
+            # p.shell(f"rm {project_dir}run_user.py ")
     with play_on(pattern_hosts=_CPROVIDER_PROVIDER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}{ite}cprovider_sat_provider.log", dest="~")
         p.fetch(src=f"{result_dir}{ite}cprovider_unsat_provider.log", dest="~")
-        p.shell(f"rm {project_dir}run_provider.py ")
+        # p.shell(f"rm {project_dir}run_provider.py ")
 
 def run_linear(roles, ite, result_dir):
     #1 Copy right python file
@@ -242,11 +242,11 @@ def run_linear(roles, ite, result_dir):
         with play_on(pattern_hosts=_LINEAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}{ite}linear_sat_transformer{i}.log", dest="~")
             p.fetch(src=f"{result_dir}{ite}linear_unsat_transformer{i}.log", dest="~")
-            p.shell(f"rm {project_dir}run_transformer.py ")
+            # p.shell(f"rm {project_dir}run_transformer.py ")
     with play_on(pattern_hosts=_LINEAR_PROVIDER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}{ite}linear_sat_provider.log", dest="~")
         p.fetch(src=f"{result_dir}{ite}linear_unsat_provider.log", dest="~")
-        p.shell(f"rm {project_dir}run_provider.py")
+        # p.shell(f"rm {project_dir}run_provider.py")
 
 
 def run_circular(roles, ite, result_dir):
@@ -280,15 +280,15 @@ def run_circular(roles, ite, result_dir):
         with play_on(pattern_hosts=_CIRCULAR_TRANSFORMER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}{ite}circular_sat_transformer{i}.log", dest="~")
             p.fetch(src=f"{result_dir}{ite}circular_unsat_transformer{i}.log", dest="~")
-            p.shell(f"rm {project_dir}run_circular_transformer.py ")
+            # p.shell(f"rm {project_dir}run_circular_transformer.py ")
     with play_on(pattern_hosts=_CIRCULAR_PROVIDER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}{ite}circular_sat_provider.log", dest="~")
         p.fetch(src=f"{result_dir}{ite}circular_unsat_provider.log", dest="~")
-        p.shell(f"rm {project_dir}run_circular_provider.py")
+        # p.shell(f"rm {project_dir}run_circular_provider.py")
     with play_on(pattern_hosts=_CIRCULAR_USER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}{ite}circular_sat_user.log", dest="~")
         p.fetch(src=f"{result_dir}{ite}circular_unsat_user.log", dest="~")
-        p.shell(f"rm {project_dir}run_circular_user.py")
+        # p.shell(f"rm {project_dir}run_circular_user.py")
 
 def run_stratified(roles, ite, result_dir):
     #1 Copy right python file
@@ -321,15 +321,15 @@ def run_stratified(roles, ite, result_dir):
         with play_on(pattern_hosts=_STRATIFIED_MIDUSER+str(i), roles=roles, run_as=username) as p:
             p.fetch(src=f"{result_dir}{ite}stratified_sat_miduser{i}.log", dest="~")
             p.fetch(src=f"{result_dir}{ite}stratified_unsat_miduser{i}.log", dest="~")
-            p.shell(f"rm {project_dir}run_miduser.py ")
+            # p.shell(f"rm {project_dir}run_miduser.py ")
     with play_on(pattern_hosts=_STRATIFIED_PROVIDER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}{ite}stratified_sat_provider.log", dest="~")
         p.fetch(src=f"{result_dir}{ite}stratified_unsat_provider.log", dest="~")
-        p.shell(f"rm {project_dir}run_provider.py")
+        # p.shell(f"rm {project_dir}run_provider.py")
     with play_on(pattern_hosts=_STRATIFIED_USER, roles=roles, run_as=username) as p:
         p.fetch(src=f"{result_dir}{ite}stratified_sat_user.log", dest="~")
         p.fetch(src=f"{result_dir}{ite}stratified_unsat_user.log", dest="~")
-        p.shell(f"rm {project_dir}run_end_user.py")
+        # p.shell(f"rm {project_dir}run_end_user.py")
 
 if __name__ == "__main__":
     timestamp="2"

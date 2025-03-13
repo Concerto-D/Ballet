@@ -78,6 +78,9 @@ for version in versions:
     connections.append((f'mariadbworker{i}', f'servicev{version}', f'novaworker{i}', f'mariadbservicev{version}'))  
     connections.append((f'keystoneworker{i}', f'servicev{version}', f'novaworker{i}', f'keystoneservicev{version}'))  
 
+for connect in connections:
+    print(connect)    
+
 ## Active
 active = {
     nova_worker : 'deployedv1'
@@ -90,6 +93,10 @@ else:
     goals = {comp : [PortReconfigurationGoal("service", True, final=True)] for comp in components}
     goals[nova_worker].append(StateReconfigurationGoal('deployedv3'))
     
+print(f"Run on port {PORT}")
+print(inventory)
+
+
 node = CostRegularNode(id=node_name,
   admin=devops, components=components, 
   connections=connections,
@@ -97,6 +104,8 @@ node = CostRegularNode(id=node_name,
   goals=goals,
   port=PORT,
   inventory=inventory)
+
+print("pinged ALL")
 
 # roots
 if sat:

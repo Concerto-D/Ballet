@@ -117,6 +117,9 @@ for version in versions:
     connections.append((f'keystoneworker{i}',f'servicev{version}', f'neutronworker{i}', f'keystoneservicev{version}'))  
     connections.append((f'keystoneworker{i}',f'servicev{version}', f'glanceworker{i}', f'keystoneservicev{version}'))  
 
+for connect in connections:
+    print(connect)    
+
 ## Active
 active = {
     mariadb_worker : 'deployedv1',
@@ -135,7 +138,11 @@ if sat:
     goals = {comp : [PortReconfigurationGoal("service", enable=True, final=True)] for comp in components}
 else:
     goals = {comp : [PortReconfigurationGoal("service", enable=True, final=True)] for comp in components}
-    
+
+print(f"Run on port {PORT}")
+print(inventory)
+
+
 node = CostRegularNode(id=node_name,
   admin=devops, components=components, 
   connections=connections,
@@ -143,6 +150,8 @@ node = CostRegularNode(id=node_name,
   goals=goals,
   port=PORT,
   inventory=inventory)
+
+print("pinged ALL")
 
 # roots
 if sat:

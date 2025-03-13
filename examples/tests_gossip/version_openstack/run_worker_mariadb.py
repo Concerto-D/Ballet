@@ -138,10 +138,7 @@ active = {
 }
 
 ## Goal
-if sat:
-    goals = {comp : [PortReconfigurationGoal("service", enable=True, final=True)] for comp in components}
-else:
-    goals = {comp : [PortReconfigurationGoal("service", enable=True, final=True)] for comp in components}
+goals = {comp : [PortReconfigurationGoal("service", enable=True, final=True)] for comp in components}
 
 print(f"Run on port {PORT}")
 print(inventory)

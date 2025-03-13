@@ -80,10 +80,10 @@ def make_inventory_content(roles):
         inventory[f'glanceworker{wid}'] =  {'address': worker_mdb_address, 'port_planner': _PORT} 
         # WORKER NEUTRON COMPONENT
         worker_neutron_address = roles[_WORKER_NEUTRON+str(wid)][0].address
-        inventory[f'novaworker{wid}'] = {'address': worker_neutron_address, 'port_planner': _PORT} 
+        inventory[f'neutronworker{wid}'] = {'address': worker_neutron_address, 'port_planner': _PORT} 
         # WORKER NOVA COMPONENT
         worker_nova_address = roles[_WORKER_NOVA+str(wid)][0].address
-        inventory[f'neutronworker{wid}'] = {'address': worker_nova_address, 'port_planner': _PORT} 
+        inventory[f'novaworker{wid}'] = {'address': worker_nova_address, 'port_planner': _PORT} 
     return inventory
 
 def inventory_format_json(data):

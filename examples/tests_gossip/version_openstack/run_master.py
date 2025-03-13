@@ -126,12 +126,9 @@ active = {
 }
 
 ## Goal
-if sat:
-    goals = {comp : [PortReconfigurationGoal("service", True, final=True)] for comp in components}
-    goals[common_master].append(StateReconfigurationGoal('deployedv2'))
-else:
-    goals = {comp : [PortReconfigurationGoal("service", True, final=True)] for comp in components}
-    goals[common_master].append(StateReconfigurationGoal('deployedv2'))
+
+goals = {comp : [PortReconfigurationGoal("service", True, final=True)] for comp in components}
+goals[common_master].append(StateReconfigurationGoal('deployedv2'))
 
 print(f"Run on port {PORT}")
 print(inventory)

@@ -22,15 +22,9 @@ $ venv/bin/python # execute
 $ venv/bin/pip # install package
 ```
 
-As a prerequisite to make Ballet work you will need [concerto](https://github.com/Concerto-D/concerto-decentralized). It is also not published on pypi so not easily installable but can be retrieved thus:
+Installation is standard:
 ```sh
-$ git clone git@github.com:Concerto-D/concerto-decentralized.git /path/to/concerto-d
-$ venv/bin/pip install /path/to/concerto-d
-```
-
-After that, it's the standard procedure:
-```sh
-venv/bin/pip install .
+venv/bin/pip install -r requirements.txt
 ```
 
 Also, for the planning phase, MiniZinc must imperatively be installed. The apt version on Ubuntu 24.04 is not up to date, prefer the edge versino from snap:

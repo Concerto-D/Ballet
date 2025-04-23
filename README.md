@@ -33,10 +33,6 @@ After that, it's the standard procedure:
 venv/bin/pip install .
 ```
 
-# If activate doesn't work
-venv/bin/pip install .
-```
-
 Also, for the planning phase, MiniZinc must imperatively be installed. The apt version on Ubuntu 24.04 is not up to date, prefer the edge versino from snap:
 ```sh
 $ sudo snap install minizinc

@@ -81,7 +81,7 @@ class ConstraintMessage:
                 and self.final == value.final
 
     def __hash__(self):
-        return hash(f"({self.source}->{self.target}:{self.port}^{self._status}~{self.behavior}[{self.final}]||{','.join(self.passed_by)})")
+        return hash(f"({self.source}->{self.target}:{self.port}^{self._status}~{self.behavior}[{self.final}]")
 
 
 class AckMessage (Acknowledgement):

@@ -166,7 +166,6 @@ def gossip (node: Node, roots: list[str],
     nloop = 0
     is_unsat = False
     has_fail_ack = False
-    has_sent_global_ack = False
     num_of_loop = 0
     while not ended_resolution:
         time.sleep(random.uniform(0, 2.0))  
@@ -249,14 +248,12 @@ def gossip (node: Node, roots: list[str],
                         print(f"SEND ACK {ack}")
                 node.send_acks(target, acks)
 
-        if not has_sent_global_ack:
-            global_acks = node.get_global_acks_to_send(roots)  
-            if len(global_acks) != 0:
-                if debug:
-                    for ack in global_acks:
-                        print(f"SEND GLOBAL ACK {ack}")
-                node.send_global_acks(global_acks)
-                has_sent_global_ack = True
+        global_acks = node.get_global_acks_to_send(roots)  
+        if len(global_acks) != 0:
+            if debug:
+                for ack in global_acks:
+                    print(f"SEND GLOBAL ACK {ack}")
+            node.send_global_acks(global_acks)
         all_acked, has_fail_ack = check_global_acks(node, roots)
         if debug:
             print(f"CHECK GLOBAL ACK: all_acked={all_acked} ; has_fail_ack:{has_fail_ack}")

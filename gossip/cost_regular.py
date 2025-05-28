@@ -88,6 +88,9 @@ class StateConstraint(CRConstraint):
     def __hash__(self):
         return hash(str(self.final)+ self.state + self.source + str(self.isGoal()))
 
+    def __str__(self):
+        return f"StateConstraint<source={self.source} state={self.state} final={self.final}>"
+
 class PortConstraint(CRConstraint):
 
     def __init__(self, port, status, source="NO SOURCE IS SPECIFIED", final=False, goal=False):
@@ -129,6 +132,8 @@ class PortConstraint(CRConstraint):
     def __hash__(self):
         return hash(str(self.final)+ self.port + self.status + self.source + str(self.isGoal()))
 
+    def __str__(self):
+        return f"PortConstraint<source={self.source} port={self.port} status={self.status} final={self.final}>"
 
 class MultiPortConstraint(CRConstraint):
 
@@ -171,6 +176,9 @@ class MultiPortConstraint(CRConstraint):
     def __hash__(self):
         return hash(str(self.final)+ '-'.join(self.ports) + self.status + self.source + str(self.isGoal()))
 
+    def __str__(self):
+        return f"MultiPortConstraint<source={self.source} ports={self.ports} status={self.status} final={self.final}>"
+
 
 class TransitionConstraint(CRConstraint):
 
@@ -200,6 +208,8 @@ class TransitionConstraint(CRConstraint):
     def __hash__(self):
         return hash(self.transition + self.source + str(self.isGoal()))
 
+    def __str__(self):
+        return f"TransitionConstraint<source={self.source} transition={self.transition}>"
 
 class CostRegular(Model):
 

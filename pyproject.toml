@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [tool.hatch.metadata]
@@ -15,9 +15,12 @@ include = [
 	"README.md"
 ]
 
+[tool.hatch.version]
+source = "vcs"
+
 [project]
 name = "ballet"
-version = "v0.1"
+dynamic = ["version"]
 dependencies = [
 	"flask == 2.3.3",
 	"grpcio == 1.70.0",

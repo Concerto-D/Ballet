@@ -7,80 +7,80 @@ import sys
 import random
 
 class Acknowledgement(ABC):
-    
+
     def __init__(self):
         pass
-    
+
     def is_failure(self):
         pass
 
 
 class GlobalAcknowledgement(ABC):
-    
+
     def __init__(self):
         pass
-    
+
     def is_failure(self):
         pass
 
 class Node (ABC):
-    
+
     def __init__(self):
         pass
-        
-    @abstractmethod  
+
+    @abstractmethod
     def get_global_acks(self):
         pass
-    
+
     @abstractmethod
     def id(self):
         pass
-    
+
     @abstractmethod
     def new_received_messages(self):
         pass
-    
+
     @abstractmethod
     def send_messages(self, target, messages):
         pass
-    
+
     @abstractmethod
     def send_message(self, target, message):
-        pass 
-    
+        pass
+
     @abstractmethod
     def send_acks(self, target, acks):
         pass
-    
+
     @abstractmethod
     def send_ack(self, target, ack):
-        pass 
-    
+        pass
+
     @abstractmethod
     def is_root(self):
         pass
-    
+
     @abstractmethod
     def get_failing_reasons(self):
         pass
-    
+
 class Model (ABC):
-    
+
     @abstractmethod
     def solve(self):
         pass
-    
+
     @abstractmethod
     def get_constraints(self):
         pass
 
 
 class Message(ABC):
-    
+
     @abstractmethod
     def source(self):
         pass
-    
+
     @abstractmethod
     def target(self):
         pass
@@ -125,11 +125,11 @@ def check_global_acks(node: Node, roots: list[str]):
         if not all_acked and has_fail_ack:
             break
     return all_acked, has_fail_ack
-    
+
 
 def gossip (node: Node, roots: list[str],
-            f_init: Callable[[Node], Model], 
-            f_local: Callable[[Model, Optional[bool]], tuple[list[Message], list[Acknowledgement]]], 
+            f_init: Callable[[Node], Model],
+            f_local: Callable[[Model, Optional[bool]], tuple[list[Message], list[Acknowledgement]]],
             f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
             f_enrich: Callable[[Model, list[Message]], Model],
             f_ack: Callable[[Node, Acknowledgement], dict[Node, Acknowledgement]],
@@ -137,7 +137,7 @@ def gossip (node: Node, roots: list[str],
             debug=False, timed=False, iteration=0):
     """
     Args:
-        node: 
+        node:
             Current node being a part of the assembly
         roots (list[Node]):
             list of nodes from which the diffusion start
@@ -151,7 +151,7 @@ def gossip (node: Node, roots: list[str],
             How to enrich the local model using received message
         f_ack: Node x Acknowledgement -> dict[str, Acknowledgement]
             When a node emits a ack, decides to which it must be sent
-        f_final: Model -> Solution 
+        f_final: Model -> Solution
             When gossip ends, make a final resolution
     """
     start_time = time.time()
@@ -168,20 +168,20 @@ def gossip (node: Node, roots: list[str],
     has_fail_ack = False
     num_of_loop = 0
     while not ended_resolution:
-        time.sleep(random.uniform(0, 2.0))  
+        time.sleep(random.uniform(0, 2.0))
         # Check if all global acks have been sent
         # And if there is a global "failed acked"
         all_acked, has_fail_ack = check_global_acks(node, roots)
         if all_acked:
-            break  
-        nloop = nloop + 1 
+            break
+        nloop = nloop + 1
         if debug:
             print(f"====================================================")
             print(f"At the beginning of the {nloop}th loop:")
             node.print_status()
             print(f"====================================================")
         if not is_unsat:
-            received_messages = node.new_received_messages() 
+            received_messages = node.new_received_messages()
             if debug:
                 for message in received_messages:
                     print(f"RECEIVE MSG {message}")
@@ -197,7 +197,7 @@ def gossip (node: Node, roots: list[str],
                     print(f"During the {nloop}th loop:")
                     node.print_status()
                     print(f"====================================================")
-                must_solve = False 
+                must_solve = False
                 all_acked, has_fail_ack = check_global_acks(node, roots)
                 if all_acked:
                     break
@@ -206,8 +206,8 @@ def gossip (node: Node, roots: list[str],
                 (out_messages, acks_refuse) = f_local(model, debug=debug)
                 if debug:
                     print("END SOLVE")
-                if acks_refuse != []:     
-                    # We face a failure... there is no solution? 
+                if acks_refuse != []:
+                    # We face a failure... there is no solution?
                     # We then have FailureAcks to send back
                     target_acks = f_ack(node, acks_refuse)
                     for (target, acks) in target_acks.items():
@@ -219,7 +219,7 @@ def gossip (node: Node, roots: list[str],
                 elif out_messages != []:
                     all_acked, has_fail_ack = check_global_acks(node, roots)
                     if all_acked:
-                        break   
+                        break
                     # A solution is found, leading to new constraint to diffuse
                     target_messages = f_msg(node, out_messages)
                     for (target, messages) in target_messages.items():
@@ -230,7 +230,7 @@ def gossip (node: Node, roots: list[str],
             # Now that the process is done, does the node must send accept acks ?
             all_acked, has_fail_ack = check_global_acks(node, roots)
             if all_acked:
-                break  
+                break
             target_acks = f_ack(node)
             for (target, acks) in target_acks.items():
                 if debug:
@@ -239,7 +239,7 @@ def gossip (node: Node, roots: list[str],
                 node.send_acks(target, acks)
             # Check global acks to send, and received, and end local solve if needed
         else:
-            received_messages = node.new_received_messages() 
+            received_messages = node.new_received_messages()
             target_acks = f_ack(node)
             # TODO make ack to accept received_messages
             for (target, acks) in target_acks.items():
@@ -248,7 +248,7 @@ def gossip (node: Node, roots: list[str],
                         print(f"SEND ACK {ack}")
                 node.send_acks(target, acks)
 
-        global_acks = node.get_global_acks_to_send(roots)  
+        global_acks = node.get_global_acks_to_send(roots)
         if len(global_acks) != 0:
             if debug:
                 for ack in global_acks:
@@ -257,7 +257,7 @@ def gossip (node: Node, roots: list[str],
         all_acked, has_fail_ack = check_global_acks(node, roots)
         if debug:
             print(f"CHECK GLOBAL ACK: all_acked={all_acked} ; has_fail_ack:{has_fail_ack}")
-            print(node.get_global_acks())
+            print(*node.get_global_acks())
         ended_resolution = all_acked
         if debug:
             print(f"====================================================")
@@ -265,8 +265,8 @@ def gossip (node: Node, roots: list[str],
             node.print_status()
             print(f"ENDED RESOLUTION : {ended_resolution}")
             print(f"====================================================")
-            time.sleep(3)  
-        num_of_loop += 1  
+            time.sleep(3)
+        num_of_loop += 1
     if debug:
         print(f"====================================================")
         print(f"At the end :")
@@ -279,7 +279,7 @@ def gossip (node: Node, roots: list[str],
         else:
             print("The reconfiguration is unsat considering the current submitted goals.")
             print(node.get_local_conflict())
-        result = None 
+        result = None
     else:
         result = f_final(model)
     # node.global_synchro()

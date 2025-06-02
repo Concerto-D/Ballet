@@ -892,6 +892,12 @@ def make_messages(sequence, port_name, port_status, passed_by, component: Compon
                 behavior = refined_port_status[i+1][0]
                 message = ConstraintMessage(component.get_name(), None, port_name, "disabled", behavior, curr_passed_by)
                 result.add(message)
+        for i in range(len(refined_port_status)-1):
+            if refined_port_status[i][1] == "disabled" and refined_port_status[i][1] == "disabled":
+                # it is active at least once
+                behavior = refined_port_status[i+1][0]
+                message = ConstraintMessage(component.get_name(), None, port_name, "enabled", behavior, curr_passed_by)
+                result.add(message)
     elif port_type == DepType.USE:
         if port_status[-1] == "enabled":
             # at the end, the related provide ports must be activated
@@ -902,6 +908,12 @@ def make_messages(sequence, port_name, port_status, passed_by, component: Compon
                 # at a moment, the use port is activate by a behavior. It is activate then
                 behavior = refined_port_status[i+1][0]
                 message = ConstraintMessage(component.get_name(), None, port_name, "enabled", behavior, curr_passed_by)
+                result.add(message)
+        for i in range(len(refined_port_status)-1):
+            if refined_port_status[i][1] == "enabled" and refined_port_status[i][1] == "disabled":
+                # it is active at least once
+                behavior = refined_port_status[i+1][0]
+                message = ConstraintMessage(component.get_name(), None, port_name, "disabled", behavior, curr_passed_by)
                 result.add(message)
     return result
 

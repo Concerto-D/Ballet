@@ -1118,11 +1118,15 @@ def cr_final_timed(cr_model: MultiCostRegular, write_file=False, iteration=0):
     def __format_push(compname, inst: str):
         return PushB(compname, inst)
     cr_model.solve_timed(write_file=write_file, step="ffinal", iteration=iteration)
-    plans = map(lambda comp_name:
-        Plan(comp_name,
-             list(map(lambda inst: __format_wait(inst) if inst[0:4] == "wait" else __format_push(comp_name, inst),
-                      cr_model.get_sequence(comp_name)))
-             ), cr_model.get_components())
+    plans = [
+        Plan(comp_name, [
+             __format_wait(inst) if inst[0:4] == "wait" else __format_push(comp_name, inst)
+             for inst
+             in cr_model.get_sequence(comp_name)
+        ])
+        for comp_name
+        in cr_model.get_components()
+    ]
     return merge_plans(list(plans))
 
 def cr_final(cr_model: MultiCostRegular, write_file=False):
@@ -1132,12 +1136,16 @@ def cr_final(cr_model: MultiCostRegular, write_file=False):
     def __format_push(compname, inst: str):
         return PushB(compname, inst)
     cr_model.solve(write_file=write_file)
-    plans = map(lambda comp_name:
-        Plan(comp_name,
-             list(map(lambda inst: __format_wait(inst) if inst[0:4] == "wait" else __format_push(comp_name, inst),
-                      cr_model.get_sequence(comp_name)))
-             ), cr_model.get_components())
-    return merge_plans(list(plans))
+    plans = [
+        Plan(comp_name, [
+            __format_wait(inst) if inst[0:4] == "wait" else __format_push(comp_name, inst)
+            for inst
+            in cr_model.get_sequence(comp_name)
+        ])
+        for comp_name
+        in cr_model.get_components()
+    ]
+    return merge_plans(plans)
 
 
 def cr_ack_with_ack(node: CostRegularNode, ack:Acknowledgement):

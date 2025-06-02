@@ -1123,43 +1123,61 @@ class Component(object, metaclass=ABCMeta):
         return accessible_places
 
 def make_custom_component(name: str, places: [str], transitions: dict[str, tuple], dependencies: dict[str, tuple]):
-	"""
-		Build a custom component class with the given attributes.
+    """
+        Build a custom component class with the given attributes.
 
-		places is the list of places in the component
+        places is the list of places in the component
 
-		transitions is a dict where the key is the name of the transition and the value is a tuple with the following fields:
-		- starting place
-		- ending place
-		- behaviour name
-		- cost
+        transitions is a dict where the key is the name of the transition and the value is a tuple with the following fields:
+        - starting place
+        - ending place
+        - behaviour name
+        - cost
+        - shell code for the actual function
+        - the name of the fog area
 
-		dependencies is a dict where the key is the name of the transition and the value is a tuple with the following fields:
-		- DepType.USE or DepType.PROVIDE
-		- the list of places that use/provide this port
+        dependencies is a dict where the key is the name of the transition and the value is a tuple with the following fields:
+        - DepType.USE or DepType.PROVIDE
+        - the list of places that use/provide this port
 
-	"""
-	ptr = transitions
-	class CustomComponent(Component):
-		def __init__(self):
-			super().__init__()
+    """
+    class CustomComponent(Component):
+        def __init__(self):
+            super().__init__()
 
-		def create(self):
-			self.name = name
-			setattr(self, "places", places)
+        def create(self):
+            self.name = name
 
-			def make_transition_func(name: str):
-				def transition_func(self):
-					pass
-				setattr(self, name, transition_func)
+            setattr(self, "places", places)
 
-			transitions_with_func = {
-				name: (tr[0], tr[1], tr[2], tr[3], make_transition_func(name)) if len(tr) == 4 else tr
-				for name, tr in ptr.items()
-			}
-			transitions = transitions_with_func
-			setattr(self, "transitions", transitions)
+            ptr = transitions
+            def make_transition_func(tr_name: str, code: str, fog_area: str):
+                import tempfile
+                script = tempfile.NamedTemporaryFile(delete_on_close=False)
+                with open(script.name, 'w') as f:
+                    f.write(code)
 
-			setattr(self, "dependencies", dependencies)
+                def transition_func():
+                    import subprocess, os, shutil, logging
+                    env = os.environ
+                    env["NAME"] = name
+                    env["FOG_AREA"] = fog_area
+                    r = subprocess.run([shutil.which("sh"), script.name], env=env, capture_output=True, text=True)
 
-	return CustomComponent
+                    status = 'OK' if r.returncode == 0 else 'KO'
+                    print(f"{status} {name}/{tr_name}")
+                    if r.stdout.strip() != '': print(r.stdout)
+                    if r.stderr.strip() != '': print(r.stderr)
+
+                setattr(self, tr_name, transition_func)
+                return transition_func
+
+            transitions_with_func = {
+                tr_name: (tr[0], tr[1], tr[2], tr[3], make_transition_func(tr_name, tr[4], tr[5]))
+                for tr_name, tr in ptr.items()
+            }
+            setattr(self, "transitions", transitions_with_func)
+
+            setattr(self, "dependencies", dependencies)
+
+    return CustomComponent

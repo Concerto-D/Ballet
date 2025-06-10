@@ -282,6 +282,8 @@ def gossip (node: Node, roots: list[str],
         result = None
     else:
         result = f_final(model)
+    print("finished, waiting for all nodes to send acks")
+    time.sleep(5)
     # node.global_synchro()
 
     end_time = time.time()  # Record end time

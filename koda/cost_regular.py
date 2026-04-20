@@ -264,7 +264,6 @@ class CostRegular(Model):
         CostRegular.__assert_conform_constraints(states, transitions, ports, constraints)
         if not (init_state in states):
             raise AssertionError(f"Initial state {init_state} is not a valid state ({list(states)}). Hint for the error component:\n{ports}")
-        
         self.__states = states
         self.__transitions = transitions
         added_skip = False
@@ -285,7 +284,17 @@ class CostRegular(Model):
         n_wait = count(lambda b: b.startswith("wait"), transitions)
         n_bhv = len(transitions) - n_wait
         self.__seq_length = len(self.__states)*n_bhv
-        
+    
+    def get_conf_names(self) -> list[str]:
+        res: set[str] = []
+        for constraint in self.constraints:
+            if constraint.isBinConstraint():
+                res.append(constraint.left)
+                res.append(constraint.right)
+            elif constraint.isValueConstraint():
+                res.append(constraint.name)
+        return list(res)
+
     def __assert_conform_automata(states: list[str], transitions: list[str], automata: dict[str,dict[str,str]]):
         for source in automata.keys():
             assert source in states # assert source is declared
@@ -1026,7 +1035,6 @@ class MultiCostRegular(Model):
         return self._solutions
 
 
-
     def get_constraints(self):
         constraints = {}
         for cmp in self.get_components():
@@ -1056,6 +1064,15 @@ class MultiCostRegular(Model):
             return self._solutions[component].get("sequence")[:self.__first_skip[component]]
         except:
             return []
+        
+    def get_conf_values(self, component):
+        try:
+            res = {}
+            for confname in self.get_model[component].get_conf_names():
+                res[confname] = self._solutions[component].get(confname)
+            return res
+        except:
+            return {}
     
     def get_states(self, component):
         return self._solutions[component].get("states")[:self.__first_skip[component]+1]

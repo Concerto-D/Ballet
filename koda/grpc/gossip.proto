@@ -35,10 +35,33 @@ message GlobalAckFailure {
     string component_source = 1;
 }
 
+message ConfigValue {
+    string component_source = 1;
+    string component_target = 2;
+    string confname = 3;
+    int32 confvalue = 4;
+}
+
+message ConfSuccess {
+    string component_source = 1;
+    string component_target = 2;
+    string confname = 3;
+}
+
+message ConfFailure {
+    string component_source = 1;
+    string component_target = 2;
+    string confname = 3;
+    string cause = 4;
+}
+
 service CostRegularGossipService {
     rpc add_message(SyncSpec) returns (Empty) {}
+    rpc add_config(ConfigValue) returns (Empty) {}
     rpc add_ack_success(AckSuccess) returns (Empty) {} 
     rpc add_ack_failure(AckFailure) returns (Empty) {}
+    rpc add_conf_success(ConfSuccess) returns (Empty) {}
+    rpc add_conf_failure(ConfFailure) returns (Empty) {}
     rpc add_global_ack_success(GlobalAckSuccess) returns (Empty) {}
     rpc add_global_ack_failure(GlobalAckFailure) returns (Empty) {}
     rpc ping (Empty) returns (Empty);

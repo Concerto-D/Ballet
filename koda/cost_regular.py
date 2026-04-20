@@ -44,6 +44,12 @@ class CRConstraint:
     def isStateConstraint(self):
         return False
     
+    def isValueConstraint(self):
+        return False
+    
+    def isBinConstraint(self):
+        return False
+    
     def isTransitionConstraint(self):
         return False
     
@@ -52,6 +58,52 @@ class CRConstraint:
         
     def isMultiPortConstraint(self):
         return False
+
+class BinConstraint (CRConstraint):
+
+    def __init__(self, left, right, ope, transition=None):
+        assert(ope in ["=", "<", "<=", ">", ">=", "!="])
+        self.__left = left
+        self.__right = right
+        self.__ope = ope
+        self.__assoc_transition = transition
+
+    @property
+    def left(self):
+        return self.__left
+
+    @property
+    def right(self):
+        return self.__right
+
+    @property
+    def comparator(self):
+        return self.__ope
+
+    @property
+    def transition(self):
+        return self.__assoc_transition
+    
+    def isBinConstraint(self):
+        return True
+
+
+class ValueConstraint (CRConstraint):
+
+    def __init__(self, name, value):
+        self.__name = name 
+        self.__val = value
+
+    @property
+    def name(self):
+        return self.__name
+    
+    @property
+    def value(self):
+        return self.__val
+    
+    def isValueConstraint(self):
+        return True
 
 
 class StateConstraint(CRConstraint):
@@ -552,13 +604,12 @@ class CostRegular(Model):
     def __make_choco_multiport_constraint_line(self, constraint: PortConstraint):
         suffix = "// goal" if constraint.isGoal() else "// inferred"
         res = []
-        # TODO 
-        # if constraint.final:
-        #     res.append(f"\t\tmodel.arithm({constraint.port}_status[seq_length], \"=\", {constraint.status}).post(); {suffix}")
-        # res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
-        # res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
-        # res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
-        # res.append("\n")
+        if constraint.final:
+            res.append(f"\t\tmodel.arithm({constraint.port}_status[seq_length], \"=\", {constraint.status}).post(); {suffix}")
+        res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
+        res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
+        res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
+        res.append("\n")
         return res
     
     def __make_choco_transition_constraint_line(self, constraint: TransitionConstraint):
@@ -588,7 +639,36 @@ class CostRegular(Model):
             return self.__make_mzn_transition_constraint_line(constraint)
         if constraint.isMultiPortConstraint():
             return self.__make_mzn_multiport_constraint_line(constraint)
-    
+
+    def __make_mzn_values_constraints_lines(self, constraints):
+        mzn_lines = []
+        var_names = set()
+        # First, collect all var names (we support only int for this POC)
+        # Then we declare all of them
+        for c in constraints:
+            if c.isValueConstraint():
+                var_names.add(c.name)
+            elif c.isBinConstraint():
+                var_names.add(c.left)
+                var_names.add(c.right)
+        for var in var_names:
+            mzn_lines.append(f"var int: {var};")
+
+        for c in constraints:
+            if c.isValueConstraint():
+                mzn_lines.append(f"constraint {c.name} == {c.value};")
+            elif c.isBinConstraint():
+                if c.transition is not None:
+                    # If a transition is associated, constraint applies when the transition is adopted
+                    # We iterate over the sequence length and imply the constraint if states[i] and sequence[i] matches
+                    mzn_lines.append(
+                        f"constraint forall(i in 1..seq_length) ("
+                        f"(states[i] == {c.transition[0]} /\\ sequence[i] == {c.transition[1]}) -> ({c.left} {c.comparator} {c.right})"
+                        f");"
+                    )
+        return mzn_lines
+
+
     def __make_mzn_global_constraint_line(self, constraint):
         if constraint.isPortConstraint():
             return self.__make_mzn_port_global_constraint_line(constraint)
@@ -612,6 +692,8 @@ class CostRegular(Model):
     def __make_mzn_goal_constraints(self):
         set_of_constraints = set(self.__constraints)
         lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), set_of_constraints)
+        val_and_bin_constraints = filter(lambda c: c.isValueConstraint() or c.isBinConstraint(), set_of_constraints)
+        lines = lines + self.__make_mzn_values_constraints_lines(val_and_bin_constraints)
         return '\n'.join(lines)
     
     def __make_mzn_goal_global_constraints(self):
@@ -623,7 +705,7 @@ class CostRegular(Model):
         lines = flatmap(lambda constraint: self.__make_choco_constraint_line(constraint), self.__constraints)
         return '\n'.join(lines)
     
-    def make_json_model(self, print_model=True, write_file=True, filepath="model.json"):
+    def make_json_model(self, print_model=True, write_file=True, filepath="model_component.json"):
         bool2int = lambda b: 1 if b else 0
         # State constraints format
         state_constraints = filter(lambda c: c.isStateConstraint() , self.constraints)
@@ -637,7 +719,19 @@ class CostRegular(Model):
         # Transition constraints format
         transition_constraints = filter(lambda c: c.isTransitionConstraint() , self.constraints)
         json_transition_constraints = list(map(lambda constraint: {"transition": constraint.transition, "goal": bool2int(constraint.isGoal()), "source": constraint.source}, transition_constraints))  
-        
+        # Value constraints format
+        value_constraints = filter(lambda c: c.isValueConstraint() , self.constraints)
+        json_value_constraints = list(map(lambda constraint: {"name": constraint.name, "value": constraint.value} ,value_constraints))
+        # Bin constraints format
+        def __make_json_bin_constraint(constraint):
+            res = {"left": constraint.left, "right": constraint.right, "comparator": constraint.comparator} 
+            if constraint.transition != None:
+                res["transition_source"] = constraint.transition[0]
+                res["transition_behavior"] = constraint.transition[1]
+            return res
+        bin_constraints = filter(lambda c: c.isBinConstraint() , self.constraints)
+        json_bin_constraints = list(map(
+            lambda constraint: __make_json_bin_constraint(constraint), bin_constraints))
         content = {
             "states": self.states,
             "transitions": self.transitions,
@@ -650,7 +744,9 @@ class CostRegular(Model):
                     "state_constraint": json_state_constraints,
                     "port_constraint": json_port_constraints,
                     "multiport_constraint": json_multiport_constraints,
-                    "transition_constraint": json_transition_constraints
+                    "transition_constraint": json_transition_constraints,
+                    "value_constraint": json_value_constraints,
+                    "bin_constraint": json_bin_constraints
                 }
         }
         json_content = json.dumps(content)
@@ -662,6 +758,7 @@ class CostRegular(Model):
 
     
     def __make_choco_model(self, classname="TestModel"):
+        # TODO safe remove
         int_states = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.states)))
         int_behaviors = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.transitions)))
         content = f"""
@@ -744,9 +841,6 @@ public class {classname} {{
         }}
     }}
 }}
-
-
-
 
 """
         return content
@@ -834,9 +928,12 @@ minimize scost;
             r = result.solution
             return CRSolution(r, sat=True)
         
-    def solve_choco(self,findmus=False, write_file=False, filename="mode.json", print_model=False):
+    def solve_choco(self,findmus=False, write_file=False, filename="model_component.json", print_model=False):
+        #TODO modify planner-mus.jar to support new type of constraints. Also, catch result better, to get result if sat or not.
+        # If sat : we get a solution (behaviors, states, and statuses of ports)
+        # If unsat : we get set of MUS
+        # TODO remove disjunction, we manage models mus or not.
         if findmus:
-            # TODO Change model.json into model_component.json
             self.make_json_model(print_model=False, write_file=True, filepath=filename)
             try:
                 cmd = f"java -jar ballet-planner-mus-1.0-SNAPSHOT-shaded.jar {filename}"
@@ -874,22 +971,7 @@ class MultiCostRegular(Model):
         self._solutions = {k: None for k in models.keys()}
         self._port_status = {k: None for k in models.keys()}
         self.__first_skip = {k: -1 for k in models.keys()}
-        
-    # def solve(self, mode="minizinc", print_model=False, write_file=True):
-    #     for (key, model) in self._models.items():
-    #         try:
-    #             print("start solve", key)
-    #             real_mode = "minizinc" if mode == "minizinc-test" else mode
-    #             solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
-    #             if mode != "minizinc-global" and mode != "minizinc-test":
-    #                 self._solutions[key] = solution
-    #                 self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
-    #                 skip_value = solution.get("sequence")[-1]
-    #                 self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
-    #         except FindMUSException:
-    #             print(f"{key} 's model is unsat. Qx running", flush=True)
-    #             self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
-    #     return self._solutions
+
 
     def solve(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
         def process_model(key, model):
@@ -904,37 +986,12 @@ class MultiCostRegular(Model):
                     self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
             except FindMUSException:
                 print(f"{key} 's model is unsat. Qx running", flush=True)
-                self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
-            
+                self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)            
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = {executor.submit(process_model, key, model): key for key, model in self._models.items()}
             for future in concurrent.futures.as_completed(futures):
                 future.result()  # Wait for all threads to complete
-
         return self._solutions
-
-
-
-    # def solve_timed(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
-    #     for (key, model) in self._models.items():
-    #         try:
-    #             real_mode = "minizinc" if mode == "minizinc-test" else mode
-    #             start_time = time.time()
-    #             solution = model.solve(real_mode, file_name=f"{key}.mzn",print_model=print_model, write_file=write_file)
-    #             if mode != "minizinc-global" and mode != "minizinc-test":
-    #                 self._solutions[key] = solution
-    #                 self._port_status[key] = {port_name : solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
-    #                 skip_value = solution.get("sequence")[-1]
-    #                 self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
-    #                 end_time = time.time()
-    #                 rstep = step
-    #         except FindMUSException:
-    #             self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
-    #             end_time = time.time()
-    #             rstep = "funsat"
-    #         cmp_time = end_time - start_time
-    #         print(f"{key}|{rstep}|{iteration}|{cmp_time}", flush=True)
-    #     return self._solutions
 
 
     def solve_timed(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):

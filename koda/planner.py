@@ -1,8 +1,8 @@
 from typing import Any
 from ballet.assembly.concertod.component import Component
 from ballet.assembly.plan.plan import Instruction
-from balletplus.gossip import gossip
-from balletplus.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
+from koda.gossip import gossip
+from koda.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
 from ballet.planner.goal import *
 
 def plan(node_name: str, devops: str, components: list[Component], connections: list[(str, str, str, str)], active: dict[Component, str], goals: dict[Component, list[ReconfigurationGoal]], port: int, inventory: dict[str, dict[str, Any]], roots: list[str]) -> list[Instruction] : 

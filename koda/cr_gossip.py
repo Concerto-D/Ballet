@@ -500,15 +500,49 @@ class CRP2P:
         self._server._wait_for_all()
     
 
+class PortConfigConstraint:
+
+    def __init__(self, component_name, port_name, left, right, comparator):
+        assert(comparator in ["=", "<", "<=", ">", ">=", "!="])
+        self.__comp_name = component_name
+        self.__port_name = port_name
+        self.__left = left
+        self.__right = right
+        self.__comparator = comparator
+
+    @property
+    def component_name(self):
+        return self.__comp_name
+    
+    @property
+    def port_name(self):
+        return self.__port_name
+
+    @property
+    def left(self):
+        return self.__left
+
+    @property
+    def right(self):
+        return self.__right
+
+    @property
+    def comparator(self):
+        return self.__comparator
+
+
+
 class CostRegularNode(Node):
     
-    def __init__(self, id: str, admin: str, connections: list[(str, str, str, str)], components: list[Component], active: dict[Component, str], goals: dict[Component, list[Goal]], port, inventory):
+    def __init__(self, id: str, admin: str, connections: list[(str, str, str, str)], components: list[Component], active: dict[Component, str], goals: dict[Component, list[Goal]], port, inventory, config_values: dict[str, int] = {}, port_config_constraints: list[PortConfigConstraint] = []):
         self._id = id
         self._components = components
         self.__dict_components = {component.get_name(): component for component in components}
         self._active = active
         self._goals = goals
         self._connections = connections
+        self._config_values = config_values
+        self._port_constraints = port_config_constraints
         for comp in components:
             if comp not in goals:
                 goals[comp] = []
@@ -526,7 +560,13 @@ class CostRegularNode(Node):
         self.__origin_constraint_of_message = {} # For a message, what constraint led to it (reverse of __consequence_of_constraint)
         self.__local_conflicting_reasons = ""
         self.__roots = []
-        
+
+    def get_config_values(self) -> dict[str, int]:
+        return self._config_values
+
+    def get_config_constraint(self) -> list[PortConfigConstraint]:
+        return self._port_constraints
+
     def __is_processed(self, list_of_global_acks, root):
         for ack in list_of_global_acks:
             if ack.source == root:
@@ -903,16 +943,32 @@ def make_messages(sequence, port_name, port_status, passed_by, component: Compon
                 result.add(message)          
     return result
   
+def contraint_from_port_constraint(cr_node : CostRegularNode, states: list[str], beahviors: list[str], matrix: dict[str, dict[str, str]]):
+    # TODO @ Neplex
+    # Here : forall port, we must find all states related (check on states, beahviors, matrix)
+    # Once found, identify the incoming transitions  
+    # For each of these transitions, make a new BinConstraint (see cost_regular.py) accordingly
+    constraints_on_ports: list[PortConfigConstraint] = cr_node.get_config_constraint()
+    pass
+
+def contraint_from_config_values(cr_node : CostRegularNode):
+    # TODO @ Neplex
+    # Here : forall config values, we must init ValueConstraint (see cost_regular.py)
+    config_values: dict[str, int]= cr_node.get_config_values()
+    pass
+
 def cr_init(cr_node : CostRegularNode): 
     models = {}
     for component in cr_node.components:
         states, beahviors, matrix, costs = matrix_from_concerto_component(component)
+        bin_constraint = contraint_from_port_constraint(cr_node, states, beahviors, matrix) 
+        val_constraint = contraint_from_config_values(cr_node, states, beahviors, matrix) 
         init_state = cr_node.active[component]
         tmp_ports = reverse_dict(component.get_bindings())
         ports = {port_name : list(filter(lambda pl: pl in states, places)) for (port_name, places) in tmp_ports.items()}
         constraints = set(
             map(lambda goal: CostRegular.constraint_from_goal(goal, cause=f"goal({cr_node.id}_9_{cr_node.admin})", active=init_state, component=component), 
-                cr_node.goals[component]))
+                cr_node.goals[component])).union(bin_constraint).union(val_constraint)
         models[component.name] = CostRegular(states, beahviors, matrix, costs, init_state, ports, constraints)
     return MultiCostRegular(models, cr_node)
 

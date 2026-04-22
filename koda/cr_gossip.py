@@ -1298,8 +1298,6 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
             value_constraint = ValueConstraint(message.confname, message.confvalue)
             node.add_origin_of_constraint(value_constraint, message)
             model.add_constraint(message.target, value_constraint)
-            # TODO Koda enrich with set local values, link cause etc
-            pass 
     node.set_lastest_constraints(list(new_constraints))
     return model
 

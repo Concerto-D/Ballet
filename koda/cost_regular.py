@@ -1,7 +1,7 @@
 from minizinc import Instance, Model as mznModel, Solver, Status
 from ballet.utils.list_utils import flatmap, indexify, indexOf, count
 from ballet.utils import string_utils
-from gossip.gossip import Model, Solution
+from koda.gossip import Model, Solution
 from ballet.planner.goal import *
 from ballet.assembly.concertod.component import Component
 import subprocess, json
@@ -62,7 +62,7 @@ class CRConstraint:
 class BinConstraint (CRConstraint):
 
     def __init__(self, left, right, ope, transition=None):
-        assert(ope in ["=", "<", "<=", ">", ">=", "!="])
+        assert(ope in ["==", "<", "<=", ">", ">=", "!="])
         self.__left = left
         self.__right = right
         self.__ope = ope
@@ -700,14 +700,22 @@ class CostRegular(Model):
     
     def __make_mzn_goal_constraints(self):
         set_of_constraints = set(self.__constraints)
-        lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), set_of_constraints)
-        val_and_bin_constraints = filter(lambda c: c.isValueConstraint() or c.isBinConstraint(), set_of_constraints)
+        state_and_transition_constraints = filter(lambda c: c.isStateConstraint() or c.isTransitionConstraint(), set_of_constraints)
+        lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), state_and_transition_constraints)
+        val_and_bin_constraints = set(filter(lambda c: c.isValueConstraint() or c.isBinConstraint(), set_of_constraints))
         lines = lines + self.__make_mzn_values_constraints_lines(val_and_bin_constraints)
+        self.make_json_model(print_model=True)
+        # TODO remove above line
         return '\n'.join(lines)
     
     def __make_mzn_goal_global_constraints(self):
         set_of_constraints = set(self.__constraints)
-        lines = flatmap(lambda constraint: self.__make_mzn_global_constraint_line(constraint), set_of_constraints)
+        state_and_transition_constraints = filter(lambda c: c.isStateConstraint() or c.isTransitionConstraint(), set_of_constraints)
+        lines = flatmap(lambda constraint: self.__make_mzn_global_constraint_line(constraint), state_and_transition_constraints)
+        val_and_bin_constraints = set(filter(lambda c: c.isValueConstraint() or c.isBinConstraint(), set_of_constraints))
+        lines = lines + self.__make_mzn_values_constraints_lines(val_and_bin_constraints)
+        self.make_json_model(print_model=True)
+        # TODO remove above line
         return '\n'.join(lines)
     
     def __make_choco_goal_constraints(self):

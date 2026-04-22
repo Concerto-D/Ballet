@@ -50,7 +50,7 @@ class ConstraintMessage (ABC):
 class ConstraintValueMessage(ConstraintMessage):
 
     def __init__(self, source, target, confname:str, confvalue:int):
-        super(source, target)
+        super().__init__(source, target)
         self._confname = confname
         self._confvalue = confvalue
 
@@ -81,7 +81,7 @@ class ConstraintValueMessage(ConstraintMessage):
 class ConstraintPortMessage(ConstraintMessage):
     
     def __init__(self, source, target, port, status, behavior, passed_by, final=False):
-        super(source, target)
+        super().__init__(source, target)
         self._port = port
         self._status = status
         if behavior == "" or  behavior == "None":
@@ -585,7 +585,7 @@ class CRP2P:
 class PortConfigConstraint:
 
     def __init__(self, component_name, port_name, left, right, comparator):
-        assert(comparator in ["=", "<", "<=", ">", ">=", "!="])
+        assert(comparator in ["==", "<", "<=", ">", ">=", "!="])
         self.__comp_name = component_name
         self.__port_name = port_name
         self.__left = left
@@ -643,8 +643,11 @@ class CostRegularNode(Node):
         self.__local_conflicting_reasons = ""
         self.__roots = []
 
-    def get_config_values(self) -> dict[str, int]:
+    def get_config_values(self) -> dict[str, dict[str, int]]:
         return self._config_values
+
+    def get_config_values(self, component_name) -> dict[str, dict[str, int]]:
+        return self._config_values[component_name]
 
     def get_config_constraint(self) -> list[PortConfigConstraint]:
         return self._port_constraints
@@ -1055,7 +1058,7 @@ def contraint_from_port_constraint(
                     bind_behaviors.add(element)
 
         constraints |= {
-            BinConstraint(pc.left, pc.right, pc.comparator, transition=transition)
+            BinConstraint(pc.left, pc.right, pc.comparator, transition=(src, transition))
             for src in matrix
             for transition in matrix[src]
             if matrix[src][transition] in bind_states
@@ -1066,9 +1069,9 @@ def contraint_from_port_constraint(
 
     return constraints
 
-def contraint_from_config_values(cr_node : CostRegularNode) -> set[ValueConstraint]:
+def contraint_from_config_values(cr_node : CostRegularNode, component_name:str) -> set[ValueConstraint]:
     # Here : forall config values, we must init ValueConstraint (see cost_regular.py)
-    config_values: dict[str, int]= cr_node.get_config_values()
+    config_values: dict[str, int] = cr_node.get_config_values(component_name)
     return {
         ValueConstraint(name, value)
         for name, value in config_values.items()
@@ -1080,7 +1083,7 @@ def cr_init(cr_node : CostRegularNode):
     for component in cr_node.components:
         states, beahviors, matrix, costs = matrix_from_concerto_component(component)
         bin_constraint = contraint_from_port_constraint(cr_node, states, beahviors, matrix)
-        val_constraint = contraint_from_config_values(cr_node)
+        val_constraint = contraint_from_config_values(cr_node,component.get_name())
         init_state = cr_node.active[component]
         tmp_ports = reverse_dict(component.get_bindings())
         ports = {port_name : list(filter(lambda pl: pl in states, places)) for (port_name, places) in tmp_ports.items()}

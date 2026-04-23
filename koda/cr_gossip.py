@@ -647,6 +647,11 @@ class CostRegularNode(Node):
         self.__out_message = {comp_name: {} for comp_name in self.__dict_components.keys()} # pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
         self.__in_message = {comp_name: {} for comp_name in self.__dict_components.keys()}  # pour chaque message recu, a-t-il deja validé via un ack?
         self._p2p_service = CRP2P(port, inventory)
+        self._variables = {
+            variable: node_name
+            for node_name in inventory
+            for variable in inventory[node_name].get('variables', [])
+        }
         # Track constraint-messages
         self.__latest_constraints = []
         self.__origin_of_constraint = {} # For a constraint, establish what message made it
@@ -975,6 +980,14 @@ class CostRegularNode(Node):
 
     def components_from_str(self, key):
         return self.__dict_components[key]
+
+    def get_variable_source(self, var: Var) -> str | None:
+        """
+        Get the component that own the variable
+
+        :param var: The variable to check
+        """
+        return self._variables.get(var)
 
     @property
     def active(self):

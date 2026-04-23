@@ -12,7 +12,10 @@ class Acknowledgement(ABC):
         pass
     
     def is_failure(self):
-        pass
+        return False
+
+    def is_success(self):
+        return False
 
 
 class GlobalAcknowledgement(ABC):

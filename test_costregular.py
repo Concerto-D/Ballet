@@ -1,6 +1,7 @@
 import warnings
 
 from ballet.assembly.concertod.components.basics.provider import Provider
+from ballet.planner.goal import StateReconfigurationGoal
 from koda.cost_regular import BinComparator, Var
 from koda.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, \
     PortConfigConstraint
@@ -19,8 +20,10 @@ provider = Provider()
 provider.set_name("provider")
 
 connections = []
-active = {provider: 'running'}
-goals = {}
+active = {provider: 'uninstalled'}
+goals = {
+    provider: [StateReconfigurationGoal('running')]
+}
 inventory = {
     'provider': {
         'address': 'localhost',

@@ -106,17 +106,17 @@ class BinConstraint (CRConstraint):
 
 class ValueConstraint (CRConstraint):
 
-    def __init__(self, name, value):
+    def __init__(self, name: Var, value: int):
         super().__init__()
         self.__name = name 
         self.__val = value
 
     @property
-    def name(self):
+    def name(self) -> Var:
         return self.__name
     
     @property
-    def value(self):
+    def value(self) -> int:
         return self.__val
     
     def isValueConstraint(self):
@@ -302,15 +302,15 @@ class CostRegular(Model):
         n_bhv = len(transitions) - n_wait
         self.__seq_length = len(self.__states)*n_bhv
     
-    def get_conf_names(self) -> list[str]:
-        res: set[str] = []
+    def get_conf_names(self) -> set[Var]:
+        res: set[Var] = set()
         for constraint in self.constraints:
             if constraint.isBinConstraint():
-                res.append(constraint.left)
-                res.append(constraint.right)
+                res.add(constraint.left)
+                res.add(constraint.right)
             elif constraint.isValueConstraint():
-                res.append(constraint.name)
-        return list(res)
+                res.add(constraint.name)
+        return res
 
     def __assert_conform_automata(states: list[str], transitions: list[str], automata: dict[str,dict[str,str]]):
         for source in automata.keys():
@@ -1093,8 +1093,8 @@ class MultiCostRegular(Model):
     def get_conf_values(self, component):
         try:
             res = {}
-            for confname in self.get_model[component].get_conf_names():
-                res[confname] = self._solutions[component].get(confname)
+            for conf_name in self.get_model(component).get_conf_names():
+                res[conf_name] = self._solutions[component].get(conf_name)
             return res
         except:
             return {}

@@ -1,6 +1,7 @@
 import threading
 import time
 from abc import ABC
+from collections import defaultdict
 from concurrent import futures
 from typing import Optional
 
@@ -47,7 +48,7 @@ class ConstraintMessage (ABC):
 
 class ConstraintValueMessage(ConstraintMessage):
 
-    def __init__(self, source, target, confname:str, confvalue:int):
+    def __init__(self, source, target, confname: str, confvalue: int):
         super().__init__(source, target)
         self._confname = confname
         self._confvalue = confvalue
@@ -64,9 +65,15 @@ class ConstraintValueMessage(ConstraintMessage):
         return f"(from:{self._source}, to:{self._target}, {self._confname} == {self._confvalue})"
 
     def __eq__(self, value):
-        if isinstance(value, ConstraintValueMessage):
-            return self.source == value.source and self.target == value.target \
-                and self.confname == value.confname and self.confvalue == value.confvalue
+        if not isinstance(value, ConstraintValueMessage):
+            return False
+
+        return (
+                self.source == value.source
+                and self.target == value.target
+                and self.confname == value.confname
+                and self.confvalue == value.confvalue
+        )
                 
     def __hash__(self):
         return hash(f"({self.source}->{self.target}:{self._confname} == {self._confvalue})")
@@ -124,35 +131,87 @@ class ConstraintPortMessage(ConstraintMessage):
         return f"(from:{self._source}, to:{self._target}, port:{self._port}, status:{self._status}, bhv:{self._behavior}, passedby: {str_passed_by},"+ f"final:{self._final})"
 
     def __eq__(self, value):
-        if isinstance(value, ConstraintPortMessage):
-            return self.source == value.source and self.target == value.target \
-                and self.port == value.port and self.status == value.status \
-                and self.behavior == value.behavior \
-                and self.final == value.final
+        if not isinstance(value, ConstraintPortMessage):
+            return False
+
+        return self.source == value.source and self.target == value.target \
+            and self.port == value.port and self.status == value.status \
+            and self.behavior == value.behavior \
+            and self.final == value.final
 
     def __hash__(self):
         return hash(f"({self.source}->{self.target}:{self.port}^{self._status}~{self.behavior}[{self.final}]||{','.join(self.passed_by)})")
 
+class ConfMessage(Acknowledgement):
 
-class AckMessage (Acknowledgement):
+    def __init__(self, source: str, target: str, confname: str):
+        self._source = source
+        self._target = target
+        self._confname = confname
 
-    def __init__(self):
-        pass
+    @property
+    def source(self):
+        return self._source
 
-    def is_failure(self):
-        return False
+    @property
+    def target(self):
+        return self._target
+
+    @property
+    def confname(self):
+        return self._confname
+
+
+class ConfSuccess(ConfMessage):
 
     def is_success(self):
+        return True
+
+    def __eq__(self, value):
+        if isinstance(value, AckFailure):
+            return self.source == value.source and self.target == value.target \
+                and self.confname == value.confname
         return False
 
+    def __hash__(self):
+        return hash(f"{self.source},{self.target},{self.confname}")
 
-class AckFailure (AckMessage):
+    def __str__(self):
+        return (f"ConfSuccess(FROM {self.source} TO {self.target} ON {self.confname})")
 
-    def __init__(self, source, target, constraint, cause):
+
+class ConfFailure(ConfMessage):
+
+    def __init__(self, source: str, target: str, confname: Var, cause: str):
+        super().__init__(source, target, confname)
+        self._cause = cause
+
+    @property
+    def cause(self):
+        return self._cause
+
+    def is_failure(self):
+        return True
+
+    def __eq__(self, value):
+        if isinstance(value, AckFailure):
+            return self.source == value.source and self.target == value.target \
+                and self.confname == value.confname and self.cause == value.cause
+        return False
+
+    def __hash__(self):
+        return hash(f"{self.source},{self.target},{self.confname},{self.cause}")
+
+    def __str__(self):
+        return (f"ConfFailure(FROM {self.source} TO {self.target} ON {self.confname} BECAUSE OF {self.cause})")
+
+
+class AckMessage(Acknowledgement):
+
+    def __init__(self, source: str, target: str, constraint: ConstraintMessage):
         self._source = source
         self._target = target
         self._constraint = constraint
-        self._cause = cause
 
     @property
     def source(self):
@@ -166,15 +225,22 @@ class AckFailure (AckMessage):
     def constraint(self):
         return self._constraint
 
+    def set_target(self, value):
+        self._target = value
+
+
+class AckFailure (AckMessage):
+
+    def __init__(self, source: str, target: str, constraint: ConstraintMessage, cause: str):
+        super().__init__(source, target, constraint)
+        self._cause = cause
+
     @property
     def cause(self):
         return self._cause
 
     def is_failure(self):
         return True
-
-    def set_target(self, value):
-        self._target = value
 
     def __eq__(self, value):
         if isinstance(value, AckFailure):
@@ -192,22 +258,8 @@ class AckFailure (AckMessage):
 
 class AckSuccess (AckMessage):
 
-    def __init__(self, source, target, constraint):
-        self._source = source
-        self._target = target
-        self._constraint = constraint
-
-    @property
-    def source(self):
-        return self._source
-
-    @property
-    def target(self):
-        return self._target
-
-    @property
-    def constraint(self):
-        return self._constraint
+    def __init__(self, source: str, target: str, constraint: ConstraintMessage):
+        super().__init__(source, target, constraint)
 
     def is_success(self):
         return True
@@ -478,15 +530,22 @@ class CRClient:
             addresses.add(self.__get_address(component))
         return addresses
 
-    def send_message(self, message):
+    def send_message(self, message: ConstraintMessage):
         address = self.__get_address(message.target)
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
-            passed_by = "["+','.join(message.passed_by)+"]"
-            to_send = gossip_pb2.SyncSpec(component_source=message.source, component_target=message.target,
-                                          port=message.port, status=message.status, behavior=message.behavior,
-                                          passed_by=passed_by, final=message.final)
-            stub.add_message(to_send)
+
+            if message.is_port_message():
+                passed_by = "["+','.join(message.passed_by)+"]"
+                to_send = gossip_pb2.SyncSpec(component_source=message.source, component_target=message.target,
+                                              port=message.port, status=message.status, behavior=message.behavior,
+                                              passed_by=passed_by, final=message.final)
+                stub.add_message(to_send)
+
+            elif message.is_value_message():
+                to_send = gossip_pb2.ConfigValue(component_source=message.source, component_target=message.target,
+                                                 confname=message.confname, confvalue=message.confvalue)
+                stub.add_config(to_send)
 
     def __send_ack_success(self, ack: AckSuccess):
         address = self.__get_address(ack.target)
@@ -514,7 +573,30 @@ class CRClient:
             # print(f"FROM PROXY POV, I AM SENDING : {ack}")
             stub.add_ack_failure(to_send)
 
-    def send_ack(self, ack: AckMessage):
+    def __send_conf_success(self, ack: ConfSuccess):
+        address = self.__get_address(ack.target)
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            to_send = gossip_pb2.ConfSuccess(
+                component_source = ack.source,
+                component_target = ack.target,
+                confname = ack.confname,
+            )
+            stub.add_ack_success(to_send)
+
+    def __send_conf_failure(self, ack: ConfFailure):
+        address = self.__get_address(ack.target)
+        with grpc.insecure_channel(address) as channel:
+            stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            to_send = gossip_pb2.ConfFailure(
+                component_source = ack.source,
+                component_target = ack.target,
+                confname = ack.confname,
+                cause = ack.cause,
+            )
+            stub.add_conf_failure(to_send)
+
+    def send_ack(self, ack: Acknowledgement):
         # print(f"FROM CLIENT POV, I AM SENDING : {ack}")
         if isinstance(ack, AckSuccess):
             # print(f"WHICH IS SUCCESS")
@@ -522,6 +604,10 @@ class CRClient:
         elif isinstance(ack, AckFailure):
             # print(f"WHICH IS FAILURE")
             self.__send_ack_failure(ack)
+        elif isinstance(ack, ConfSuccess):
+            self.__send_conf_success(ack)
+        elif isinstance(ack, ConfFailure):
+            self.__send_conf_failure(ack)
 
     def __send_global_ack_success(self, address, ack: GlobalAckSuccess):
         with grpc.insecure_channel(address) as channel:
@@ -558,10 +644,10 @@ class CRP2P:
         self._server = CRServer(port=port, inventory=inventory)
         self._client = CRClient(inventory=inventory)
 
-    def send_message(self, message):
+    def send_message(self, message: ConstraintMessage):
         self._client.send_message(message)
 
-    def send_ack(self, ack):
+    def send_ack(self, ack: Acknowledgement):
         self._client.send_ack(ack)
 
     def send_global_ack(self, ack):
@@ -716,7 +802,7 @@ class CostRegularNode(Node):
         results = []
         for (_, message_ack) in self.__out_message.items():
             for (_, ack) in message_ack.items():
-                if ack != None and isinstance(ack, AckFailure):
+                if ack is not None and isinstance(ack, (AckFailure, ConfFailure)):
                     cause = ack.cause.replace('_9_', ',').replace('/\\', '\n \t & ')
                     results.append(f"{count}. {cause}\n")
                     count = count + 1
@@ -764,15 +850,13 @@ class CostRegularNode(Node):
         print("OUT_MESSAGES:", flush=True)
         for comp_name in self.__out_message.keys():
             print(f"\t- {comp_name}:", flush=True)
+
             for message in self.__out_message[comp_name].keys():
-                if self.__out_message[comp_name][message] != None and isinstance(self.__out_message[comp_name][message], AckSuccess):
-                    acked = "ACKED SUCCESS"
-                if self.__out_message[comp_name][message] != None and isinstance(self.__out_message[comp_name][message], AckFailure):
-                    acked = "ACKED FAILURE"
-                else:
-                    acked = str(self.__out_message[comp_name][message])
-                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, [{','.join(message.passed_by)}], {message.final})"
-                print(f"\t\t* {str_message}: {acked}", flush=True)
+                msg = self.__out_message[comp_name][message]
+                if msg is None or not isinstance(msg, Acknowledgement):
+                    continue
+
+                print(f"\t\t* {msg}", flush=True)
 
         print("IN_MESSAGES:", flush=True)
         for comp_name in self.__in_message.keys():
@@ -1022,7 +1106,7 @@ def refine_status(sequence, port_status):
             curr_status = port_status[i+1]
     return res
     
-def make_port_messages(sequence, port_name, port_status, passed_by, component: Component):
+def make_port_messages(sequence, port_name, port_status, passed_by, component: Component) -> set[ConstraintPortMessage]:
     curr_passed_by = set_utils.copy(passed_by)
     curr_passed_by.add(component.get_name())
     result = set()
@@ -1050,7 +1134,7 @@ def make_port_messages(sequence, port_name, port_status, passed_by, component: C
                 # at a moment, the use port is activate by a behavior. It is activate then
                 behavior = refined_port_status[i+1][0]
                 message = ConstraintPortMessage(component.get_name(), None, port_name, "enabled", behavior, curr_passed_by)
-                result.add(message)          
+                result.add(message)
     return result
 
 def contraint_from_port_constraint(
@@ -1169,6 +1253,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
     results = cr_model.solve(write_file=write_file)
 
     for (comp_name, result) in results.items():
+        component = node.components_from_str(comp_name)
         if result.is_sat:
             if debug:
                 print(f"{comp_name}:", flush=True)
@@ -1177,21 +1262,28 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
                 print("\tsequence = ", cr_model.get_sequence(comp_name), flush=True)
                 print("\tconfiguration =", cr_model.get_conf_values(comp_name), flush=True)
             sequence = cr_model.get_sequence(comp_name)
+            # Get message from configuration values
+            for (conf_name, conf_value) in cr_model.get_conf_values(comp_name).items():
+                # If a transition is related to a constraint,
+                # we must emit a message with internal values of it
+                if (src := node.get_variable_source(conf_name)) != comp_name:
+                    if src is None:
+                        explanation = f'The config {conf_name} is not available on any node. Cannot proceed!'
+                        node.set_local_conflict(explanation)
+                        # FIXME: Should send ConfFailure ?
+                        return [], []
+                    if debug:
+                        print(f"\t{conf_name}[{src}]: {conf_value}", flush=True)
+                    message = ConstraintValueMessage(component.get_name(), src, conf_name, conf_value)
+                    out_messages.add(message)
             # Get message from ports statuses
-            for (port_name, _) in cr_model.get_port_statuses(comp_name).items():
+            for port_name in cr_model.get_port_statuses(comp_name):
                 port_status = cr_model.get_port_status(comp_name, port_name)
                 port_status_str = list(map(lambda v: "enabled" if v == 1 or v == "enabled" else "disabled", port_status))
                 if debug:
                     print(f"\t{port_name}: {port_status_str}", flush=True)
-                component = node.components_from_str(comp_name)
                 msgs = make_port_messages(sequence, port_name, port_status, node.passed_by, component)
                 out_messages = out_messages | msgs
-            # Get message from configuration values
-            for (conf_name, conf_value) in cr_model.get_conf_values(comp_name).items():
-                # TODO Koda infer messages about all values
-                # If a transition is related to a constraint, 
-                # we must emit a message with internal values of it
-                pass
             if debug:
                 print("\n", flush=True)
         else:
@@ -1202,15 +1294,19 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
             node.set_local_conflict(explainity)
             for reason in all_reasons:
                 if not is_caused_internally(reason):
-                    message_to_ack = None
+                    message_to_ack: ConstraintMessage | None = None
                     (_, reason_message) = split_reason(reason)
                     for (_, messages) in node.get_in_message().items():
                         for (message, _) in messages.items():
                             if message == reason_message:
                                 message_to_ack = message
-                    if message_to_ack != None:
-                        fail_ack = AckFailure(comp_name, None, message_to_ack, explainity)
-                        opt_ack.add(fail_ack)
+                    if message_to_ack is not None:
+                        if message_to_ack.is_port_message():
+                            fail_ack = AckFailure(comp_name, None, message_to_ack, explainity)
+                            opt_ack.add(fail_ack)
+                        elif message_to_ack.is_value_message():
+                            fail_ack = ConfFailure(comp_name, message_to_ack.source, message_to_ack.confname, explainity)
+                            opt_ack.add(fail_ack)
     out_messages = cr_model.get_node().remove_deplicata(out_messages)
     return out_messages, list(opt_ack)
 
@@ -1258,7 +1354,7 @@ def check_to_be_diffused(node: CostRegularNode, msg: ConstraintPortMessage):
 
 
 def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, list[Message]]
-    res = {}
+    res = defaultdict(set)
     out_messages = set()
     for msg in msgs:
         if msg.is_port_message():
@@ -1268,13 +1364,12 @@ def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, 
             if msg_to_be_diffused:
                 targets = node.use_by(msg.source, msg.port) + node.provide_by(msg.source, msg.port)
                 for target in targets:
-                    if target not in res.keys():
-                        res[target] = set()
                     message = ConstraintPortMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.passed_by, msg.final)
                     res[target].add(message)
                     out_messages.add(message)
         elif msg.is_value_message():
-            pass # TODO Koda
+            res[msg.target].add(msg)
+            out_messages.add(msg)
     node.add_consequence_of_constraints(node.get_lastest_constraints(), out_messages)        
     return {k: list(v) for (k,v) in res.items()}
 

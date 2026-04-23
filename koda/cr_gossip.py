@@ -616,14 +616,17 @@ class PortConfigConstraint:
 
 class CostRegularNode(Node):
 
-    def __init__(self, id: str, admin: str, connections: list[(str, str, str, str)], components: list[Component], active: dict[Component, str], goals: dict[Component, list[Goal]], port, inventory, config_values: dict[str, int] = {}, port_config_constraints: list[PortConfigConstraint] = []):
+    def __init__(self, id: str, admin: str, connections: list[tuple[str, str, str, str]], components: list[Component], active: dict[Component, str], goals: dict[Component, list[Goal]], port, inventory, config_values: dict[Component, dict[str, int]] | None = None, port_config_constraints: list[PortConfigConstraint] = []):
         self._id = id
         self._components = components
         self.__dict_components = {component.get_name(): component for component in components}
         self._active = active
         self._goals = goals
         self._connections = connections
-        self._config_values = config_values
+        self._config_values = {
+            component.get_name(): values
+            for component, values in config_values.items()
+        } if config_values is not None else {}
         self._port_constraints = port_config_constraints
         for comp in components:
             if comp not in goals:
@@ -646,8 +649,8 @@ class CostRegularNode(Node):
     def get_config_values(self) -> dict[str, dict[str, int]]:
         return self._config_values
 
-    def get_config_values(self, component_name) -> dict[str, dict[str, int]]:
-        return self._config_values[component_name]
+    def get_config_values(self, component_name: str) -> dict[str, int]:
+        return self._config_values.get(component_name, {})
 
     def get_config_constraint(self) -> list[PortConfigConstraint]:
         return self._port_constraints

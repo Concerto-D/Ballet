@@ -1,6 +1,8 @@
 from ballet.assembly.concertod.components.basics.provider import Provider
 from koda.gossip import gossip
-from koda.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, PortConfigConstraint
+from koda.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, \
+    PortConfigConstraint
+from koda.cost_regular import BinComparator, Var
 
 import warnings
 
@@ -20,14 +22,19 @@ inventory = {
         'port_planner': PORT,
     }
 }
+
+var1 = Var('test1')
+var2 = Var('test2')
+var3 = Var('test3')
+
 config_values = {
     provider: {
-        'test1': 0,
-        'test2': 1,
+        var1: 0,
+        var2: 1,
     }
 }
 port_config_constraints = [
-    PortConfigConstraint('provider', 'service', 'test1', 'test3', '==')
+    PortConfigConstraint('provider', 'service', var1, var3, BinComparator.EQ)
 ]
 
 node = CostRegularNode(

@@ -1,12 +1,11 @@
 import threading
 import time
+from abc import ABC
 from concurrent import futures
 from typing import Optional
-from ballet.utils.dict_utils import reverse_dict
-from ballet.utils.list_utils import find
-from koda.gossip import Node, Acknowledgement, GlobalAcknowledgement
-from ballet.planner.automata import matrix_from_concerto_component
-from koda.cost_regular import CRConstraint, CostRegular, MultiCostRegular, PortConstraint, TransitionConstraint, BinConstraint, ValueConstraint
+
+import grpc
+
 from ballet.assembly.concertod.component import Component
 from ballet.assembly.concertod.dependency import DepType
 from ballet.assembly.plan.plan import Plan, Wait, PushB, merge_plans
@@ -14,17 +13,16 @@ from ballet.planner.automata import matrix_from_concerto_component
 from ballet.planner.goal import Goal
 from ballet.utils import set_utils
 from ballet.utils import string_utils
-from ballet.utils import time_utils
-from ballet.assembly.concertod.dependency import DepType
-from ballet.assembly.plan.plan import Plan, Wait, PushB, merge_plans
-from koda.grpc import gossip_pb2_grpc
+from ballet.utils.dict_utils import reverse_dict
+from ballet.utils.list_utils import find
+from koda.cost_regular import (
+    CRConstraint, CostRegular, MultiCostRegular, PortConstraint, TransitionConstraint,
+    BinConstraint, ValueConstraint, BinComparator, Var
+)
+from koda.gossip import Node, Acknowledgement, GlobalAcknowledgement
 from koda.grpc import gossip_pb2
-from abc import ABC
-from concurrent import futures
+from koda.grpc import gossip_pb2_grpc
 
-import grpc
-import threading
-import time
 
 class ConstraintMessage (ABC):
 
@@ -584,8 +582,7 @@ class CRP2P:
 
 class PortConfigConstraint:
 
-    def __init__(self, component_name, port_name, left, right, comparator):
-        assert(comparator in ["==", "<", "<=", ">", ">=", "!="])
+    def __init__(self, component_name: str, port_name: str, left: Var, right: Var, comparator: BinComparator):
         self.__comp_name = component_name
         self.__port_name = port_name
         self.__left = left
@@ -593,23 +590,23 @@ class PortConfigConstraint:
         self.__comparator = comparator
 
     @property
-    def component_name(self):
+    def component_name(self) -> str:
         return self.__comp_name
 
     @property
-    def port_name(self):
+    def port_name(self) -> str:
         return self.__port_name
 
     @property
-    def left(self):
+    def left(self) -> Var:
         return self.__left
 
     @property
-    def right(self):
+    def right(self) -> Var:
         return self.__right
 
     @property
-    def comparator(self):
+    def comparator(self) -> BinComparator:
         return self.__comparator
 
 
@@ -626,7 +623,7 @@ class CostRegularNode(Node):
             goals: dict[Component, list[Goal]],
             port,
             inventory,
-            config_values: dict[Component, dict[str, int]] | None = None,
+            config_values: dict[Component, dict[Var, int]] | None = None,
             port_config_constraints: list[PortConfigConstraint] | None = None,
     ):
         self._id = id

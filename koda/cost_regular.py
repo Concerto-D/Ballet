@@ -1,13 +1,29 @@
-from minizinc import Instance, Model as mznModel, Solver, Status
-from ballet.utils.list_utils import flatmap, indexify, indexOf, count
-from ballet.utils import string_utils
-from koda.gossip import Model, Solution
-from ballet.planner.goal import *
-from ballet.assembly.concertod.component import Component
-import subprocess, json
-import minizinc
-import time
 import concurrent.futures
+import json
+import subprocess
+import time
+from enum import Enum
+from typing import NewType
+
+from minizinc import Instance, Model as mznModel, Solver, Status
+
+from ballet.assembly.concertod.component import Component
+from ballet.planner.goal import *
+from ballet.utils import string_utils
+from ballet.utils.list_utils import flatmap, indexify, indexOf, count
+from koda.gossip import Model, Solution
+
+Var = NewType('Var', str)
+
+
+class BinComparator(str, Enum):
+    EQ = '=='
+    LT = '<'
+    LE = '<='
+    GT = '>'
+    GE = '>='
+    NE = '!='
+
 
 class FindMUSException(Exception):
     
@@ -61,36 +77,37 @@ class CRConstraint:
 
 class BinConstraint (CRConstraint):
 
-    def __init__(self, left, right, ope, transition=None):
-        assert(ope in ["==", "<", "<=", ">", ">=", "!="])
+    def __init__(self, left: Var, right: Var, ope: BinComparator, transition=None):
+        super().__init__()
         self.__left = left
         self.__right = right
         self.__ope = ope
         self.__assoc_transition = transition
 
     @property
-    def left(self):
+    def left(self) -> Var:
         return self.__left
 
     @property
-    def right(self):
+    def right(self) -> Var:
         return self.__right
 
     @property
-    def comparator(self):
+    def comparator(self) -> BinComparator:
         return self.__ope
 
     @property
-    def transition(self):
+    def transition(self) -> str:
         return self.__assoc_transition
     
-    def isBinConstraint(self):
+    def isBinConstraint(self) -> bool:
         return True
 
 
 class ValueConstraint (CRConstraint):
 
     def __init__(self, name, value):
+        super().__init__()
         self.__name = name 
         self.__val = value
 

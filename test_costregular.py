@@ -1,6 +1,6 @@
 from ballet.assembly.concertod.components.basics.provider import Provider
 from koda.gossip import gossip
-from koda.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack
+from koda.cr_gossip import CostRegularNode, cr_init, cr_local, cr_msg, cr_enrich, cr_final, cr_ack, PortConfigConstraint
 
 import warnings
 
@@ -15,17 +15,23 @@ active = {provider: 'running'}
 goals = {}
 PORT = 3000
 inventory = {
-    'provider': {'address': 'localhost', 'port_planner': PORT}
+    'provider': {
+        'address': 'localhost',
+        'port_planner': PORT,
+    }
 }
 config_values = {
     provider: {
-        "test1": 0,
-        "test2": 1
+        'test1': 0,
+        'test2': 1,
     }
 }
+port_config_constraints = [
+    PortConfigConstraint('provider', 'service', 'test1', 'test3', '==')
+]
 
 node = CostRegularNode(
-    id="node0",
+    "node0",
     admin="DevOps0",
     components=[provider],
     connections=connections,
@@ -34,6 +40,7 @@ node = CostRegularNode(
     port=PORT,
     inventory=inventory,
     config_values=config_values,
+    port_config_constraints=port_config_constraints,
 )
 roots = ['provider']
 

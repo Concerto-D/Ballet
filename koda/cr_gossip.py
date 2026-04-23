@@ -616,7 +616,19 @@ class PortConfigConstraint:
 
 class CostRegularNode(Node):
 
-    def __init__(self, id: str, admin: str, connections: list[tuple[str, str, str, str]], components: list[Component], active: dict[Component, str], goals: dict[Component, list[Goal]], port, inventory, config_values: dict[Component, dict[str, int]] | None = None, port_config_constraints: list[PortConfigConstraint] = []):
+    def __init__(
+            self,
+            id: str, *,
+            admin: str,
+            connections: list[tuple[str, str, str, str]],
+            components: list[Component],
+            active: dict[Component, str],
+            goals: dict[Component, list[Goal]],
+            port,
+            inventory,
+            config_values: dict[Component, dict[str, int]] | None = None,
+            port_config_constraints: list[PortConfigConstraint] | None = None,
+    ):
         self._id = id
         self._components = components
         self.__dict_components = {component.get_name(): component for component in components}
@@ -627,7 +639,7 @@ class CostRegularNode(Node):
             component.get_name(): values
             for component, values in config_values.items()
         } if config_values is not None else {}
-        self._port_constraints = port_config_constraints
+        self._port_constraints = port_config_constraints or []
         for comp in components:
             if comp not in goals:
                 goals[comp] = []
@@ -1065,9 +1077,6 @@ def contraint_from_port_constraint(
             for src in matrix
             for transition in matrix[src]
             if matrix[src][transition] in bind_states
-        } | {
-            BinConstraint(pc.left, pc.right, pc.comparator, transition=transition)
-            for transition in bind_behaviors
         }
 
     return constraints

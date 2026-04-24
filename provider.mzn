@@ -33,20 +33,18 @@ array[1..seq_length+1] of var STATUS : service_status;
 constraint forall (i in 1..seq_length+1) (service_status[i] = enabled <-> states[i] = running);
 
 % Init state
-constraint states[1]=running;
-constraint regular(sequence, transitions, running, {uninstalled,installed,running});
+constraint states[1]=uninstalled;
+constraint regular(sequence, transitions, uninstalled, {uninstalled,installed,running});
 
 % Reconfiguration goals as constraints
-constraint states[seq_length+1] = running; % goal
-constraint count (states, running) > 0; % goal
 var int: test1;
-var int: test3;
 var int: test2;
+var int: test3;
+constraint forall(i in 1..seq_length) ((states[i] == uninstalled /\ sequence[i] == install) -> (test1 == test3));
 constraint test1 == 0;
+constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == skip) -> (test1 == test3));
 constraint forall(i in 1..seq_length) ((states[i] == installed /\ sequence[i] == install) -> (test1 == test3));
 constraint test2 == 1;
-constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == skip) -> (test1 == test3));
-constraint forall(i in 1..seq_length) ((states[i] == uninstalled /\ sequence[i] == install) -> (test1 == test3));
 constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == install) -> (test1 == test3));
 
 

@@ -862,15 +862,7 @@ class CostRegularNode(Node):
         for comp_name in self.__in_message.keys():
             print(f"\t- {comp_name}", flush=True)
             for message in self.__in_message[comp_name].keys():
-                if self.__in_message[comp_name][message] != None and isinstance(self.__in_message[comp_name][message], AckSuccess):
-                    acked = "ACKED SUCCESS"
-                if self.__in_message[comp_name][message] != None and isinstance(self.__in_message[comp_name][message], AckFailure):
-                    acked = "ACKED FAILURE"
-                else:
-                    acked = str(self.__in_message[comp_name][message])
-
-                str_message = f"({message.source}, {message.target}, {message.port}, {message.status}, {message.behavior}, [{','.join(message.passed_by)}], {message.final})"
-                print(f"\t\t* {str_message}: {acked}", flush=True)
+                print(f"\t\t* {message}", flush=True)
 
     def new_received_messages(self):
         all_new_messages = set()
@@ -879,9 +871,10 @@ class CostRegularNode(Node):
             messages = self._p2p_service.get_messages(comp_name)
             # all_new_messages = all_new_messages | messages
             for message in messages:
-                for passed_by in message.passed_by:
-                    if passed_by not in self._passed_by:
-                        self._passed_by.add(passed_by)
+                if message.is_port_message():
+                    for passed_by in message.passed_by:
+                        if passed_by not in self._passed_by:
+                            self._passed_by.add(passed_by)
                 if not message in self.__in_message[comp_name].keys():
                     self.__in_message[comp_name][message] = None
                     all_new_messages.add(message)
@@ -1141,7 +1134,8 @@ def contraint_from_port_constraint(
     cr_node : CostRegularNode,
     states: list[str],
     behaviors: list[str],
-    matrix: dict[str, dict[str, str]]
+    matrix: dict[str, dict[str, str]],
+    component_name: str,
 ) -> set[BinConstraint]:
     # Here : forall port, we must find all states related (check on states, behaviors, matrix)
     # Once found, identify the incoming transitions
@@ -1150,6 +1144,9 @@ def contraint_from_port_constraint(
 
     constraints = set()
     for pc in constraints_on_ports:
+        if pc.component_name != component_name:
+            continue
+
         component = cr_node.components_from_str(pc.component_name)
         groups = component.get_groups()
         bind_states = set()
@@ -1175,7 +1172,7 @@ def contraint_from_port_constraint(
 
     return constraints
 
-def contraint_from_config_values(cr_node : CostRegularNode, component_name:str) -> set[ValueConstraint]:
+def contraint_from_config_values(cr_node : CostRegularNode, component_name: str) -> set[ValueConstraint]:
     # Here : forall config values, we must init ValueConstraint (see cost_regular.py)
     config_values: dict[str, int] = cr_node.get_config_values(component_name)
     return {
@@ -1188,7 +1185,7 @@ def cr_init(cr_node : CostRegularNode):
 
     for component in cr_node.components:
         states, beahviors, matrix, costs = matrix_from_concerto_component(component)
-        bin_constraint = contraint_from_port_constraint(cr_node, states, beahviors, matrix)
+        bin_constraint = contraint_from_port_constraint(cr_node, states, beahviors, matrix, component.get_name())
         val_constraint = contraint_from_config_values(cr_node,component.get_name())
         init_state = cr_node.active[component]
         tmp_ports = reverse_dict(component.get_bindings())
@@ -1368,8 +1365,9 @@ def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, 
                     res[target].add(message)
                     out_messages.add(message)
         elif msg.is_value_message():
-            res[msg.target].add(msg)
-            out_messages.add(msg)
+            if check_to_be_diffused(node, msg):
+                res[msg.target].add(msg)
+                out_messages.add(msg)
     node.add_consequence_of_constraints(node.get_lastest_constraints(), out_messages)        
     return {k: list(v) for (k,v) in res.items()}
 

@@ -2,6 +2,7 @@ import threading
 import time
 from abc import ABC
 from collections import defaultdict
+from collections.abc import Iterable
 from concurrent import futures
 from typing import Optional
 
@@ -119,10 +120,6 @@ class ConstraintPortMessage(ConstraintMessage):
     def has_to_wait(self):
         return not self._behavior == ""
 
-    @property
-    def passed_by(self):
-        return self._passed_by
-    
     def is_port_message(self):
         return True
     
@@ -144,22 +141,17 @@ class ConstraintPortMessage(ConstraintMessage):
 
 class ConfMessage(Acknowledgement):
 
-    def __init__(self, source: str, target: str, confname: str):
-        self._source = source
-        self._target = target
-        self._confname = confname
+    def __init__(self, source: str, target: str, constraint: ConstraintValueMessage):
+        super().__init__(source, target)
+        self._constraint = constraint
 
     @property
-    def source(self):
-        return self._source
-
-    @property
-    def target(self):
-        return self._target
+    def constraint(self):
+        return self._constraint
 
     @property
     def confname(self):
-        return self._confname
+        return self.constraint.confname
 
 
 class ConfSuccess(ConfMessage):
@@ -168,7 +160,7 @@ class ConfSuccess(ConfMessage):
         return True
 
     def __eq__(self, value):
-        if isinstance(value, AckFailure):
+        if isinstance(value, ConfSuccess):
             return self.source == value.source and self.target == value.target \
                 and self.confname == value.confname
         return False
@@ -182,8 +174,8 @@ class ConfSuccess(ConfMessage):
 
 class ConfFailure(ConfMessage):
 
-    def __init__(self, source: str, target: str, confname: Var, cause: str):
-        super().__init__(source, target, confname)
+    def __init__(self, source: str, target: str, constraint: ConstraintValueMessage, cause: str):
+        super().__init__(source, target, constraint)
         self._cause = cause
 
     @property
@@ -194,7 +186,7 @@ class ConfFailure(ConfMessage):
         return True
 
     def __eq__(self, value):
-        if isinstance(value, AckFailure):
+        if isinstance(value, ConfFailure):
             return self.source == value.source and self.target == value.target \
                 and self.confname == value.confname and self.cause == value.cause
         return False
@@ -208,18 +200,9 @@ class ConfFailure(ConfMessage):
 
 class AckMessage(Acknowledgement):
 
-    def __init__(self, source: str, target: str, constraint: ConstraintMessage):
-        self._source = source
-        self._target = target
+    def __init__(self, source: str, target: str, constraint: ConstraintPortMessage):
+        super().__init__(source, target)
         self._constraint = constraint
-
-    @property
-    def source(self):
-        return self._source
-
-    @property
-    def target(self):
-        return self._target
 
     @property
     def constraint(self):
@@ -231,7 +214,7 @@ class AckMessage(Acknowledgement):
 
 class AckFailure (AckMessage):
 
-    def __init__(self, source: str, target: str, constraint: ConstraintMessage, cause: str):
+    def __init__(self, source: str, target: str, constraint: ConstraintPortMessage, cause: str):
         super().__init__(source, target, constraint)
         self._cause = cause
 
@@ -258,7 +241,7 @@ class AckFailure (AckMessage):
 
 class AckSuccess (AckMessage):
 
-    def __init__(self, source: str, target: str, constraint: ConstraintMessage):
+    def __init__(self, source: str, target: str, constraint: ConstraintPortMessage):
         super().__init__(source, target, constraint)
 
     def is_success(self):
@@ -279,15 +262,11 @@ class AckSuccess (AckMessage):
 
 class GlobalAckSuccess(GlobalAcknowledgement):
 
-    def __init__(self, source):
-        self._source = source
+    def __init__(self, source: str):
+        super().__init__(source)
 
-    @property
-    def source(self):
-        return self._source
-
-    def is_failure(self):
-        return False
+    def is_success(self):
+        return True
 
     def __eq__(self, value):
         if isinstance(value, GlobalAckSuccess):
@@ -304,12 +283,8 @@ class GlobalAckSuccess(GlobalAcknowledgement):
 
 class GlobalAckFailure(GlobalAcknowledgement):
 
-    def __init__(self, source):
-        self._source = source
-
-    @property
-    def source(self):
-        return self._source
+    def __init__(self, source: str):
+        super().__init__(source)
 
     def is_failure(self):
         return True
@@ -367,21 +342,43 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
         return gossip_pb2.Empty()
 
     def add_conf_success(self, request, context):
-        # TODO Koda
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        target = request.component_target
+        message_to_ack = request.to_message
+        constraint_to_ack = ConstraintValueMessage(
+            source=message_to_ack.component_source,
+            target=message_to_ack.component_target,
+            confname=message_to_ack.confname,
+            confvalue=message_to_ack.confvalue,
+        )
+        ack = ConfSuccess(request.component_source, request.component_target, constraint_to_ack)
+        # print(f"------ MARK -------")
+        # print(f"I RECEIVED CONFSUCCESS FROM {request.component_source} FOR THE CONSTRAINT {constraint_to_ack}")
+        with self._lock_new_acks:
+            if target not in self._acks.keys():
+                self._acks[target] = set()
+        with self._lock_add_ack:
+            self._acks[target].add(ack)
+        return gossip_pb2.Empty()
 
     def add_conf_failure(self, request, context):
-        # TODO Koda
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        target = request.component_target
+        message_to_ack = request.to_message
+        constraint_to_ack = ConstraintValueMessage(
+            source=message_to_ack.component_source,
+            target=message_to_ack.component_target,
+            confname=message_to_ack.confname,
+            confvalue=message_to_ack.confvalue,
+        )
+        ack = ConfFailure(request.component_source, request.component_target, constraint_to_ack, request.cause)
+        # print(f"------ MARK -------")
+        # print(f"I RECEIVED CONFFAILURE FROM {request.component_source} FOR THE CONSTRAINT {constraint_to_ack}")
+        with self._lock_new_acks:
+            if target not in self._acks.keys():
+                self._acks[target] = set()
+        with self._lock_add_ack:
+            self._acks[target].add(ack)
+        return gossip_pb2.Empty()
 
-    
-        
     def get_messages(self, comp_name):
         if comp_name not in self._mailbox.keys():
             return set()
@@ -458,8 +455,8 @@ class CRServicer(gossip_pb2_grpc.CostRegularGossipServiceServicer):
 
 class CRServer:
 
-    def __init__(self, servicer=CRServicer(), port=3000, max_workers=16, inventory: dict[str, dict[str, str]]={}):
-        self.__inventory = inventory
+    def __init__(self, servicer=CRServicer(), port=3000, max_workers=16, inventory: dict[str, dict[str, str]] | None = None):
+        self.__inventory = inventory or {}
         self._full_address = {}
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
         gossip_pb2_grpc.add_CostRegularGossipServiceServicer_to_server(servicer=servicer, server=server)
@@ -470,7 +467,7 @@ class CRServer:
         self._wait_for_all()
 
     def stop(self):
-        self._server.stop()
+        self._server.stop(None)
 
     def __ping(self, address):
         with grpc.insecure_channel(address) as channel:
@@ -535,14 +532,14 @@ class CRClient:
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
 
-            if message.is_port_message():
+            if isinstance(message, ConstraintPortMessage):
                 passed_by = "["+','.join(message.passed_by)+"]"
                 to_send = gossip_pb2.SyncSpec(component_source=message.source, component_target=message.target,
                                               port=message.port, status=message.status, behavior=message.behavior,
                                               passed_by=passed_by, final=message.final)
                 stub.add_message(to_send)
 
-            elif message.is_value_message():
+            elif isinstance(message, ConstraintValueMessage):
                 to_send = gossip_pb2.ConfigValue(component_source=message.source, component_target=message.target,
                                                  confname=message.confname, confvalue=message.confvalue)
                 stub.add_config(to_send)
@@ -577,21 +574,33 @@ class CRClient:
         address = self.__get_address(ack.target)
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            acked_message = gossip_pb2.ConfigValue(
+                component_source=ack.constraint.source,
+                component_target=ack.constraint.target,
+                confname=ack.constraint.confname,
+                confvalue=ack.constraint.confvalue,
+            )
             to_send = gossip_pb2.ConfSuccess(
                 component_source = ack.source,
                 component_target = ack.target,
-                confname = ack.confname,
+                to_message = acked_message,
             )
-            stub.add_ack_success(to_send)
+            stub.add_conf_success(to_send)
 
     def __send_conf_failure(self, ack: ConfFailure):
         address = self.__get_address(ack.target)
         with grpc.insecure_channel(address) as channel:
             stub = gossip_pb2_grpc.CostRegularGossipServiceStub(channel)
+            acked_message = gossip_pb2.ConfigValue(
+                component_source=ack.constraint.source,
+                component_target=ack.constraint.target,
+                confname=ack.constraint.confname,
+                confvalue=ack.constraint.confvalue,
+            )
             to_send = gossip_pb2.ConfFailure(
                 component_source = ack.source,
                 component_target = ack.target,
-                confname = ack.confname,
+                to_message = acked_message,
                 cause = ack.cause,
             )
             stub.add_conf_failure(to_send)
@@ -626,7 +635,7 @@ class CRClient:
             to_send = gossip_pb2.GlobalAckFailure(component_source=ack.source)
             stub.add_global_ack_failure(to_send)
 
-    def __send_all_global_ack_failure(self, ack: GlobalAckSuccess):
+    def __send_all_global_ack_failure(self, ack: GlobalAckFailure):
         addresses = self.__get_all_addresses()
         for address in addresses:
             self.__send_global_ack_failure(address, ack)
@@ -712,6 +721,7 @@ class CostRegularNode(Node):
             config_values: dict[Component, dict[Var, int]] | None = None,
             port_config_constraints: list[PortConfigConstraint] | None = None,
     ):
+        super().__init__()
         self._id = id
         self._components = components
         self.__dict_components = {component.get_name(): component for component in components}
@@ -744,12 +754,12 @@ class CostRegularNode(Node):
         self.__consequence_of_constraint = {} # For a constraint, establish what messages have been emitted
         self.__origin_constraint_of_message = {} # For a message, what constraint led to it (reverse of __consequence_of_constraint)
         self.__local_conflicting_reasons = ""
-        self.__roots = []
+        self.__roots = set()
 
     def get_config_values(self) -> dict[str, dict[str, int]]:
         return self._config_values
 
-    def get_config_values(self, component_name: str) -> dict[str, int]:
+    def get_config_values_for_component(self, component_name: str) -> dict[str, int]:
         return self._config_values.get(component_name, {})
 
     def get_config_constraint(self) -> list[PortConfigConstraint]:
@@ -769,7 +779,7 @@ class CostRegularNode(Node):
         return True
 
     def set_roots(self, roots):
-        self.__roots = roots
+        self.__roots = set(roots)
 
     def add_root(self, root):
         self.__roots.add(root)
@@ -901,11 +911,11 @@ class CostRegularNode(Node):
         __sec_send_message(message)
 
 
-    def send_acks(self, target, acks):
+    def send_acks(self, target: str, acks: Iterable[ConfMessage | AckMessage]):
         for ack in acks:
             self.send_ack(target, ack)
 
-    def send_ack(self, target, ack):
+    def send_ack(self, target: str, ack: ConfMessage | AckMessage):
         def __sec_send_ack(ack):
             try:
                 self._p2p_service.send_ack(ack)
@@ -974,9 +984,9 @@ class CostRegularNode(Node):
                         result.add(GlobalAckFailure(comp_name))
         return result
 
-    def is_root(self, roots):
+    def is_root(self):
         for comp_name in self.__out_message.keys():
-            if comp_name in roots:
+            if comp_name in self.__roots:
                 return True
         return False
 
@@ -1174,7 +1184,7 @@ def contraint_from_port_constraint(
 
 def contraint_from_config_values(cr_node : CostRegularNode, component_name: str) -> set[ValueConstraint]:
     # Here : forall config values, we must init ValueConstraint (see cost_regular.py)
-    config_values: dict[str, int] = cr_node.get_config_values(component_name)
+    config_values: dict[str, int] = cr_node.get_config_values_for_component(component_name)
     return {
         ValueConstraint(name, value)
         for name, value in config_values.items()
@@ -1302,7 +1312,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
                             fail_ack = AckFailure(comp_name, None, message_to_ack, explainity)
                             opt_ack.add(fail_ack)
                         elif message_to_ack.is_value_message():
-                            fail_ack = ConfFailure(comp_name, message_to_ack.source, message_to_ack.confname, explainity)
+                            fail_ack = ConfFailure(comp_name, message_to_ack.source, message_to_ack, explainity)
                             opt_ack.add(fail_ack)
     out_messages = cr_model.get_node().remove_deplicata(out_messages)
     return out_messages, list(opt_ack)
@@ -1342,7 +1352,7 @@ def cr_local_timed(cr_model: MultiCostRegular, write_file=True, debug=False, ite
     return out_messages, list(opt_ack)
 
 
-def check_to_be_diffused(node: CostRegularNode, msg: ConstraintPortMessage):
+def check_to_be_diffused(node: CostRegularNode, msg: ConstraintMessage):
     # If source has no goal constraint, and no inferred constraint from remote message, do not create a message !
     # It means, it solves a model tat was not needed to be solved... 
     has_remote_constraint = len(node.get_in_message()[msg.source]) != 0
@@ -1353,8 +1363,9 @@ def check_to_be_diffused(node: CostRegularNode, msg: ConstraintPortMessage):
 def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, list[Message]]
     res = defaultdict(set)
     out_messages = set()
+
     for msg in msgs:
-        if msg.is_port_message():
+        if isinstance(msg, ConstraintPortMessage):
             # If source has no goal constraint, and no inferred constraint from remote message, do not create a message !
             # It means, it solves a model that was not needed to be solved... 
             msg_to_be_diffused = check_to_be_diffused(node, msg)
@@ -1364,11 +1375,13 @@ def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, 
                     message = ConstraintPortMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.passed_by, msg.final)
                     res[target].add(message)
                     out_messages.add(message)
-        elif msg.is_value_message():
-            if check_to_be_diffused(node, msg):
+
+        elif isinstance(msg, ConstraintValueMessage):
+            if node.is_comp_root(msg.source):#check_to_be_diffused(node, msg):
                 res[msg.target].add(msg)
                 out_messages.add(msg)
-    node.add_consequence_of_constraints(node.get_lastest_constraints(), out_messages)        
+
+    node.add_consequence_of_constraints(node.get_lastest_constraints(), out_messages)
     return {k: list(v) for (k,v) in res.items()}
 
 
@@ -1385,7 +1398,7 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
         return result
     node: CostRegularNode = model.get_node()
     for message in messages:
-        if message.is_port_message():
+        if isinstance(message, ConstraintPortMessage):
             msg_source = f"infer({message.source}_9_{message.target}_9_{message.port}_9_{message.status}_9_{message.behavior}_9_{message.final})"
             connected_ports = node.use_by_port(message.source, message.port, message.target) + node.provide_by_port(message.source, message.port, message.target)
             for connected_port in connected_ports:
@@ -1411,11 +1424,13 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
                 node.add_origin_of_constraint(wait_constraint, message)
                 model.add_constraint(message.target, wait_constraint) # remove message
                 new_constraints.add(wait_constraint)
-        elif message.is_value_message():
+
+        elif isinstance(message, ConstraintValueMessage):
             msg_source = f"value({message.source}_9_{message.target}_9_{message.confname}_9_{message.confvalue})"
             value_constraint = ValueConstraint(message.confname, message.confvalue)
             node.add_origin_of_constraint(value_constraint, message)
             model.add_constraint(message.target, value_constraint)
+
     node.set_lastest_constraints(list(new_constraints))
     return model
 
@@ -1448,7 +1463,7 @@ def cr_final(cr_model: MultiCostRegular, write_file=False):
     return merge_plans(list(plans))
 
 
-def cr_ack_with_ack(node: CostRegularNode, ack: list[Acknowledgement] | Acknowledgement):
+def cr_ack_with_ack(node: CostRegularNode, ack: list[AckFailure | ConfFailure] | AckFailure | ConfFailure):
     node.new_received_ack()
     result: dict[Node, set[Acknowledgement]] = defaultdict(set)
     fail_acks: list[AckFailure | ConfFailure] = []
@@ -1484,27 +1499,33 @@ def cr_ack_default(node: CostRegularNode):
 
         for message in all_out_messages_of_comp:
             got_ack_message = node.get_ack_out_message(comp_name, message)
-            if got_ack_message is None or got_ack_message.is_failure():
-                there_are_accept_acks_to_send = False
-                if got_ack_message is not None and got_ack_message.is_failure():
-                    # get the origin_constraint who caused this message
-                    origin_constraint = node.get_origin_constraint_of_a_message(message)
-                    if origin_constraint is not None:
-                        # We don't go into this condition if no message led to this out message, that is it is initiated from root
-                        # get the origin_message, if exists, who caused this origin_constraint. 
-                        origin_message: ConstraintMessage = node.get_origin_of_constraint(origin_constraint)
-                        # send AckFail to this message 
-                        new_cause = got_ack_message.cause + f"/\\ trans({origin_constraint},on::{comp_name}) "# TODO prefix this cause by what,local transitive information,
+            if got_ack_message is not None and not got_ack_message.is_failure():
+                continue
 
-                        for in_message in {origin_message} | all_in_messages_of_comp: #todo send ackfail all unacked in_message
-                            if isinstance(origin_message, ConstraintPortMessage):
-                                to_send_ack = AckFailure(comp_name, in_message.source, in_message, new_cause)
-                            elif isinstance(origin_message, ConstraintValueMessage):
-                                to_send_ack = ConfFailure(comp_name, in_message.source, in_message.confname, new_cause)
-                            else:
-                                continue
+            there_are_accept_acks_to_send = False
 
-                            result[to_send_ack.target].add(to_send_ack)
+            if got_ack_message is None or not got_ack_message.is_failure():
+                continue
+
+            # get the origin_constraint who caused this message
+            origin_constraint = node.get_origin_constraint_of_a_message(message)
+            if origin_constraint is not None:
+                # We don't go into this condition if no message led to this out message, that is it is initiated from root
+                # get the origin_message, if exists, who caused this origin_constraint.
+                origin_message: ConstraintMessage = node.get_origin_of_constraint(origin_constraint)
+                # send AckFail to this message
+                # TODO prefix this cause by what,local transitive information,
+                new_cause = got_ack_message.cause + f"/\\ trans({origin_constraint},on::{comp_name}) "
+
+                for in_message in {origin_message} | all_in_messages_of_comp: #todo send ackfail all unacked in_message
+                    if isinstance(origin_message, ConstraintPortMessage):
+                        to_send_ack = AckFailure(comp_name, in_message.source, in_message, new_cause)
+                    elif isinstance(origin_message, ConstraintValueMessage):
+                        to_send_ack = ConfFailure(comp_name, in_message.source, in_message, new_cause)
+                    else:
+                        continue
+
+                    result[to_send_ack.target].add(to_send_ack)
 
         if there_are_accept_acks_to_send:
             for message in all_in_messages_of_comp:
@@ -1516,7 +1537,7 @@ def cr_ack_default(node: CostRegularNode):
                     result[message.source].add(to_send_ack)
 
                 elif isinstance(message, ConstraintValueMessage):
-                    to_send_ack = ConfSuccess(comp_name, message.source, message.confname)
+                    to_send_ack = ConfSuccess(comp_name, message.source, message)
                     result[message.source].add(to_send_ack)
 
         """Cyclic constraints ack management:
@@ -1541,14 +1562,14 @@ def cr_ack_default(node: CostRegularNode):
                         result[message.source].add(to_send_ack)
 
                     elif isinstance(message, ConstraintValueMessage):
-                        to_send_ack = ConfSuccess(comp_name, message.source, message.confname)
+                        to_send_ack = ConfSuccess(comp_name, message.source, message)
                         result[message.source].add(to_send_ack)
 
     return result
 
 
 
-def cr_ack(node: CostRegularNode, ack: Optional[Acknowledgement]=None):
+def cr_ack(node: CostRegularNode, ack: Optional[AckFailure | ConfFailure]=None):
     """
     node: the node which will send acks 
     ack: if we preivously received a AckFailure, then we must send an ackfailure too..  

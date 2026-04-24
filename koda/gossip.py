@@ -1,15 +1,24 @@
+import random
+import time
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
+
 from ballet.utils.dict_utils import min_max_set_size_with_keys
 
-import time
-import sys
-import random
 
 class Acknowledgement(ABC):
     
-    def __init__(self):
-        pass
+    def __init__(self, source: str, target: str | None):
+        self._source = source
+        self._target = target
+
+    @property
+    def source(self):
+        return self._source
+
+    @property
+    def target(self):
+        return self._target
     
     def is_failure(self):
         return False
@@ -19,12 +28,19 @@ class Acknowledgement(ABC):
 
 
 class GlobalAcknowledgement(ABC):
-    
-    def __init__(self):
-        pass
-    
+
+    def __init__(self, source: str):
+        self._source = source
+
+    @property
+    def source(self):
+        return self._source
+
     def is_failure(self):
-        pass
+        return False
+
+    def is_success(self):
+        return False
 
 class Node (ABC):
     
@@ -135,7 +151,7 @@ def gossip (node: Node, roots: list[str],
             f_local: Callable[[Model, Optional[bool]], tuple[list[Message], list[Acknowledgement]]], 
             f_msg: Callable[[Node, list[Message]], dict[Node, list[Message]]],
             f_enrich: Callable[[Model, list[Message]], Model],
-            f_ack: Callable[[Node, Acknowledgement], dict[Node, Acknowledgement]],
+            f_ack: Callable[[Node, list[Acknowledgement]], dict[Node, list[Acknowledgement]]],
             f_final: Callable[[Model], Solution],
             debug=False, timed=False, iteration=0):
     """
@@ -163,7 +179,7 @@ def gossip (node: Node, roots: list[str],
     model = f_init(node)
     ended_resolution = False
     # Initially, only node considered as roots must process an initial CP solving
-    node_is_root = node.is_root(roots)
+    node_is_root = node.is_root()
     must_solve = node_is_root
     # Different tracker for debug and unsat management
     nloop = 0
@@ -192,7 +208,7 @@ def gossip (node: Node, roots: list[str],
             all_acked, has_fail_ack = check_global_acks(node, roots)
             if all_acked:
                 break
-            if received_messages != []:
+            if received_messages:
                 must_solve = True
                 model = f_enrich(model, received_messages)
             if must_solve:
@@ -210,7 +226,7 @@ def gossip (node: Node, roots: list[str],
                 (out_messages, acks_refuse) = f_local(model, debug=debug)
                 if debug:
                     print("END SOLVE")
-                if acks_refuse != []:     
+                if acks_refuse:
                     # We face a failure... there is no solution? 
                     # We then have FailureAcks to send back
                     target_acks = f_ack(node, acks_refuse)

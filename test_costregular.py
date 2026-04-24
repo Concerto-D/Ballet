@@ -71,7 +71,7 @@ node = CostRegularNode(
     config_values=config_values,
     port_config_constraints=port_config_constraints,
 )
-roots = ['provider']
+roots = ['user']
 
 plan = gossip(node, roots, cr_init, cr_local, cr_msg, cr_enrich, cr_ack, cr_final, debug=True)
 

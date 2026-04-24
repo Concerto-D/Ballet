@@ -1106,7 +1106,8 @@ class MultiCostRegular(Model):
         self._models[component].add_transition(label, _from, _to)
     
     def add_constraint(self, component, constraint):
+        print(f'{component}: ADD CONSTRAINT {constraint}', flush=True)
         self._models[component].add_constraint(constraint)
-        
+
     def get_model(self, key):
         return self._models[key]

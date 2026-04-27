@@ -930,9 +930,9 @@ class CostRegularNode(Node):
         # print(f"SENDING ACK {ack} ..... ")
         self.mark_in_message(ack.source, ack.constraint, ack)
         __sec_send_ack(ack)
-            
-        
-        
+
+
+
     def new_received_ack(self):
         for component in self._components:
             comp_name = component.name
@@ -1261,6 +1261,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
 
     for (comp_name, result) in results.items():
         component = node.components_from_str(comp_name)
+
         if result.is_sat:
             if debug:
                 print(f"{comp_name}:", flush=True)
@@ -1268,21 +1269,43 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
                 print("\tstates = ", cr_model.get_states(comp_name), flush=True)
                 print("\tsequence = ", cr_model.get_sequence(comp_name), flush=True)
                 print("\tconfiguration =", cr_model.get_conf_values(comp_name), flush=True)
+
             sequence = cr_model.get_sequence(comp_name)
+            constraints = cr_model.get_model(comp_name).constraints
+
             # Get message from configuration values
             for (conf_name, conf_value) in cr_model.get_conf_values(comp_name).items():
                 # If a transition is related to a constraint,
                 # we must emit a message with internal values of it
-                if (src := node.get_variable_source(conf_name)) != comp_name:
-                    if src is None:
-                        explanation = f'The config {conf_name} is not available on any node. Cannot proceed!'
-                        node.set_local_conflict(explanation)
-                        # FIXME: Should send ConfFailure ?
-                        return [], []
-                    if debug:
-                        print(f"\t{conf_name}[{src}]: {conf_value}", flush=True)
-                    message = ConstraintValueMessage(component.get_name(), src, conf_name, conf_value)
-                    out_messages.add(message)
+                constraint: BinConstraint | None = None
+                for c in constraints:
+                    if (
+                            isinstance(c, BinConstraint)
+                            and (c.left == conf_name or c.right == conf_name)
+                            and c.transition[1] in sequence
+                    ):
+                        constraint = c
+
+                if constraint is None:
+                    continue
+
+                src = node.get_variable_source(conf_name)
+
+                if src == comp_name:
+                    continue
+
+                if src is None:
+                    explanation = f'The config {conf_name} is not available on any node. Cannot proceed!'
+                    node.set_local_conflict(explanation)
+                    # FIXME: Should send ConfFailure ?
+                    return [], []
+
+                if debug:
+                    print(f"\t{conf_name}[{src}]: {conf_value}", flush=True)
+
+                message = ConstraintValueMessage(component.get_name(), src, conf_name, conf_value)
+                out_messages.add(message)
+
             # Get message from ports statuses
             for port_name in cr_model.get_port_statuses(comp_name):
                 port_status = cr_model.get_port_status(comp_name, port_name)
@@ -1293,6 +1316,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
                 out_messages = out_messages | msgs
             if debug:
                 print("\n", flush=True)
+
         else:
             all_reasons = [s for s in result.result.split('\n') if s.strip()]
             # TODO Koda what do we do if a constraint on confvalue is responsible ?
@@ -1307,13 +1331,17 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
                         for (message, _) in messages.items():
                             if message == reason_message:
                                 message_to_ack = message
-                    if message_to_ack is not None:
-                        if message_to_ack.is_port_message():
-                            fail_ack = AckFailure(comp_name, None, message_to_ack, explainity)
-                            opt_ack.add(fail_ack)
-                        elif message_to_ack.is_value_message():
-                            fail_ack = ConfFailure(comp_name, message_to_ack.source, message_to_ack, explainity)
-                            opt_ack.add(fail_ack)
+
+                    if message_to_ack is None:
+                        continue
+
+                    if isinstance(message_to_ack, ConstraintPortMessage):
+                        fail_ack = AckFailure(comp_name, None, message_to_ack, explainity)
+                        opt_ack.add(fail_ack)
+                    elif isinstance(message_to_ack, ConstraintValueMessage):
+                        fail_ack = ConfFailure(comp_name, message_to_ack.source, message_to_ack, explainity)
+                        opt_ack.add(fail_ack)
+
     out_messages = cr_model.get_node().remove_deplicata(out_messages)
     return out_messages, list(opt_ack)
 
@@ -1365,21 +1393,21 @@ def cr_msg(node: CostRegularNode, msgs: list[ConstraintMessage]): #-> dict[str, 
     out_messages = set()
 
     for msg in msgs:
+        if not check_to_be_diffused(node, msg):
+            continue
+
         if isinstance(msg, ConstraintPortMessage):
             # If source has no goal constraint, and no inferred constraint from remote message, do not create a message !
             # It means, it solves a model that was not needed to be solved... 
-            msg_to_be_diffused = check_to_be_diffused(node, msg)
-            if msg_to_be_diffused:
-                targets = node.use_by(msg.source, msg.port) + node.provide_by(msg.source, msg.port)
-                for target in targets:
-                    message = ConstraintPortMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.passed_by, msg.final)
-                    res[target].add(message)
-                    out_messages.add(message)
+            targets = node.use_by(msg.source, msg.port) + node.provide_by(msg.source, msg.port)
+            for target in targets:
+                message = ConstraintPortMessage(msg.source, target, msg.port, msg.status, msg.behavior, msg.passed_by, msg.final)
+                res[target].add(message)
+                out_messages.add(message)
 
         elif isinstance(msg, ConstraintValueMessage):
-            if node.is_comp_root(msg.source):#check_to_be_diffused(node, msg):
-                res[msg.target].add(msg)
-                out_messages.add(msg)
+            res[msg.target].add(msg)
+            out_messages.add(msg)
 
     node.add_consequence_of_constraints(node.get_lastest_constraints(), out_messages)
     return {k: list(v) for (k,v) in res.items()}

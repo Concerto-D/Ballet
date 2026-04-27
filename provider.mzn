@@ -38,15 +38,15 @@ constraint regular(sequence, transitions, uninstalled, {uninstalled,installed,ru
 
 % Reconfiguration goals as constraints
 var int: test3;
-var int: test1;
 var int: test2;
-constraint test1 == 0;
+var int: test1;
+constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == skip) -> (test1 == test3));
+constraint forall(i in 1..seq_length) ((states[i] == uninstalled /\ sequence[i] == install) -> (test1 == test3));
 constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == install) -> (test1 == test3));
 constraint test1 == 0;
 constraint forall(i in 1..seq_length) ((states[i] == installed /\ sequence[i] == install) -> (test1 == test3));
 constraint test2 == 1;
-constraint forall(i in 1..seq_length) ((states[i] == uninstalled /\ sequence[i] == install) -> (test1 == test3));
-constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == skip) -> (test1 == test3));
+constraint test1 == 0;
 
 
 % Goal

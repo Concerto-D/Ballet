@@ -4,6 +4,7 @@ from abc import ABC
 from collections import defaultdict
 from collections.abc import Iterable
 from concurrent import futures
+from dataclasses import dataclass
 from typing import Optional
 
 import grpc
@@ -19,283 +20,110 @@ from ballet.utils.dict_utils import reverse_dict
 from ballet.utils.list_utils import find
 from koda.cost_regular import (
     CRConstraint, CostRegular, MultiCostRegular, PortConstraint, TransitionConstraint,
-    BinConstraint, ValueConstraint, BinComparator, Var
+    BinConstraint, ValueConstraint, BinComparator, Var, PortStatus, Port, Transition
 )
-from koda.gossip import Node, Acknowledgement, GlobalAcknowledgement
+from koda.gossip import Node, Acknowledgement, GlobalAcknowledgement, Message, ComponentName
 from koda.grpc import gossip_pb2
 from koda.grpc import gossip_pb2_grpc
 
 
-class ConstraintMessage (ABC):
-
-    def __init__(self, source, target):
-        self._source = source
-        self._target = target
-
-    @property
-    def source(self):
-        return self._source
-
-    @property
-    def target(self):
-        return self._target
-    
-    def is_value_message(self):
-        return False
-    
-    def is_port_message(self):
-        return False
+@dataclass(unsafe_hash=True, slots=True)
+class ConstraintMessage(Message, ABC): ...
 
 
+@dataclass(unsafe_hash=True, slots=True)
 class ConstraintValueMessage(ConstraintMessage):
-
-    def __init__(self, source, target, confname: str, confvalue: int):
-        super().__init__(source, target)
-        self._confname = confname
-        self._confvalue = confvalue
-
-    @property
-    def confname(self):
-        return self._confname
-
-    @property
-    def confvalue(self):
-        return self._confvalue
+    confname: Var
+    confvalue: int
     
     def __str__(self):
-        return f"(from:{self._source}, to:{self._target}, {self._confname} == {self._confvalue})"
+        return f"(from:{self.source}, to:{self.target}, {self.confname} == {self.confvalue})"
 
-    def __eq__(self, value):
-        if not isinstance(value, ConstraintValueMessage):
-            return False
 
-        return (
-                self.source == value.source
-                and self.target == value.target
-                and self.confname == value.confname
-                and self.confvalue == value.confvalue
-        )
-                
-    def __hash__(self):
-        return hash(f"({self.source}->{self.target}:{self._confname} == {self._confvalue})")
-    
-    def is_value_message(self):
-        return True
-
-    
-
+@dataclass(unsafe_hash=True, slots=True)
 class ConstraintPortMessage(ConstraintMessage):
-    
-    def __init__(self, source, target, port, status, behavior, passed_by, final=False):
-        super().__init__(source, target)
-        self._port = port
-        self._status = status
-        if behavior == "" or  behavior == "None":
-            self._behavior = None
-        else:
-            self._behavior = behavior
-        self._final = final
-        self._passed_by = passed_by
-    
-    @property
-    def passed_by(self):
-        return self._passed_by
-
-    @property
-    def port(self):
-        return self._port
-
-    @property
-    def status(self):
-        return self._status
-
-    @property
-    def behavior(self):
-        return self._behavior
-
-    @property
-    def final(self):
-        return self._final
+    port: Port
+    status: PortStatus
+    behavior: Transition | None
+    passed_by: tuple[str]
+    final: bool = False
 
     def has_to_wait(self):
-        return not self._behavior == ""
-
-    def is_port_message(self):
-        return True
+        return not self.behavior == ""
     
     def __str__(self):
-        str_passed_by = f"[{','.join(self._passed_by)}]"
-        return f"(from:{self._source}, to:{self._target}, port:{self._port}, status:{self._status}, bhv:{self._behavior}, passedby: {str_passed_by},"+ f"final:{self._final})"
+        str_passed_by = f"[{','.join(self.passed_by)}]"
+        return f"(from:{self.source}, to:{self.target}, port:{self.port}, status:{self.status}, bhv:{self.behavior}, passedby: {str_passed_by},"+ f"final:{self.final})"
 
-    def __eq__(self, value):
-        if not isinstance(value, ConstraintPortMessage):
-            return False
-
-        return self.source == value.source and self.target == value.target \
-            and self.port == value.port and self.status == value.status \
-            and self.behavior == value.behavior \
-            and self.final == value.final
-
-    def __hash__(self):
-        return hash(f"({self.source}->{self.target}:{self.port}^{self._status}~{self.behavior}[{self.final}]||{','.join(self.passed_by)})")
-
-class ConfMessage(Acknowledgement):
-
-    def __init__(self, source: str, target: str, constraint: ConstraintValueMessage):
-        super().__init__(source, target)
-        self._constraint = constraint
-
-    @property
-    def constraint(self):
-        return self._constraint
+@dataclass(unsafe_hash=True, slots=True)
+class ConfMessage(Acknowledgement, ABC):
+    constraint: ConstraintValueMessage
 
     @property
     def confname(self):
         return self.constraint.confname
 
 
+@dataclass(unsafe_hash=True, slots=True)
 class ConfSuccess(ConfMessage):
 
     def is_success(self):
         return True
 
-    def __eq__(self, value):
-        if isinstance(value, ConfSuccess):
-            return self.source == value.source and self.target == value.target \
-                and self.confname == value.confname
-        return False
-
-    def __hash__(self):
-        return hash(f"{self.source},{self.target},{self.confname}")
-
     def __str__(self):
-        return (f"ConfSuccess(FROM {self.source} TO {self.target} ON {self.confname})")
+        return f"ConfSuccess(FROM {self.source} TO {self.target} ON {self.confname})"
 
 
+@dataclass(unsafe_hash=True, slots=True)
 class ConfFailure(ConfMessage):
-
-    def __init__(self, source: str, target: str, constraint: ConstraintValueMessage, cause: str):
-        super().__init__(source, target, constraint)
-        self._cause = cause
-
-    @property
-    def cause(self):
-        return self._cause
+    cause: str
 
     def is_failure(self):
         return True
 
-    def __eq__(self, value):
-        if isinstance(value, ConfFailure):
-            return self.source == value.source and self.target == value.target \
-                and self.confname == value.confname and self.cause == value.cause
-        return False
-
-    def __hash__(self):
-        return hash(f"{self.source},{self.target},{self.confname},{self.cause}")
-
     def __str__(self):
-        return (f"ConfFailure(FROM {self.source} TO {self.target} ON {self.confname} BECAUSE OF {self.cause})")
+        return f"ConfFailure(FROM {self.source} TO {self.target} ON {self.confname} BECAUSE OF {self.cause})"
 
 
-class AckMessage(Acknowledgement):
-
-    def __init__(self, source: str, target: str, constraint: ConstraintPortMessage):
-        super().__init__(source, target)
-        self._constraint = constraint
-
-    @property
-    def constraint(self):
-        return self._constraint
-
-    def set_target(self, value):
-        self._target = value
-
-
-class AckFailure (AckMessage):
-
-    def __init__(self, source: str, target: str, constraint: ConstraintPortMessage, cause: str):
-        super().__init__(source, target, constraint)
-        self._cause = cause
-
-    @property
-    def cause(self):
-        return self._cause
-
-    def is_failure(self):
-        return True
-
-    def __eq__(self, value):
-        if isinstance(value, AckFailure):
-            return self.source == value.source and self.target == value.target \
-                and self.constraint == value.constraint and self.cause == value.cause
-        return False
-
-    def __hash__(self):
-        return hash(f"{self.source},{self.target},{self.constraint},{self.cause}")
-
-    def __str__(self):
-        return (f"AckFailure(FROM {self.source} TO {self.target} ON {self.constraint} BECAUSE OF {self.cause})")
-
-
+@dataclass(unsafe_hash=True, slots=True)
+class AckMessage(Acknowledgement, ABC):
+    target: ComponentName | None
+    constraint: ConstraintPortMessage
 
 class AckSuccess (AckMessage):
 
-    def __init__(self, source: str, target: str, constraint: ConstraintPortMessage):
-        super().__init__(source, target, constraint)
-
     def is_success(self):
         return True
-
-    def __eq__(self, value):
-        if isinstance(value, AckSuccess):
-            return self.source == value.source and self.target == value.target \
-                and self.constraint == value.constraint
-        return False
-
-    def __hash__(self):
-        return hash(f"{self.source},{self.target},{self.constraint}")
 
     def __str__(self):
         return f"AckSuccess(FROM {self.source} TO {self.target} ON {self.constraint})"
 
+@dataclass(unsafe_hash=True, slots=True)
+class AckFailure (AckMessage):
+    cause: str
 
+    def is_failure(self):
+        return True
+
+    def __str__(self):
+        return f"AckFailure(FROM {self.source} TO {self.target} ON {self.constraint} BECAUSE OF {self.cause})"
+
+
+@dataclass(unsafe_hash=True, slots=True)
 class GlobalAckSuccess(GlobalAcknowledgement):
-
-    def __init__(self, source: str):
-        super().__init__(source)
 
     def is_success(self):
         return True
-
-    def __eq__(self, value):
-        if isinstance(value, GlobalAckSuccess):
-            return self.source == value.source
-        return False
-
-    def __hash__(self):
-        return hash(f"global-success-{self.source}")
 
     def __str__(self):
         return f"global-success-{self.source}"
 
 
-
+@dataclass(unsafe_hash=True, slots=True)
 class GlobalAckFailure(GlobalAcknowledgement):
-
-    def __init__(self, source: str):
-        super().__init__(source)
 
     def is_failure(self):
         return True
-
-    def __eq__(self, value):
-        if isinstance(value, GlobalAckFailure):
-            return self.source == value.source
-        return False
-
-    def __hash__(self):
-        return hash(f"global-failure-{self.source}")
 
     def __str__(self):
         return f"global-failure-{self.source}"
@@ -881,7 +709,7 @@ class CostRegularNode(Node):
             messages = self._p2p_service.get_messages(comp_name)
             # all_new_messages = all_new_messages | messages
             for message in messages:
-                if message.is_port_message():
+                if isinstance(message, ConstraintPortMessage):
                     for passed_by in message.passed_by:
                         if passed_by not in self._passed_by:
                             self._passed_by.add(passed_by)
@@ -1112,6 +940,7 @@ def refine_status(sequence, port_status):
 def make_port_messages(sequence, port_name, port_status, passed_by, component: Component) -> set[ConstraintPortMessage]:
     curr_passed_by = set_utils.copy(passed_by)
     curr_passed_by.add(component.get_name())
+    curr_passed_by = tuple(curr_passed_by)
     result = set()
     port = find(lambda p: p[0] == port_name, component.get_ports())
     port_type = port[1]
@@ -1232,7 +1061,7 @@ def split_reason(reason):
             infered.replace(")","").replace("infer(","").replace("goal(","").split('_9_')
         msg_isFinal = True if msg_isFinal == "True" or msg_isFinal == "1" else False
         msg_behavior = None if msg_behavior == "None" else msg_behavior
-        reason_message = ConstraintPortMessage(msg_source, msg_target, msg_port, msg_status, msg_behavior, [], msg_isFinal) # HERE also get the real message, with passed_by
+        reason_message = ConstraintPortMessage(msg_source, msg_target, msg_port, msg_status, msg_behavior, tuple(), msg_isFinal) # HERE also get the real message, with passed_by
         reason_constraint = PortConstraint(port_name, status, infered, isFinal, isGoal)
     elif string_utils.startswith(reason, "transition"):
         port_reason = reason[len("transition")+1:-1]
@@ -1242,7 +1071,7 @@ def split_reason(reason):
             infered.replace(")","").replace("infer(","").replace("goal(","").split('_9_')
         msg_isFinal = True if msg_isFinal == "True" or msg_isFinal == "1" else False
         msg_behavior = None if msg_behavior == "None" else msg_behavior
-        reason_message = ConstraintPortMessage(msg_source, msg_target, msg_port, msg_status, msg_behavior, [], msg_isFinal) # HERE also get the real message, with passed_by
+        reason_message = ConstraintPortMessage(msg_source, msg_target, msg_port, msg_status, msg_behavior, tuple(), msg_isFinal) # HERE also get the real message, with passed_by
         reason_constraint = TransitionConstraint(transition, infered, isGoal)
     return reason_constraint,reason_message
 
@@ -1511,7 +1340,7 @@ def cr_ack_with_ack(node: CostRegularNode, ack: list[AckFailure | ConfFailure] |
         else:
             continue
 
-        fail_ack.set_target(target)
+        fail_ack.target = target
         result[target].add(fail_ack)
 
     return result

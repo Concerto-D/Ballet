@@ -1,24 +1,23 @@
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from dataclasses import dataclass
+from typing import Callable, Optional, NewType
 
 from ballet.utils.dict_utils import min_max_set_size_with_keys
 
+ComponentName = NewType('ComponentName', str)
 
+@dataclass
+class Message(ABC):
+    source: ComponentName
+    target: ComponentName
+
+
+@dataclass
 class Acknowledgement(ABC):
-    
-    def __init__(self, source: str, target: str | None):
-        self._source = source
-        self._target = target
-
-    @property
-    def source(self):
-        return self._source
-
-    @property
-    def target(self):
-        return self._target
+    source: ComponentName
+    target: ComponentName
     
     def is_failure(self):
         return False
@@ -27,14 +26,9 @@ class Acknowledgement(ABC):
         return False
 
 
+@dataclass
 class GlobalAcknowledgement(ABC):
-
-    def __init__(self, source: str):
-        self._source = source
-
-    @property
-    def source(self):
-        return self._source
+    source: ComponentName
 
     def is_failure(self):
         return False
@@ -42,10 +36,8 @@ class GlobalAcknowledgement(ABC):
     def is_success(self):
         return False
 
-class Node (ABC):
-    
-    def __init__(self):
-        pass
+
+class Node(ABC):
         
     @abstractmethod  
     def get_global_acks(self):
@@ -83,7 +75,7 @@ class Node (ABC):
     def get_failing_reasons(self):
         pass
     
-class Model (ABC):
+class Model(ABC):
     
     @abstractmethod
     def solve(self):
@@ -94,19 +86,7 @@ class Model (ABC):
         pass
 
 
-class Message(ABC):
-    
-    @abstractmethod
-    def source(self):
-        pass
-    
-    @abstractmethod
-    def target(self):
-        pass
-
-
-class Solution(ABC):
-    pass
+class Solution(ABC): ...
 
 """ Check if one root of the gossip diffusion has sent a global ack """
 def __is_acked(list_of_global_acks, root):

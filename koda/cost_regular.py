@@ -2,10 +2,12 @@ import concurrent.futures
 import json
 import subprocess
 import time
+from abc import abstractmethod
 from collections.abc import Collection
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import NewType
+from typing import NewType, Sequence
 
 from minizinc import Instance, Model as mznModel, Solver, Status
 
@@ -13,7 +15,7 @@ from ballet.assembly.concertod.component import Component
 from ballet.planner.goal import *
 from ballet.utils import string_utils
 from ballet.utils.list_utils import flatmap, indexify, indexOf, count
-from koda.gossip import Model, Solution, Node
+from koda.gossip import Model, Solution, Node, ComponentName
 
 State = NewType('State', str)
 Transition = NewType('Transition', str)
@@ -63,13 +65,11 @@ class CRSolution(Solution):
         return getattr(self.__result, key)
             
 
-class CRConstraint:
-    
-    def __init__(self, goal: bool = False):
-        self.__goal = goal
-    
+class CRConstraint(ABC):
+
+    @abstractmethod
     def isGoal(self) -> bool:
-        return self.__goal
+        raise NotImplemented
     
     def isStateConstraint(self):
         return False
@@ -89,199 +89,88 @@ class CRConstraint:
     def isMultiPortConstraint(self):
         return False
 
-class BinConstraint (CRConstraint):
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
+class BinConstraint(CRConstraint):
+    left: Var
+    right: Var
+    comparator: BinComparator
+    transition: tuple[State, Transition] | None = None
 
-    def __init__(self, left: Var, right: Var, ope: BinComparator, transition: tuple[State, Transition] | None = None):
-        super().__init__()
-        self.__left = left
-        self.__right = right
-        self.__ope = ope
-        self.__assoc_transition = transition
+    def isGoal(self) -> bool:
+        return False
 
-    @property
-    def left(self) -> Var:
-        return self.__left
-
-    @property
-    def right(self) -> Var:
-        return self.__right
-
-    @property
-    def comparator(self) -> BinComparator:
-        return self.__ope
-
-    @property
-    def transition(self) -> tuple[str, str] | None:
-        return self.__assoc_transition
-    
     def isBinConstraint(self) -> bool:
         return True
 
 
-class ValueConstraint (CRConstraint):
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
+class ValueConstraint(CRConstraint):
+    name: Var
+    value: int
 
-    def __init__(self, name: Var, value: int):
-        super().__init__()
-        self.__name = name 
-        self.__val = value
-
-    @property
-    def name(self) -> Var:
-        return self.__name
-    
-    @property
-    def value(self) -> int:
-        return self.__val
+    def isGoal(self) -> bool:
+        return False
     
     def isValueConstraint(self):
         return True
 
 
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class StateConstraint(CRConstraint):
-    
-    def __init__(self, state: State, source: str ="NO SOURCE IS SPECIFIED", final: bool =False, goal: bool=False):
-        super().__init__(goal)
-        self.__state = state
-        self.__final = final
-        self.__source = source
-        
+    state: State
+    source: str = "NO SOURCE IS SPECIFIED"
+    final: bool = False
+    goal: bool = False
+
+    def isGoal(self) -> bool:
+        return self.goal
+
     def isStateConstraint(self):
         return True
-        
-    @property
-    def final(self) -> bool:
-        return self.__final
-        
-    @property
-    def state(self) -> State:
-        return self.__state
-        
-    @property
-    def source(self) -> str:
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, StateConstraint):
-            return value.final == self.final and \
-                value.state == self.state and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(str(self.final)+ self.state + self.source + str(self.isGoal()))
-        
+
+
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class PortConstraint(CRConstraint):
-    
-    def __init__(self, port: Port, status: PortStatus, source: str="NO SOURCE IS SPECIFIED", final: bool=False, goal: bool=False):
-        super().__init__(goal)
-        self.__port = port
-        self.__status = status
-        self.__final = final
-        self.__source = source
+    port: Port
+    status: PortStatus
+    source: str="NO SOURCE IS SPECIFIED"
+    final: bool=False
+    goal: bool=False
+
+    def isGoal(self) -> bool:
+        return self.goal
         
     def isPortConstraint(self):
         return True
-    
-    @property
-    def port(self) -> Port:
-        return self.__port
-    
-    @property
-    def status(self) -> PortStatus:
-        return self.__status
-    
-    @property
-    def final(self) -> bool:
-        return self.__final
-        
-    @property
-    def source(self):
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, PortConstraint):
-            return value.port == self.port and \
-                value.status == self.status and \
-                value.final == self.final and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(str(self.final)+ self.port + self.status + self.source + str(self.isGoal()))
-    
 
+
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class MultiPortConstraint(CRConstraint):
-    
-    def __init__(self, ports: list[Port], status: PortStatus, source: str="NO SOURCE IS SPECIFIED", final: bool=False, goal: bool=False):
-        super().__init__(goal)
-        self.__ports = ports
-        self.__status = status
-        self.__final = final
-        self.__source = source
+    ports: list[Port]
+    status: PortStatus
+    source: str = "NO SOURCE IS SPECIFIED"
+    final: bool = False
+    goal: bool = False
+
+    def isGoal(self) -> bool:
+        return self.goal
         
     def isMultiPortConstraint(self):
         return True
-    
-    @property
-    def ports(self) -> list[Port]:
-        return self.__ports
-    
-    @property
-    def status(self) -> PortStatus:
-        return self.__status
-    
-    @property
-    def final(self) -> bool:
-        return self.__final
-        
-    @property
-    def source(self) -> str:
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, MultiPortConstraint):
-            return value.ports == self.ports and \
-                value.status == self.status and \
-                value.final == self.final and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(str(self.final)+ '-'.join(self.ports) + self.status + self.source + str(self.isGoal()))
-    
 
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class TransitionConstraint(CRConstraint):
-    
-    def __init__(self, transition: Transition, source: str="NO SOURCE IS SPECIFIED", goal: bool=False):
-        super().__init__(goal)
-        self.__transition = transition
-        self.__source = source
+    transition: Transition
+    source: str = "NO SOURCE IS SPECIFIED"
+    goal: bool = False
+
+    def isGoal(self) -> bool:
+        return self.goal
     
     def isTransitionConstraint(self):
         return True
-        
-    @property
-    def transition(self) -> Transition:
-        return self.__transition
-        
-    @property
-    def source(self) -> str:
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, TransitionConstraint):
-            return value.transition == self.transition and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(self.transition + self.source + str(self.isGoal()))
 
- 
+
 class CostRegular(Model):
 
     def __init__(self, states: list[State], transitions: list[Transition],
@@ -363,7 +252,7 @@ class CostRegular(Model):
                 assert constraint.state in states
     
     @staticmethod
-    def constraint_from_goal(goal: Goal, cause, component:Component=None, active=None):
+    def constraint_from_goal(goal: Goal, cause: str, component: Component = None, active: State | None = None):
         if isinstance(goal, BehaviorReconfigurationGoal):
             return TransitionConstraint(transition = Transition(goal.behavior()), source=cause, goal=True)
         elif isinstance(goal, PlaceReconfigurationGoal):
@@ -378,13 +267,13 @@ class CostRegular(Model):
             )
         elif isinstance(goal, StateReconfigurationGoal):
             if goal.state() == "deployed" or goal.state() == "running":
-                to_reach = component.running_place 
+                to_reach = State(component.running_place)
             elif goal.state() == "destroyed":
-                to_reach = component.initial_place_place
-            elif goal.state() == "current" or goal.state() == "initial":
+                to_reach = State(component.initial_place_place)
+            elif (goal.state() == "current" or goal.state() == "initial") and active is not None:
                 to_reach = active
             else:
-                to_reach = goal.state()
+                to_reach = State(goal.state())
             return StateConstraint(state=to_reach, source=cause, final=goal.final(), goal=True)
 
         else:
@@ -936,8 +825,8 @@ include "regular.mzn";
                             
 int: seq_length = {seq_length};
 
-enum STATE = {{{','.join(self.states)}}};
-enum BEHAVIOR = {{{','.join(self.transitions)}}}; 
+enum STATE = {{{','.join(sorted(self.states))}}};
+enum BEHAVIOR = {{{','.join(sorted(self.transitions))}}}; 
 enum STATUS = {{enabled, disabled}};
 
 array[STATE, BEHAVIOR] of opt STATE: transitions = 
@@ -1102,37 +991,37 @@ class MultiCostRegular(Model):
         return self._solutions
 
 
-    def get_constraints(self):
-        constraints = {}
-        for cmp in self.get_components():
-            constraints[cmp] = self.get_model(cmp).constraints
-        return constraints
+    def get_constraints(self) -> dict[ComponentName, Collection[CRConstraint]]:
+        return {
+            component: self.get_model(cmp).constraints
+            for component in self.get_components()
+        }
 
     def get_node(self):
         return self._node
 
-    def get_components(self):
-        return list(self._solutions.keys())
+    def get_components(self) -> list[ComponentName]:
+        return [ComponentName(key) for key in self._solutions.keys()]
 
-    def get_solution(self, key):
+    def get_solution(self, key: ComponentName):
         return self._solutions[key]
     
-    def get_port_status(self, component, port):
+    def get_port_status(self, component: ComponentName, port: Port):
         return self._port_status[component][port][:self.__first_skip[component]+1]
     
-    def get_port_statuses(self, component):
+    def get_port_statuses(self, component: ComponentName):
         result = {}
         for port in self._port_status[component].keys():
             result[port] = self._port_status[component][port][:self.__first_skip[component]+1]
         return result
     
-    def get_sequence(self, component):
+    def get_sequence(self, component: ComponentName) -> Sequence[Transition]:
         try:
             return self._solutions[component].get("sequence")[:self.__first_skip[component]]
         except:
             return []
-        
-    def get_conf_values(self, component):
+
+    def get_conf_values(self, component: ComponentName):
         try:
             res = {}
             for conf_name in self.get_model(component).get_conf_names():
@@ -1141,15 +1030,15 @@ class MultiCostRegular(Model):
         except:
             return {}
     
-    def get_states(self, component):
+    def get_states(self, component: ComponentName) -> Sequence[State]:
         return self._solutions[component].get("states")[:self.__first_skip[component]+1]
     
-    def add_transition(self, component, label, _from, _to, ):
+    def add_transition(self, component: ComponentName, label: Transition, _from: State, _to: State) -> None:
         self._models[component].add_transition(label, _from, _to)
     
-    def add_constraint(self, component, constraint):
+    def add_constraint(self, component: ComponentName, constraint: CRConstraint) -> None:
         print(f'{component}: ADD CONSTRAINT {constraint}', flush=True)
         self._models[component].add_constraint(constraint)
 
-    def get_model(self, key):
+    def get_model(self, key: ComponentName) -> CostRegular:
         return self._models[key]

@@ -14,7 +14,6 @@ from ballet.assembly.concertod.dependency import DepType
 from ballet.assembly.plan.plan import Plan, Wait, PushB, merge_plans
 from ballet.planner.automata import matrix_from_concerto_component
 from ballet.planner.goal import Goal
-from ballet.utils import string_utils
 from ballet.utils.dict_utils import reverse_dict
 from ballet.utils.list_utils import find
 from koda.cost_regular import (
@@ -48,7 +47,7 @@ from koda.grpc import gossip_pb2_grpc
 class ConstraintMessage(Message, ABC): ...
 
 
-@dataclass(unsafe_hash=True, slots=True)
+@dataclass(slots=True)
 class ConstraintValueMessage(ConstraintMessage):
     confname: Var
     confvalue: int
@@ -56,10 +55,12 @@ class ConstraintValueMessage(ConstraintMessage):
     def __str__(self):
         return f"(from:{self.source}, to:{self.target}, {self.confname} == {self.confvalue})"
 
+    def __hash__(self):
+        return hash(str(self))
+
 
 @dataclass(slots=True)
 class ConstraintPortMessage(ConstraintMessage):
-    target: ComponentName | None
     port: Port
     status: PortStatus
     behavior: Transition | None
@@ -111,7 +112,6 @@ class ConfFailure(ConfMessage):
 
 @dataclass(unsafe_hash=True, slots=True)
 class AckMessage(Acknowledgement, ABC):
-    target: ComponentName | None
     constraint: ConstraintPortMessage
 
 
@@ -663,10 +663,14 @@ class CostRegularNode(Node):
         self._passed_by: set[ComponentName] = set()
         # Communication management
         self.__global_acks = set()
-        self.__out_message = {
+        self.__out_message: dict[
+            ComponentName, dict[ConstraintMessage, Acknowledgement | None]
+        ] = {
             comp_name: {} for comp_name in self.__dict_components.keys()
         }  # pour chaque message envoyé, a-t-il recu un ack? Et quel ack?
-        self.__in_message = {
+        self.__in_message: dict[
+            ComponentName, dict[ConstraintMessage, Acknowledgement | None]
+        ] = {
             comp_name: {} for comp_name in self.__dict_components.keys()
         }  # pour chaque message recu, a-t-il deja validé via un ack?
         self._p2p_service = CRP2P(port, inventory)
@@ -754,21 +758,18 @@ class CostRegularNode(Node):
     def add_origin_of_constraint(self, constraint, message):
         self.__origin_of_constraint[constraint] = message
 
-    def get_origin_of_constraint(self, constraint: CRConstraint) -> ConstraintMessage:
-        for constr, origin in self.__origin_of_constraint.items():
-            if constraint == constr:
-                return origin
-        return None
+    def get_origin_of_constraint(
+        self, constraint: CRConstraint
+    ) -> ConstraintMessage | None:
+        return self.__origin_of_constraint.get(constraint)
 
     def get_all_origins_of_constraint(self):
         return self.__origin_of_constraint
 
     def get_origin_constraint_of_a_message(
         self, message: ConstraintMessage
-    ) -> CRConstraint:
-        if message in self.__origin_constraint_of_message.keys():
-            return self.__origin_constraint_of_message[message]
-        return None
+    ) -> CRConstraint | None:
+        return self.__origin_constraint_of_message.get(message)
 
     def get_all_origin_constraints_of_a_message(self):
         return self.__origin_constraint_of_message
@@ -812,7 +813,7 @@ class CostRegularNode(Node):
     def new_received_messages(self):
         all_new_messages = set()
         for component in self._components:
-            comp_name = component.name
+            comp_name = ComponentName(component.name)
             messages = self._p2p_service.get_messages(comp_name)
             # all_new_messages = all_new_messages | messages
             for message in messages:
@@ -870,7 +871,7 @@ class CostRegularNode(Node):
 
     def new_received_ack(self):
         for component in self._components:
-            comp_name = component.name
+            comp_name = ComponentName(component.name)
             acks = self._p2p_service.get_acks(comp_name)
             for ack in acks:
                 for message in self.__out_message[comp_name].keys():
@@ -1220,13 +1221,9 @@ def cr_init(cr_node: CostRegularNode):
 
 
 def is_caused_internally(reason: str):
-    if string_utils.startswith(reason, "model") or string_utils.startswith(
-        reason, "state"
-    ):
+    if reason.startswith("model") or reason.startswith("state"):
         return True
-    elif string_utils.startswith(reason, "port") or string_utils.startswith(
-        reason, "transition"
-    ):
+    elif reason.startswith("port") or reason.startswith("transition"):
         return "infer" not in reason
     else:
         return True
@@ -1234,7 +1231,7 @@ def is_caused_internally(reason: str):
 
 def split_reason(reason):
     reason_constraint, reason_message = None, None
-    if string_utils.startswith(reason, "port"):
+    if reason.startswith("port"):
         port_reason = reason[len("port") + 1 : -1]
         port_name, status, isFinal, isGoal_asInt, infered = port_reason.split(",")
         isFinal = True if isFinal == "True" or isFinal == "1" else False
@@ -1257,7 +1254,7 @@ def split_reason(reason):
             msg_isFinal,
         )  # HERE also get the real message, with passed_by
         reason_constraint = PortConstraint(port_name, status, infered, isFinal, isGoal)
-    elif string_utils.startswith(reason, "transition"):
+    elif reason.startswith("transition"):
         port_reason = reason[len("transition") + 1 : -1]
         transition, isGoal_asInt, infered = port_reason.split(",")
         isGoal = True if isGoal_asInt == "1" else False
@@ -1499,13 +1496,13 @@ def cr_msg(
 
 
 def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
-    new_constraints = set()
+    new_constraints: set[CRConstraint] = set()
 
-    def __get_places(component, port):
+    def __get_places(component: Component, port: Port):
         tmp_ports = reverse_dict(component.get_bindings())
         tmp_places = tmp_ports[port]
         result = []
-        model_states = model.get_model(component.name).states
+        model_states = model.get_model(ComponentName(component.name)).states
         for place in tmp_places:
             if place in model_states:
                 result.append(place)
@@ -1519,7 +1516,7 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
                 message.source, message.port, message.target
             ) + node.provide_by_port(message.source, message.port, message.target)
             for connected_port in connected_ports:
-                port_constraint = PortConstraint(
+                port_constraint: PortConstraint = PortConstraint(
                     connected_port,
                     message.status,
                     source=msg_source,
@@ -1629,7 +1626,7 @@ def cr_ack_with_ack(
     ack: list[AckFailure | ConfFailure] | AckFailure | ConfFailure,
 ):
     node.new_received_ack()
-    result: dict[Node, set[Acknowledgement]] = defaultdict(set)
+    result: dict[ComponentName, set[Acknowledgement]] = defaultdict(set)
     fail_acks: list[AckFailure | ConfFailure] = []
 
     if isinstance(ack, (AckFailure, ConfFailure)):
@@ -1650,8 +1647,9 @@ def cr_ack_with_ack(
         else:
             continue
 
-        fail_ack.target = target
-        result[target].add(fail_ack)
+        if target is not None:
+            fail_ack.target = target
+            result[target].add(fail_ack)
 
     return result
 
@@ -1689,9 +1687,8 @@ def cr_ack_default(node: CostRegularNode):
                     + f"/\\ trans({origin_constraint},on::{comp_name}) "
                 )
 
-                for in_message in {
-                    origin_message
-                } | all_in_messages_of_comp:  # todo send ackfail all unacked in_message
+                for in_message in {origin_message} | all_in_messages_of_comp:
+                    # todo send ackfail all unacked in_message
                     if isinstance(origin_message, ConstraintPortMessage):
                         to_send_ack = AckFailure(
                             comp_name, in_message.source, in_message, new_cause

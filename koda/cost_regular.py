@@ -2,17 +2,23 @@ import concurrent.futures
 import json
 import subprocess
 import time
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections.abc import Collection
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import NewType, Sequence
+from typing import NewType, Sequence, Any
 
 from minizinc import Instance, Model as mznModel, Solver, Status
 
 from ballet.assembly.concertod.component import Component
-from ballet.planner.goal import *
+from ballet.planner.goal import (
+    Goal,
+    BehaviorReconfigurationGoal,
+    PlaceReconfigurationGoal,
+    PortReconfigurationGoal,
+    StateReconfigurationGoal,
+)
 from ballet.utils import string_utils
 from ballet.utils.list_utils import indexOf, count
 from koda.gossip import Model, Solution, Node, ComponentName
@@ -315,23 +321,26 @@ class CostRegular(Model):
             else:
                 to_reach = State(goal.state())
             return StateConstraint(
-                state=to_reach, source=cause, final=goal.final(), goal=True
+                state=to_reach,
+                source=cause,
+                final=goal.final(),
+                goal=True,
             )
 
         else:
             raise ValueError
 
     @property
-    def states(self) -> set[State]:
-        return self.__states
+    def states(self) -> Sequence[State]:
+        return sorted(self.__states)
 
     @property
     def init_state(self) -> State:
         return self.__init_state
 
     @property
-    def transitions(self) -> set[Transition]:
-        return self.__transitions
+    def transitions(self) -> Sequence[Transition]:
+        return sorted(self.__transitions)
 
     @property
     def automata(self) -> Automata:
@@ -369,33 +378,33 @@ class CostRegular(Model):
 
     def __make_mzn_transitions_line(self, state: State, undefined="<>"):
         targets = []
-        for transition in self.__transitions:
+        for transition in self.transitions:
             if (
-                state in self.__automata.keys()
-                and transition in self.__automata[state].keys()
+                state in self.automata.keys()
+                and transition in self.automata[state].keys()
             ):  # the transition exists
-                targets.append(self.__automata[state][transition])
+                targets.append(self.automata[state][transition])
             else:
                 targets.append(undefined)
         return "|" + ",".join(targets)
 
     def __make_choco_transitions_line(self, state: State):
         targets = []
-        for transition in self.__transitions:
+        for transition in self.transitions:
             if (
-                state in self.__automata.keys()
-                and transition in self.__automata[state].keys()
+                state in self.automata.keys()
+                and transition in self.automata[state].keys()
             ):  # the transition exists
-                targets.append(self.__automata[state][transition])
+                targets.append(self.automata[state][transition])
             else:
                 targets.append("any")
         return "{" + ",".join(targets) + "}"
 
     def __make_mzn_transitions_matrix(self):
-        lines = map(
-            lambda state: self.__make_mzn_transitions_line(state), self.__states
+        ll = "\n".join(
+            self.__make_mzn_transitions_line(state)
+            for state in self.states
         )
-        ll = "\n".join(lines)
         return "\n".join(
             f"""
 [{ll}|]""".split("\n")[1:]
@@ -403,25 +412,21 @@ class CostRegular(Model):
 
     def __make_mzn_global_transitions_matrix(self):
         error_line = "|" + ",".join(["error" for _ in range(len(self.transitions))])
-        lines = [error_line] + list(
-            map(
-                lambda state: self.__make_mzn_transitions_line(state, "error").replace(
-                    "<>", "error"
-                ),
-                self.__states,
-            )
+        ll = f"{error_line}\n" + "\n".join(
+            self.__make_mzn_transitions_line(state, "error").replace("<>", "error")
+            for state in self.states
         )
-        ll = "\n".join(lines)
         return "\n".join(
             f"""
 [{ll}|]""".split("\n")[1:]
         )
 
     def __make_choco_transitions_matrix(self):
-        lines = map(
-            lambda state: self.__make_choco_transitions_line(state), self.__states
+        ll = "\n".join(
+            f"\t\t{line}"
+            for state in self.states
+            for line in self.__make_choco_transitions_line(state)
         )
-        ll = "\n".join(map(lambda l: f"\t\t{l}", lines))
         return ",\n".join(
             f"""
 {ll}""".split("\n")[1:]
@@ -429,31 +434,33 @@ class CostRegular(Model):
 
     def __make_mzn_costs_line(self, state: State):
         targets = []
-        for transition in self.__transitions:
+        for transition in self.transitions:
             if (
-                state in self.__costs.keys()
-                and transition in self.__costs[state].keys()
+                state in self.costs.keys()
+                and transition in self.costs[state].keys()
             ):  # the transition has a cost
-                targets.append(str(self.__costs[state][transition]))
+                targets.append(str(self.costs[state][transition]))
             else:
                 targets.append(str(100000))
         return "|" + ",".join(targets)
 
     def __make_choco_costs_line(self, state: State):
         targets = []
-        for transition in self.__transitions:
+        for transition in self.transitions:
             if (
-                state in self.__costs.keys()
-                and transition in self.__costs[state].keys()
+                state in self.costs.keys()
+                and transition in self.costs[state].keys()
             ):  # the transition has a cost
-                targets.append(str(self.__costs[state][transition]))
+                targets.append(str(self.costs[state][transition]))
             else:
                 targets.append(str(100000))
         return "{" + ",".join(targets) + "}"
 
     def __make_mzn_costs_matrix(self):
-        lines = map(lambda state: self.__make_mzn_costs_line(state), self.__states)
-        ll = "\n".join(lines)
+        ll = "\n".join(
+            self.__make_mzn_costs_line(state)
+            for state in self.states
+        )
         return "\n".join(
             f"""
 [{ll}|]""".split("\n")[1:]
@@ -461,18 +468,21 @@ class CostRegular(Model):
 
     def __make_mzn_global_costs_matrix(self):
         error_line = "|" + ",".join([str(100000) for i in range(len(self.transitions))])
-        lines = [error_line] + list(
-            map(lambda state: self.__make_mzn_costs_line(state), self.__states)
+        ll = f"{error_line}\n" + "\n".join(
+            self.__make_mzn_costs_line(state)
+            for state in self.states
         )
-        ll = "\n".join(lines)
         return "\n".join(
             f"""
 [{ll}|]""".split("\n")[1:]
         )
 
     def __make_choco_costs_matrix(self):
-        lines = map(lambda state: self.__make_choco_costs_line(state), self.__states)
-        ll = ",\n".join(map(lambda l: f"\t\t{l}", lines))
+        ll = ",\n".join(
+            f"\t\t{line}"
+            for state in self.states
+            for line in self.__make_choco_costs_line(state)
+        )
         return "\n".join(
             f"""
 {ll}""".split("\n")[1:]
@@ -480,7 +490,7 @@ class CostRegular(Model):
 
     def __make_mzn_port_line(self, port: Port, places: Collection[State]):
         decl = f"array[1..seq_length+1] of var STATUS : {port}_status;"
-        disjunction = " \/ ".join(map(lambda place: f"states[i] = {place}", places))
+        disjunction = " \/ ".join(f"states[i] = {place}" for place in places)
         constr = f"constraint forall (i in 1..seq_length+1) ({port}_status[i] = enabled <-> {disjunction});"
         return [decl, constr]
 
@@ -505,15 +515,15 @@ class CostRegular(Model):
     def __make_mzn_ports_status_constraints(self) -> str:
         return "\n".join(
             line
-            for port in self.__ports.keys()
-            for line in self.__make_mzn_port_line(port, self.__ports[port])
+            for port in self.ports.keys()
+            for line in self.__make_mzn_port_line(port, self.ports[port])
         )
 
     def __make_choco_ports_status_constraints(self) -> str:
         return "\n".join(
             line
-            for port in self.__ports.keys()
-            for line in self.__make_choco_port_line(port, self.__ports[port])
+            for port in self.ports.keys()
+            for line in self.__make_choco_port_line(port, self.ports[port])
         )
 
     def __make_mzn_port_constraint_line(self, constraint: PortConstraint) -> list[str]:
@@ -550,9 +560,8 @@ class CostRegular(Model):
                 )
         res.append(f"var int: {count_name}; {suffix}")
         and_condition = " /\ ".join(
-            map(
-                lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports
-            )
+            f"{port}_status[i] = {constraint.status}"
+            for port in constraint.ports
         )
         res.append(
             f"constraint {count_name} = sum (i in 1..seq_length+1) ({and_condition});"
@@ -630,9 +639,8 @@ class CostRegular(Model):
                     f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}"
                 )
         and_condition = " /\ ".join(
-            map(
-                lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports
-            )
+            f"{port}_status[i] = {constraint.status}"
+            for port in constraint.ports
         )
         res.append(
             f"constraint count([({and_condition}) | i in 1..seq_length+1], true) > 0; {suffix}"
@@ -812,7 +820,7 @@ class CostRegular(Model):
             return []
 
     def __make_mzn_goal_constraints(self):
-        set_of_constraints = set(self.__constraints)
+        set_of_constraints = set(self.constraints)
         state_and_transition_constraints = filter(
             lambda c: c.isStateConstraint() or c.isTransitionConstraint(),
             set_of_constraints,
@@ -835,19 +843,15 @@ class CostRegular(Model):
         return "\n".join(lines)
 
     def __make_mzn_goal_global_constraints(self):
-        set_of_constraints = set(self.__constraints)
-        state_and_transition_constraints = filter(
-            lambda c: c.isStateConstraint() or c.isTransitionConstraint(),
-            set_of_constraints,
-        )
         lines = [
             line
-            for constraint in state_and_transition_constraints
+            for constraint in self.constraints
             for line in self.__make_mzn_global_constraint_line(constraint)
+            if isinstance(constraint, StateConstraint) or isinstance(constraint, TransitionConstraint)
         ]
         val_and_bin_constraints = {
             constraint
-            for constraint in set_of_constraints
+            for constraint in self.constraints
             if constraint.isValueConstraint() or constraint.isBinConstraint()
         }
         lines = lines + self.__make_mzn_values_constraints_lines(
@@ -860,7 +864,7 @@ class CostRegular(Model):
     def __make_choco_goal_constraints(self):
         return "\n".join(
             line
-            for constraint in self.__constraints
+            for constraint in self.constraints
             for line in self.__make_choco_constraint_line(constraint)
         )
 
@@ -872,70 +876,59 @@ class CostRegular(Model):
         filepath: Path | str = "model_component.json",
     ):
         # State constraints format
-        state_constraints = filter(lambda c: c.isStateConstraint(), self.constraints)
-        json_state_constraints = list(
-            map(
-                lambda constraint: {
-                    "state": constraint.state,
-                    "isFinal": int(constraint.final),
-                    "goal": int(constraint.isGoal()),
-                    "source": constraint.source,
-                },
-                state_constraints,
-            )
-        )
+        json_state_constraints = [
+             {
+                 "state": constraint.state,
+                 "isFinal": int(constraint.final),
+                 "goal": int(constraint.isGoal()),
+                 "source": constraint.source,
+             }
+            for constraint in self.constraints
+            if isinstance(constraint, StateConstraint)
+        ]
         # Port constraints format
-        port_constraints = filter(lambda c: c.isPortConstraint(), self.constraints)
-        json_port_constraints = list(
-            map(
-                lambda constraint: {
-                    "port": constraint.port,
-                    "status": constraint.status,
-                    "isFinal": int(constraint.final),
-                    "goal": int(constraint.isGoal()),
-                    "source": constraint.source,
-                },
-                port_constraints,
-            )
-        )
+        json_port_constraints = [
+            {
+                "port": constraint.port,
+                "status": constraint.status,
+                "isFinal": int(constraint.final),
+                "goal": int(constraint.isGoal()),
+                "source": constraint.source,
+            }
+            for constraint in self.constraints
+            if isinstance(constraint, PortConstraint)
+        ]
         # Multiport constraints format
-        multiport_constraints = filter(
-            lambda c: c.isMultiPortConstraint(), self.constraints
-        )
-        json_multiport_constraints = list(
-            map(
-                lambda constraint: {
-                    "ports": constraint.ports,
-                    "status": constraint.status,
-                    "isFinal": int(constraint.final),
-                    "goal": int(constraint.isGoal()),
-                    "source": constraint.source,
-                },
-                multiport_constraints,
-            )
-        )
+        json_multiport_constraints = [
+            {
+                "ports": constraint.ports,
+                "status": constraint.status,
+                "isFinal": int(constraint.final),
+                "goal": int(constraint.isGoal()),
+                "source": constraint.source,
+            }
+            for constraint in self.constraints
+            if isinstance(constraint, MultiPortConstraint)
+        ]
         # Transition constraints format
-        transition_constraints = filter(
-            lambda c: c.isTransitionConstraint(), self.constraints
-        )
-        json_transition_constraints = list(
-            map(
-                lambda constraint: {
-                    "transition": constraint.transition,
-                    "goal": int(constraint.isGoal()),
-                    "source": constraint.source,
-                },
-                transition_constraints,
-            )
-        )
+        json_transition_constraints = [
+            {
+                "transition": constraint.transition,
+                "goal": int(constraint.isGoal()),
+                "source": constraint.source,
+            }
+            for constraint in self.constraints
+            if isinstance(constraint, TransitionConstraint)
+        ]
         # Value constraints format
-        value_constraints = filter(lambda c: c.isValueConstraint(), self.constraints)
-        json_value_constraints = list(
-            map(
-                lambda constraint: {"name": constraint.name, "value": constraint.value},
-                value_constraints,
-            )
-        )
+        json_value_constraints = [
+            {
+                "name": constraint.name,
+                "value": constraint.value,
+            }
+            for constraint in self.constraints
+            if isinstance(constraint, ValueConstraint)
+        ]
 
         # Bin constraints format
         def __make_json_bin_constraint(constraint):
@@ -1024,8 +1017,8 @@ public class {classname} {{
 
 
         // Captured variables
-        IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, {len(self.__transitions) - 1});
-        IntVar[] states = model.intVarArray("states", seq_length + 1, 0, {len(self.__states) - 1});
+        IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, {len(self.transitions) - 1});
+        IntVar[] states = model.intVarArray("states", seq_length + 1, 0, {len(self.states) - 1});
         IntVar[] cost = model.intVarArray("cost", seq_length, 0, 1000000);
 
         for (int i = 0; i < seq_length; i++) {{
@@ -1044,7 +1037,7 @@ public class {classname} {{
 {self.__make_choco_ports_status_constraints()}
     
         // Init state
-        model.arithm(states[0], "=", {self.__init_state}).post();
+        model.arithm(states[0], "=", {self.init_state}).post();
         
         // Reconfiguration goals as constraints
 {self.__make_choco_goal_constraints()}
@@ -1070,7 +1063,7 @@ public class {classname} {{
 
     def __make_mzn_model(self, globalconstraint=True):
         nstate = len(self.states)
-        nwait = count(lambda b: b.startswith("wait"), self.transitions)
+        nwait = sum(b.startswith("wait") for b in self.transitions)
         nbhv = len(self.transitions) - nwait
         seq_length = nbhv * nstate + nwait
         if globalconstraint:
@@ -1107,8 +1100,8 @@ constraint forall (i in 1..seq_length) (cost[i] = costs[states[i],sequence[i]]);
 {self.__make_mzn_ports_status_constraints()}
 
 % Init state
-constraint states[1]={self.__init_state};
-constraint regular(sequence, transitions, {self.__init_state}, {{{",".join(self.states)}}});
+constraint states[1]={self.init_state};
+constraint regular(sequence, transitions, {self.init_state}, {{{",".join(self.states)}}});
 
 % Reconfiguration goals as constraints
 {goal_constraints}
@@ -1201,23 +1194,25 @@ minimize scost;
         file_name="model.mzn",
         print_model=False,
         solve_with="chuffed",
-    ):
+    ) -> CRSolution:
         # print(f"Solve with: {mode}, findMus: {findmus}, solver: {solve_with}")
         if mode == "minizinc":
             return self.solve_minizinc(
                 findmus, write_file, file_name, print_model, solve_with
             )
-        if mode == "choco":
+        elif mode == "choco":
             return self.solve_choco(findmus, write_file, file_name, print_model)
 
 
 class MultiCostRegular(Model):
-    def __init__(self, models: dict[str, CostRegular], node: Node):
+    def __init__(self, models: dict[ComponentName, CostRegular], node: Node):
         self._models = models
         self._node = node
-        self._solutions = {k: None for k in models.keys()}
-        self._port_status = {k: None for k in models.keys()}
-        self.__first_skip = {k: -1 for k in models.keys()}
+        self._solutions: dict[ComponentName, Any] = {k: None for k in models.keys()}
+        self._port_status: dict[ComponentName, dict[Port, Sequence[PortStatus]] | None] = {
+            k: None for k in models.keys()
+        }
+        self.__first_skip: dict[ComponentName, int] = {k: -1 for k in models.keys()}
 
     def solve(
         self,
@@ -1227,7 +1222,7 @@ class MultiCostRegular(Model):
         step="flocal",
         iteration=0,
     ):
-        def process_model(key, model):
+        def process_model(key: ComponentName, model: CostRegular):
             try:
                 real_mode = "minizinc" if mode == "minizinc-test" else mode
                 solution = model.solve(

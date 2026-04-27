@@ -1,6 +1,7 @@
 from typing import Any
 from ballet.assembly.concertod.component import Component
 from ballet.assembly.plan.plan import Instruction
+from ballet.planner.goal import ReconfigurationGoal
 from koda.gossip import gossip
 from koda.cr_gossip import (
     CostRegularNode,
@@ -11,7 +12,6 @@ from koda.cr_gossip import (
     cr_final,
     cr_ack,
 )
-from ballet.planner.goal import *
 
 
 def plan(

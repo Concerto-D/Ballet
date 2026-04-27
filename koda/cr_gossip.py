@@ -1282,6 +1282,7 @@ def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
                     if (
                             isinstance(c, BinConstraint)
                             and (c.left == conf_name or c.right == conf_name)
+                            and c.transition is not None
                             and c.transition[1] in sequence
                     ):
                         constraint = c

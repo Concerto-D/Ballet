@@ -3,18 +3,18 @@ include "regular.mzn";
                             
 int: seq_length = 12;
 
-enum STATE = {uninstalled,installed,running};
-enum BEHAVIOR = {install,stop,update,skip}; 
+enum STATE = {running,uninstalled,installed};
+enum BEHAVIOR = {update,stop,install,skip}; 
 enum STATUS = {enabled, disabled};
 
 array[STATE, BEHAVIOR] of opt STATE: transitions = 
-[|running,uninstalled,<>,uninstalled
-|running,uninstalled,installed,installed
-|running,uninstalled,installed,running|];
+[|installed,uninstalled,running,running
+|<>,uninstalled,running,uninstalled
+|installed,uninstalled,running,installed|];
 
 array[STATE, BEHAVIOR] of int: costs = 
-[|2,100000,100000,0
-|1,1,100000,0
+[|1,1,100000,0
+|100000,100000,2,0
 |100000,1,1,0|];
 
 % Captured variables
@@ -34,19 +34,19 @@ constraint forall (i in 1..seq_length+1) (service_status[i] = enabled <-> states
 
 % Init state
 constraint states[1]=uninstalled;
-constraint regular(sequence, transitions, uninstalled, {uninstalled,installed,running});
+constraint regular(sequence, transitions, uninstalled, {running,uninstalled,installed});
 
 % Reconfiguration goals as constraints
 var int: test3;
 var int: test2;
 var int: test1;
-constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == skip) -> (test1 == test3));
+constraint test1 == 0;
 constraint forall(i in 1..seq_length) ((states[i] == uninstalled /\ sequence[i] == install) -> (test1 == test3));
 constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == install) -> (test1 == test3));
 constraint test1 == 0;
 constraint forall(i in 1..seq_length) ((states[i] == installed /\ sequence[i] == install) -> (test1 == test3));
 constraint test2 == 1;
-constraint test1 == 0;
+constraint forall(i in 1..seq_length) ((states[i] == running /\ sequence[i] == skip) -> (test1 == test3));
 
 
 % Goal

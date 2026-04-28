@@ -1284,7 +1284,9 @@ def make_reason_explicit(reason):
     return reason
 
 
-def cr_local(cr_model: MultiCostRegular, write_file=False, debug=False, time=0):
+def cr_local(
+    cr_model: MultiCostRegular, write_file: bool = False, debug: bool = False
+) -> tuple[list[Message], list[Acknowledgement]]:
     if debug:
         write_file = True
     out_messages = set()

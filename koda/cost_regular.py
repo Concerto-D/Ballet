@@ -3,7 +3,7 @@ import json
 import subprocess
 import time
 from abc import abstractmethod, ABC
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -69,9 +69,14 @@ class CRSolution(Solution):
         return getattr(self.__result, key)
 
 
+@dataclass(frozen=True, slots=True)
 class CRConstraint(ABC):
     @abstractmethod
     def isGoal(self) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_json(self) -> Mapping[str, Sequence[str | int] | str | int]:
         raise NotImplementedError
 
     def isStateConstraint(self):
@@ -100,6 +105,19 @@ class BinConstraint(CRConstraint):
     comparator: BinComparator
     transition: tuple[State, Transition] | None = None
 
+    def to_json(self) -> Mapping[str, str]:
+        res: dict[str, str] = {
+            "left": self.left,
+            "right": self.right,
+            "comparator": self.comparator,
+        }
+
+        if self.transition is not None:
+            res["transition_source"] = self.transition[0]
+            res["transition_behavior"] = self.transition[1]
+
+        return res
+
     def isGoal(self) -> bool:
         return False
 
@@ -111,6 +129,12 @@ class BinConstraint(CRConstraint):
 class ValueConstraint(CRConstraint):
     name: Var
     value: int
+
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "name": self.name,
+            "value": self.value,
+        }
 
     def isGoal(self) -> bool:
         return False
@@ -125,6 +149,14 @@ class StateConstraint(CRConstraint):
     source: str = "NO SOURCE IS SPECIFIED"
     final: bool = False
     goal: bool = False
+
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "state": self.state,
+            "isFinal": int(self.final),
+            "goal": int(self.goal),
+            "source": self.source,
+        }
 
     def isGoal(self) -> bool:
         return self.goal
@@ -141,6 +173,15 @@ class PortConstraint(CRConstraint):
     final: bool = False
     goal: bool = False
 
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "port": self.port,
+            "status": self.status,
+            "isFinal": int(self.final),
+            "goal": int(self.goal),
+            "source": self.source,
+        }
+
     def isGoal(self) -> bool:
         return self.goal
 
@@ -156,6 +197,15 @@ class MultiPortConstraint(CRConstraint):
     final: bool = False
     goal: bool = False
 
+    def to_json(self) -> Mapping[str, Sequence[str | int] | str | int]:
+        return {
+            "ports": self.ports,
+            "status": self.status,
+            "isFinal": int(self.final),
+            "goal": int(self.goal),
+            "source": self.source,
+        }
+
     def isGoal(self) -> bool:
         return self.goal
 
@@ -168,6 +218,13 @@ class TransitionConstraint(CRConstraint):
     transition: Transition
     source: str = "NO SOURCE IS SPECIFIED"
     goal: bool = False
+
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "transition": self.transition,
+            "goal": int(self.goal),
+            "source": self.source,
+        }
 
     def isGoal(self) -> bool:
         return self.goal
@@ -401,10 +458,7 @@ class CostRegular(Model):
         return "{" + ",".join(targets) + "}"
 
     def __make_mzn_transitions_matrix(self):
-        ll = "\n".join(
-            self.__make_mzn_transitions_line(state)
-            for state in self.states
-        )
+        ll = "\n".join(self.__make_mzn_transitions_line(state) for state in self.states)
         return "\n".join(
             f"""
 [{ll}|]""".split("\n")[1:]
@@ -436,8 +490,7 @@ class CostRegular(Model):
         targets = []
         for transition in self.transitions:
             if (
-                state in self.costs.keys()
-                and transition in self.costs[state].keys()
+                state in self.costs.keys() and transition in self.costs[state].keys()
             ):  # the transition has a cost
                 targets.append(str(self.costs[state][transition]))
             else:
@@ -448,8 +501,7 @@ class CostRegular(Model):
         targets = []
         for transition in self.transitions:
             if (
-                state in self.costs.keys()
-                and transition in self.costs[state].keys()
+                state in self.costs.keys() and transition in self.costs[state].keys()
             ):  # the transition has a cost
                 targets.append(str(self.costs[state][transition]))
             else:
@@ -457,10 +509,7 @@ class CostRegular(Model):
         return "{" + ",".join(targets) + "}"
 
     def __make_mzn_costs_matrix(self):
-        ll = "\n".join(
-            self.__make_mzn_costs_line(state)
-            for state in self.states
-        )
+        ll = "\n".join(self.__make_mzn_costs_line(state) for state in self.states)
         return "\n".join(
             f"""
 [{ll}|]""".split("\n")[1:]
@@ -469,8 +518,7 @@ class CostRegular(Model):
     def __make_mzn_global_costs_matrix(self):
         error_line = "|" + ",".join([str(100000) for i in range(len(self.transitions))])
         ll = f"{error_line}\n" + "\n".join(
-            self.__make_mzn_costs_line(state)
-            for state in self.states
+            self.__make_mzn_costs_line(state) for state in self.states
         )
         return "\n".join(
             f"""
@@ -560,8 +608,7 @@ class CostRegular(Model):
                 )
         res.append(f"var int: {count_name}; {suffix}")
         and_condition = " /\ ".join(
-            f"{port}_status[i] = {constraint.status}"
-            for port in constraint.ports
+            f"{port}_status[i] = {constraint.status}" for port in constraint.ports
         )
         res.append(
             f"constraint {count_name} = sum (i in 1..seq_length+1) ({and_condition});"
@@ -639,8 +686,7 @@ class CostRegular(Model):
                     f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}"
                 )
         and_condition = " /\ ".join(
-            f"{port}_status[i] = {constraint.status}"
-            for port in constraint.ports
+            f"{port}_status[i] = {constraint.status}" for port in constraint.ports
         )
         res.append(
             f"constraint count([({and_condition}) | i in 1..seq_length+1], true) > 0; {suffix}"
@@ -766,7 +812,7 @@ class CostRegular(Model):
             return []
 
     def __make_mzn_values_constraints_lines(
-        self, constraints: Collection[CRConstraint]
+        self, constraints: Collection[ValueConstraint | BinConstraint]
     ) -> list[str]:
         mzn_lines = []
         var_names = set()
@@ -820,20 +866,18 @@ class CostRegular(Model):
             return []
 
     def __make_mzn_goal_constraints(self):
-        set_of_constraints = set(self.constraints)
-        state_and_transition_constraints = filter(
-            lambda c: c.isStateConstraint() or c.isTransitionConstraint(),
-            set_of_constraints,
-        )
         lines = [
             line
-            for constraint in state_and_transition_constraints
+            for constraint in self.constraints
             for line in self.__make_mzn_constraint_line(constraint)
+            if isinstance(constraint, StateConstraint)
+            or isinstance(constraint, TransitionConstraint)
         ]
-        val_and_bin_constraints = {
+        val_and_bin_constraints: set[ValueConstraint | BinConstraint] = {
             constraint
-            for constraint in set_of_constraints
-            if constraint.isValueConstraint() or constraint.isBinConstraint()
+            for constraint in self.constraints
+            if isinstance(constraint, ValueConstraint)
+            or isinstance(constraint, BinConstraint)
         }
         lines = lines + self.__make_mzn_values_constraints_lines(
             val_and_bin_constraints
@@ -847,12 +891,14 @@ class CostRegular(Model):
             line
             for constraint in self.constraints
             for line in self.__make_mzn_global_constraint_line(constraint)
-            if isinstance(constraint, StateConstraint) or isinstance(constraint, TransitionConstraint)
+            if isinstance(constraint, StateConstraint)
+            or isinstance(constraint, TransitionConstraint)
         ]
-        val_and_bin_constraints = {
+        val_and_bin_constraints: set[ValueConstraint | BinConstraint] = {
             constraint
             for constraint in self.constraints
-            if constraint.isValueConstraint() or constraint.isBinConstraint()
+            if isinstance(constraint, ValueConstraint)
+            or isinstance(constraint, BinConstraint)
         }
         lines = lines + self.__make_mzn_values_constraints_lines(
             val_and_bin_constraints
@@ -875,77 +921,22 @@ class CostRegular(Model):
         write_file: bool = True,
         filepath: Path | str = "model_component.json",
     ):
-        # State constraints format
-        json_state_constraints = [
-             {
-                 "state": constraint.state,
-                 "isFinal": int(constraint.final),
-                 "goal": int(constraint.isGoal()),
-                 "source": constraint.source,
-             }
-            for constraint in self.constraints
-            if isinstance(constraint, StateConstraint)
-        ]
-        # Port constraints format
-        json_port_constraints = [
-            {
-                "port": constraint.port,
-                "status": constraint.status,
-                "isFinal": int(constraint.final),
-                "goal": int(constraint.isGoal()),
-                "source": constraint.source,
-            }
-            for constraint in self.constraints
-            if isinstance(constraint, PortConstraint)
-        ]
-        # Multiport constraints format
-        json_multiport_constraints = [
-            {
-                "ports": constraint.ports,
-                "status": constraint.status,
-                "isFinal": int(constraint.final),
-                "goal": int(constraint.isGoal()),
-                "source": constraint.source,
-            }
-            for constraint in self.constraints
-            if isinstance(constraint, MultiPortConstraint)
-        ]
-        # Transition constraints format
-        json_transition_constraints = [
-            {
-                "transition": constraint.transition,
-                "goal": int(constraint.isGoal()),
-                "source": constraint.source,
-            }
-            for constraint in self.constraints
-            if isinstance(constraint, TransitionConstraint)
-        ]
-        # Value constraints format
-        json_value_constraints = [
-            {
-                "name": constraint.name,
-                "value": constraint.value,
-            }
-            for constraint in self.constraints
-            if isinstance(constraint, ValueConstraint)
-        ]
+        constraint_map = {
+            StateConstraint: "state_constraint",
+            PortConstraint: "port_constraint",
+            MultiPortConstraint: "multiport_constraint",
+            TransitionConstraint: "transition_constraint",
+            ValueConstraint: "value_constraint",
+            BinConstraint: "bin_constraint",
+        }
 
-        # Bin constraints format
-        def __make_json_bin_constraint(constraint):
-            res = {
-                "left": constraint.left,
-                "right": constraint.right,
-                "comparator": constraint.comparator,
-            }
-            if constraint.transition is not None:
-                res["transition_source"] = constraint.transition[0]
-                res["transition_behavior"] = constraint.transition[1]
-            return res
+        grouped_constraints = {v: [] for v in constraint_map.values()}
+        for constraint in self.constraints:
+            for cls, key in constraint_map.items():
+                if isinstance(constraint, cls):
+                    grouped_constraints[key].append(constraint.to_json())
+                    break
 
-        bin_constraints = filter(lambda c: c.isBinConstraint(), self.constraints)
-        json_bin_constraints = [
-            __make_json_bin_constraint(constraint) for constraint in bin_constraints
-        ]
         content = {
             "states": sorted(self.states),
             "transitions": sorted(self.transitions),
@@ -953,14 +944,7 @@ class CostRegular(Model):
             "costs": self.costs,
             "init_state": self.init_state,
             "ports": self.ports,
-            "constraints": {
-                "state_constraint": json_state_constraints,
-                "port_constraint": json_port_constraints,
-                "multiport_constraint": json_multiport_constraints,
-                "transition_constraint": json_transition_constraints,
-                "value_constraint": json_value_constraints,
-                "bin_constraint": json_bin_constraints,
-            },
+            "constraints": grouped_constraints,
         }
         json_content = json.dumps(content)
         if print_model:
@@ -1203,15 +1187,18 @@ minimize scost;
         elif mode == "choco":
             return self.solve_choco(findmus, write_file, file_name, print_model)
 
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
 
 class MultiCostRegular(Model):
     def __init__(self, models: dict[ComponentName, CostRegular], node: Node):
         self._models = models
         self._node = node
         self._solutions: dict[ComponentName, Any] = {k: None for k in models.keys()}
-        self._port_status: dict[ComponentName, dict[Port, Sequence[PortStatus]] | None] = {
-            k: None for k in models.keys()
-        }
+        self._port_status: dict[
+            ComponentName, dict[Port, Sequence[PortStatus]] | None
+        ] = {k: None for k in models.keys()}
         self.__first_skip: dict[ComponentName, int] = {k: -1 for k in models.keys()}
 
     def solve(
@@ -1232,7 +1219,7 @@ class MultiCostRegular(Model):
                     write_file=write_file,
                 )
 
-                if mode not in ["minizinc-global", "minizinc-test"]:
+                if mode not in {"minizinc-global", "minizinc-test"}:
                     self._solutions[key] = solution
                     self._port_status[key] = {
                         port_name: solution.get(f"{port_name}_status")

@@ -45,13 +45,13 @@ message ConfigValue {
 message ConfSuccess {
     string component_source = 1;
     string component_target = 2;
-    string confname = 3;
+    ConfigValue to_message = 3;
 }
 
 message ConfFailure {
     string component_source = 1;
     string component_target = 2;
-    string confname = 3;
+    ConfigValue to_message = 3;
     string cause = 4;
 }
 

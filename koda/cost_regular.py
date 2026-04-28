@@ -1,530 +1,624 @@
-from minizinc import Instance, Model as mznModel, Solver, Status
-from ballet.utils.list_utils import flatmap, indexify, indexOf, count
-from ballet.utils import string_utils
-from koda.gossip import Model, Solution
-from ballet.planner.goal import *
-from ballet.assembly.concertod.component import Component
-import subprocess, json
-import minizinc
-import time
 import concurrent.futures
+import json
+import subprocess
+import time
+from abc import abstractmethod, ABC
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import NewType, Sequence, Any
+
+from minizinc import Instance, Model as mznModel, Solver, Status
+
+from ballet.assembly.concertod.component import Component
+from ballet.planner.goal import (
+    Goal,
+    BehaviorReconfigurationGoal,
+    PlaceReconfigurationGoal,
+    PortReconfigurationGoal,
+    StateReconfigurationGoal,
+)
+from ballet.utils import string_utils
+from ballet.utils.list_utils import indexOf, count
+from koda.gossip import Model, Solution, Node, ComponentName
+
+State = NewType("State", str)
+Transition = NewType("Transition", str)
+Automata = NewType("Automata", dict[State, dict[Transition, State]])
+
+Port = NewType("Port", str)
+Var = NewType("Var", str)
+
+SKIP = Transition("skip")
+
+
+class PortStatus(str, Enum):
+    ENABLED = "enabled"
+    DISABLED = "disabled"
+
+
+class BinComparator(str, Enum):
+    EQ = "=="
+    LT = "<"
+    LE = "<="
+    GT = ">"
+    GE = ">="
+    NE = "!="
+
 
 class FindMUSException(Exception):
-    
-    def __init__(self, message):            
+    def __init__(self, message):
         super().__init__(message)
-        
-        
+
+
 class CRSolution(Solution):
-    
-    def __init__(self, result, sat=True):
+    def __init__(self, result, sat: bool = True):
         self.__result = result
         self.__is_sat = sat
-    
-    @property    
-    def is_sat(self):
+
+    @property
+    def is_sat(self) -> bool:
         return self.__is_sat
-    
+
     @property
     def result(self):
         return self.__result
-    
-    def get(self, key):
+
+    def get(self, key: str):
         return getattr(self.__result, key)
-            
 
-class CRConstraint:
-    
-    def __init__(self, goal=False):
-        self.__goal = goal
-    
-    def isGoal(self):
-        return self.__goal
-    
+
+@dataclass(frozen=True, slots=True)
+class CRConstraint(ABC):
+    @abstractmethod
+    def isGoal(self) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_json(self) -> Mapping[str, Sequence[str | int] | str | int]:
+        raise NotImplementedError
+
     def isStateConstraint(self):
         return False
-    
+
     def isValueConstraint(self):
         return False
-    
+
     def isBinConstraint(self):
         return False
-    
+
     def isTransitionConstraint(self):
         return False
-    
+
     def isPortConstraint(self):
         return False
-        
+
     def isMultiPortConstraint(self):
         return False
 
-class BinConstraint (CRConstraint):
 
-    def __init__(self, left, right, ope, transition=None):
-        assert(ope in ["==", "<", "<=", ">", ">=", "!="])
-        self.__left = left
-        self.__right = right
-        self.__ope = ope
-        self.__assoc_transition = transition
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
+class BinConstraint(CRConstraint):
+    left: Var
+    right: Var
+    comparator: BinComparator
+    transition: tuple[State, Transition] | None = None
 
-    @property
-    def left(self):
-        return self.__left
+    def to_json(self) -> Mapping[str, str]:
+        res: dict[str, str] = {
+            "left": self.left,
+            "right": self.right,
+            "comparator": self.comparator,
+        }
 
-    @property
-    def right(self):
-        return self.__right
+        if self.transition is not None:
+            res["transition_source"] = self.transition[0]
+            res["transition_behavior"] = self.transition[1]
 
-    @property
-    def comparator(self):
-        return self.__ope
+        return res
 
-    @property
-    def transition(self):
-        return self.__assoc_transition
-    
-    def isBinConstraint(self):
+    def isGoal(self) -> bool:
+        return False
+
+    def isBinConstraint(self) -> bool:
         return True
 
 
-class ValueConstraint (CRConstraint):
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
+class ValueConstraint(CRConstraint):
+    name: Var
+    value: int
 
-    def __init__(self, name, value):
-        self.__name = name 
-        self.__val = value
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "name": self.name,
+            "value": self.value,
+        }
 
-    @property
-    def name(self):
-        return self.__name
-    
-    @property
-    def value(self):
-        return self.__val
-    
+    def isGoal(self) -> bool:
+        return False
+
     def isValueConstraint(self):
         return True
 
 
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class StateConstraint(CRConstraint):
-    
-    def __init__(self, state, source="NO SOURCE IS SPECIFIED", final=False, goal=False):
-        super().__init__(goal)
-        self.__state = state
-        self.__final = final
-        self.__source = source
-        
+    state: State
+    source: str = "NO SOURCE IS SPECIFIED"
+    final: bool = False
+    goal: bool = False
+
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "state": self.state,
+            "isFinal": int(self.final),
+            "goal": int(self.goal),
+            "source": self.source,
+        }
+
+    def isGoal(self) -> bool:
+        return self.goal
+
     def isStateConstraint(self):
         return True
-        
-    @property
-    def final(self):
-        return self.__final
-        
-    @property
-    def state(self):
-        return self.__state
-        
-    @property
-    def source(self):
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, StateConstraint):
-            return value.final == self.final and \
-                value.state == self.state and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(str(self.final)+ self.state + self.source + str(self.isGoal()))
-        
+
+
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class PortConstraint(CRConstraint):
-    
-    def __init__(self, port, status, source="NO SOURCE IS SPECIFIED", final=False, goal=False):
-        super().__init__(goal)
-        assert status == "enabled" or status == "disabled"
-        self.__port = port
-        self.__status = status
-        self.__final = final
-        self.__source = source
-        
+    port: Port
+    status: PortStatus
+    source: str = "NO SOURCE IS SPECIFIED"
+    final: bool = False
+    goal: bool = False
+
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "port": self.port,
+            "status": self.status,
+            "isFinal": int(self.final),
+            "goal": int(self.goal),
+            "source": self.source,
+        }
+
+    def isGoal(self) -> bool:
+        return self.goal
+
     def isPortConstraint(self):
         return True
-    
-    @property
-    def port(self):
-        return self.__port
-    
-    @property
-    def status(self):
-        return self.__status
-    
-    @property
-    def final(self):
-        return self.__final
-        
-    @property
-    def source(self):
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, PortConstraint):
-            return value.port == self.port and \
-                value.status == self.status and \
-                value.final == self.final and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(str(self.final)+ self.port + self.status + self.source + str(self.isGoal()))
-    
 
+
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class MultiPortConstraint(CRConstraint):
-    
-    def __init__(self, ports, status, source="NO SOURCE IS SPECIFIED", final=False, goal=False):
-        super().__init__(goal)
-        assert status == "enabled" or status == "disabled"
-        self.__ports = ports
-        self.__status = status
-        self.__final = final
-        self.__source = source
-        
+    ports: list[Port]
+    status: PortStatus
+    source: str = "NO SOURCE IS SPECIFIED"
+    final: bool = False
+    goal: bool = False
+
+    def to_json(self) -> Mapping[str, Sequence[str | int] | str | int]:
+        return {
+            "ports": self.ports,
+            "status": self.status,
+            "isFinal": int(self.final),
+            "goal": int(self.goal),
+            "source": self.source,
+        }
+
+    def isGoal(self) -> bool:
+        return self.goal
+
     def isMultiPortConstraint(self):
         return True
-    
-    @property
-    def ports(self):
-        return self.__ports
-    
-    @property
-    def status(self):
-        return self.__status
-    
-    @property
-    def final(self):
-        return self.__final
-        
-    @property
-    def source(self):
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, MultiPortConstraint):
-            return value.ports == self.ports and \
-                value.status == self.status and \
-                value.final == self.final and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(str(self.final)+ '-'.join(self.ports) + self.status + self.source + str(self.isGoal()))
-    
 
+
+@dataclass(frozen=True, unsafe_hash=True, slots=True)
 class TransitionConstraint(CRConstraint):
-    
-    def __init__(self, transition, source="NO SOURCE IS SPECIFIED", goal=False):
-        super().__init__(goal)
-        self.__transition = transition
-        self.__source = source
-    
+    transition: Transition
+    source: str = "NO SOURCE IS SPECIFIED"
+    goal: bool = False
+
+    def to_json(self) -> Mapping[str, str | int]:
+        return {
+            "transition": self.transition,
+            "goal": int(self.goal),
+            "source": self.source,
+        }
+
+    def isGoal(self) -> bool:
+        return self.goal
+
     def isTransitionConstraint(self):
         return True
-        
-    @property
-    def transition(self):
-        return self.__transition
-        
-    @property
-    def source(self):
-        return self.__source
-    
-    def __eq__(self, value: object):
-        if isinstance(value, TransitionConstraint):
-            return value.transition == self.transition and \
-                value.source == self.source and \
-                value.isGoal() == self.isGoal()
-        return False
-    
-    def __hash__(self):
-        return hash(self.transition + self.source + str(self.isGoal()))
 
- 
+
 class CostRegular(Model):
-    
-    def __init__(self, states: list[str], transitions: list[str], 
-                 automata: dict[str,dict[str,str]], costs: dict[str,dict[str,int]], init_state: str, 
-                 ports: dict[str,list[str]], constraints: set[CRConstraint]):
-        CostRegular.__assert_conform_automata(states, transitions, automata)
-        CostRegular.__assert_conform_costs(states, transitions, costs, automata)
-        CostRegular.__assert_conform_ports(states, ports)
-        CostRegular.__assert_conform_constraints(states, transitions, ports, constraints)
-        if not (init_state in states):
-            raise AssertionError(f"Initial state {init_state} is not a valid state ({list(states)}). Hint for the error component:\n{ports}")
-        self.__states = states
-        self.__transitions = transitions
+    def __init__(
+        self,
+        states: list[State],
+        transitions: list[Transition],
+        automata: Automata,
+        costs: dict[State, dict[Transition, int]],
+        init_state: State,
+        ports: dict[Port, list[State]],
+        constraints: set[CRConstraint],
+    ):
+        self.__assert_conform_automata(states, transitions, automata)
+        self.__assert_conform_costs(states, transitions, costs, automata)
+        self.__assert_conform_ports(states, ports)
+        self.__assert_conform_constraints(states, transitions, ports, constraints)
+        if init_state not in states:
+            raise AssertionError(
+                f"Initial state {init_state} is not a valid state ({list(states)}). Hint for the error component:\n{ports}"
+            )
+        self.__states = set(states)
+        self.__transitions = set(transitions)
         added_skip = False
-        if "skip" not in self.__transitions:
+        if SKIP not in self.__transitions:
             added_skip = True
-            self.__transitions.append("skip")
+            self.__transitions.add(SKIP)
         self.__automata = automata
         self.__init_state = init_state
         if added_skip:
             for state in self.__states:
-                self.__automata[state]["skip"] = state
+                self.__automata[state][SKIP] = state
         self.__costs = costs
         if added_skip:
             for state in self.__states:
-                self.__costs[state]["skip"] = 0
+                self.__costs[state][SKIP] = 0
         self.__constraints = constraints
         self.__ports = ports
         n_wait = count(lambda b: b.startswith("wait"), transitions)
         n_bhv = len(transitions) - n_wait
-        self.__seq_length = len(self.__states)*n_bhv
-    
-    def get_conf_names(self) -> list[str]:
-        res: set[str] = []
-        for constraint in self.constraints:
-            if constraint.isBinConstraint():
-                res.append(constraint.left)
-                res.append(constraint.right)
-            elif constraint.isValueConstraint():
-                res.append(constraint.name)
-        return list(res)
+        self.__seq_length = len(self.__states) * n_bhv
 
-    def __assert_conform_automata(states: list[str], transitions: list[str], automata: dict[str,dict[str,str]]):
+    def get_conf_names(self) -> set[Var]:
+        res: set[Var] = set()
+        for constraint in self.constraints:
+            if isinstance(constraint, BinConstraint):
+                res.add(constraint.left)
+                res.add(constraint.right)
+            elif isinstance(constraint, ValueConstraint):
+                res.add(constraint.name)
+        return res
+
+    @staticmethod
+    def __assert_conform_automata(
+        states: list[State], transitions: list[str], automata: Automata
+    ):
         for source in automata.keys():
-            assert source in states # assert source is declared
+            assert source in states  # assert source is declared
             for label in automata[source].keys():
-                assert label in transitions # assert the label of transition is declared
-                assert automata[source][label] in states or automata[source][label] == "<>" or automata[source][label] == "error" 
+                assert (
+                    label in transitions
+                )  # assert the label of transition is declared
+                assert (
+                    automata[source][label] in states
+                    or automata[source][label] == "<>"
+                    or automata[source][label] == "error"
+                )
                 # assert target is declared, or the transition does not exist
-        
-    def __assert_conform_costs(states: list[str], transitions: list[str], costs: dict[str,dict[str,int]], automata:dict[str,dict[str,str]]):
+
+    @staticmethod
+    def __assert_conform_costs(
+        states: list[State],
+        transitions: list[str],
+        costs: dict[State, dict[Transition, int]],
+        automata: Automata,
+    ):
         for source in costs.keys():
-            assert source in states # assert source is declared
+            assert source in states  # assert source is declared
             for label in costs[source].keys():
-                assert label in transitions # assert the label of transition is declared
-                assert automata[source][label] # assert the transition exists in the automata
-        
-    def __assert_conform_ports(states: list[str], ports:dict[str,list[str]]):
-        for (_, places) in ports.items():
+                assert (
+                    label in transitions
+                )  # assert the label of transition is declared
+                assert automata[source][
+                    label
+                ]  # assert the transition exists in the automata
+
+    @staticmethod
+    def __assert_conform_ports(states: list[State], ports: dict[Port, list[State]]):
+        for _, places in ports.items():
             for place in places:
                 assert place in states
-                
-    def __assert_conform_constraints(states: list[str],  transitions: list[str], ports:dict[str,list[str]], constraints: set[CRConstraint]):
-        for constraint in constraints:
-            if constraint.isPortConstraint():
-                assert constraint.port in ports.keys()
-            if constraint.isTransitionConstraint():
-                assert constraint.transition in transitions
-            if constraint.isStateConstraint():
-                if not (constraint.state in states):
-                    print(f"{constraint.state} is not in {states} (component = {ports})", flush=True)
-                assert constraint.state in states
-    
+
     @staticmethod
-    def constraint_from_goal(goal: Goal, cause, component:Component=None, active=None):
-        if goal.isBehaviorGoal():
-            return TransitionConstraint(transition = goal.behavior(), source=cause, goal=True)
-        elif goal.isPlaceGoal():
-            return StateConstraint(state=goal.place(), source=cause, final=goal.final(), goal=True)
-        elif goal.isPortGoal():
-            return PortConstraint(port=goal.port(), status="enabled" if goal.isEnable() else "disabled", 
-                                  source=cause, final=goal.final(), goal=True)
-        elif goal.isStateGoal():
+    def __assert_conform_constraints(
+        states: list[State],
+        transitions: list[Transition],
+        ports: dict[Port, list[State]],
+        constraints: set[CRConstraint],
+    ):
+        for constraint in constraints:
+            if isinstance(constraint, PortConstraint):
+                assert constraint.port in ports.keys()
+            elif isinstance(constraint, MultiPortConstraint):
+                for port in constraint.ports:
+                    assert port in ports.keys()
+            elif isinstance(constraint, TransitionConstraint):
+                assert constraint.transition in transitions
+            elif isinstance(constraint, StateConstraint):
+                if constraint.state not in states:
+                    print(
+                        f"{constraint.state} is not in {states} (component = {ports})",
+                        flush=True,
+                    )
+                assert constraint.state in states
+
+    @staticmethod
+    def constraint_from_goal(
+        goal: Goal, cause: str, component: Component = None, active: State | None = None
+    ):
+        if isinstance(goal, BehaviorReconfigurationGoal):
+            return TransitionConstraint(
+                transition=Transition(goal.behavior()), source=cause, goal=True
+            )
+        elif isinstance(goal, PlaceReconfigurationGoal):
+            return StateConstraint(
+                state=State(goal.place()), source=cause, final=goal.final(), goal=True
+            )
+        elif isinstance(goal, PortReconfigurationGoal):
+            return PortConstraint(
+                port=Port(goal.port()),
+                status=PortStatus.ENABLED if goal.isEnable() else PortStatus.DISABLED,
+                source=cause,
+                final=goal.final(),
+                goal=True,
+            )
+        elif isinstance(goal, StateReconfigurationGoal):
             if goal.state() == "deployed" or goal.state() == "running":
-                to_reach = component.running_place 
+                to_reach = State(component.running_place)
             elif goal.state() == "destroyed":
-                to_reach = component.initial_place_place
-            elif goal.state() == "current" or goal.state() == "initial":
+                to_reach = State(component.initial_place_place)
+            elif (
+                goal.state() == "current" or goal.state() == "initial"
+            ) and active is not None:
                 to_reach = active
             else:
-                to_reach = goal.state()
-            return StateConstraint(state=to_reach, source=cause, final=goal.final(), goal=True)    
-    
+                to_reach = State(goal.state())
+            return StateConstraint(
+                state=to_reach,
+                source=cause,
+                final=goal.final(),
+                goal=True,
+            )
+
+        else:
+            raise ValueError
+
     @property
-    def states(self):
-        return self.__states
-    
+    def states(self) -> Sequence[State]:
+        return sorted(self.__states)
+
     @property
-    def init_state(self):
+    def init_state(self) -> State:
         return self.__init_state
-        
+
     @property
-    def transitions(self):
-        return self.__transitions
-        
+    def transitions(self) -> Sequence[Transition]:
+        return sorted(self.__transitions)
+
     @property
-    def automata(self):
+    def automata(self) -> Automata:
         return self.__automata
-        
+
     @property
-    def costs(self):
+    def costs(self) -> dict[State, dict[Transition, int]]:
         return self.__costs
-      
+
     @property
-    def constraints(self):
-        return self.__constraints
-      
-    def get_constraints(self):
-        return self.__constraints
-      
-    def add_constraint(self, constraint):
-        if constraint not in self.__constraints:
-            self.__constraints.add(constraint)
-      
-    def add_transition(self, label, source, target, cost=0):
-        if label not in self.__transitions:
-            self.__transitions.append(label)
+    def constraints(self) -> frozenset[CRConstraint]:
+        return self.get_constraints()
+
+    def get_constraints(self) -> frozenset[CRConstraint]:
+        return frozenset(self.__constraints)
+
+    def add_constraint(self, constraint: CRConstraint):
+        self.__constraints.add(constraint)
+
+    def add_transition(
+        self, label: Transition, source: State, target: State, cost: int = 0
+    ):
+        self.__transitions.add(label)
         self.__automata[source][label] = target
         self.__costs[source][label] = cost
         self.__seq_length = self.__seq_length + 1
-        
+
     @property
     def ports(self):
         return self.__ports
-        
+
     @property
     def port_names(self):
         return list(self.__ports.keys())
-        
-    def __make_mzn_transitions_line(self, state, undefined="<>"):
+
+    def __make_mzn_transitions_line(self, state: State, undefined="<>"):
         targets = []
-        for transition in self.__transitions:
-            if state in self.__automata.keys() and transition in self.__automata[state].keys(): # the transition exists
-                targets.append(self.__automata[state][transition])
+        for transition in self.transitions:
+            if (
+                state in self.automata.keys()
+                and transition in self.automata[state].keys()
+            ):  # the transition exists
+                targets.append(self.automata[state][transition])
             else:
                 targets.append(undefined)
-        return '|' + ','.join(targets)
-        
-    def __make_choco_transitions_line(self, state):
+        return "|" + ",".join(targets)
+
+    def __make_choco_transitions_line(self, state: State):
         targets = []
-        for transition in self.__transitions:
-            if state in self.__automata.keys() and transition in self.__automata[state].keys(): # the transition exists
-                targets.append(self.__automata[state][transition])
+        for transition in self.transitions:
+            if (
+                state in self.automata.keys()
+                and transition in self.automata[state].keys()
+            ):  # the transition exists
+                targets.append(self.automata[state][transition])
             else:
                 targets.append("any")
-        return '{' + ','.join(targets) + '}'
+        return "{" + ",".join(targets) + "}"
 
     def __make_mzn_transitions_matrix(self):
-        lines = map(lambda state: self.__make_mzn_transitions_line(state), self.__states)
-        ll = '\n'.join(lines)
-        return '\n'.join(f"""
-[{ll}|]""".split('\n')[1:])
+        ll = "\n".join(self.__make_mzn_transitions_line(state) for state in self.states)
+        return "\n".join(
+            f"""
+[{ll}|]""".split("\n")[1:]
+        )
 
     def __make_mzn_global_transitions_matrix(self):
-        error_line = "|" + ','.join(["error" for i in range(len(self.transitions))])
-        lines = [error_line] + list(map(lambda state: self.__make_mzn_transitions_line(state, "error").replace("<>","error"), self.__states))
-        ll = '\n'.join(lines)
-        return '\n'.join(f"""
-[{ll}|]""".split('\n')[1:])
-        
-    def __make_choco_transitions_matrix(self):
-        lines = map(lambda state: self.__make_choco_transitions_line(state), self.__states)
-        ll = '\n'.join(map(lambda l: f"\t\t{l}",lines))
-        return ',\n'.join(f"""
-{ll}""".split('\n')[1:])
-        
-    def __make_mzn_costs_line(self, state):
-        targets = []
-        for transition in self.__transitions:
-            if state in self.__costs.keys() and transition in self.__costs[state].keys(): # the transition has a cost
-                targets.append(str(self.__costs[state][transition]))
-            else:
-                targets.append(str(100000))
-        return "|" + ','.join(targets)  
+        error_line = "|" + ",".join(["error" for _ in range(len(self.transitions))])
+        ll = f"{error_line}\n" + "\n".join(
+            self.__make_mzn_transitions_line(state, "error").replace("<>", "error")
+            for state in self.states
+        )
+        return "\n".join(
+            f"""
+[{ll}|]""".split("\n")[1:]
+        )
 
-        
-    def __make_choco_costs_line(self, state):
+    def __make_choco_transitions_matrix(self):
+        ll = "\n".join(
+            f"\t\t{line}"
+            for state in self.states
+            for line in self.__make_choco_transitions_line(state)
+        )
+        return ",\n".join(
+            f"""
+{ll}""".split("\n")[1:]
+        )
+
+    def __make_mzn_costs_line(self, state: State):
         targets = []
-        for transition in self.__transitions:
-            if state in self.__costs.keys() and transition in self.__costs[state].keys(): # the transition has a cost
-                targets.append(str(self.__costs[state][transition]))
+        for transition in self.transitions:
+            if (
+                state in self.costs.keys() and transition in self.costs[state].keys()
+            ):  # the transition has a cost
+                targets.append(str(self.costs[state][transition]))
             else:
                 targets.append(str(100000))
-        return "{" + ','.join(targets) + "}" 
+        return "|" + ",".join(targets)
+
+    def __make_choco_costs_line(self, state: State):
+        targets = []
+        for transition in self.transitions:
+            if (
+                state in self.costs.keys() and transition in self.costs[state].keys()
+            ):  # the transition has a cost
+                targets.append(str(self.costs[state][transition]))
+            else:
+                targets.append(str(100000))
+        return "{" + ",".join(targets) + "}"
 
     def __make_mzn_costs_matrix(self):
-        lines = map(lambda state: self.__make_mzn_costs_line(state), self.__states)
-        ll = '\n'.join(lines)
-        return '\n'.join(f"""
-[{ll}|]""".split('\n')[1:])
+        ll = "\n".join(self.__make_mzn_costs_line(state) for state in self.states)
+        return "\n".join(
+            f"""
+[{ll}|]""".split("\n")[1:]
+        )
 
     def __make_mzn_global_costs_matrix(self):
-        error_line = "|" + ','.join([str(100000) for i in range(len(self.transitions))])
-        lines = [error_line] + list(map(lambda state: self.__make_mzn_costs_line(state), self.__states))
-        ll = '\n'.join(lines)
-        return '\n'.join(f"""
-[{ll}|]""".split('\n')[1:])
+        error_line = "|" + ",".join([str(100000) for i in range(len(self.transitions))])
+        ll = f"{error_line}\n" + "\n".join(
+            self.__make_mzn_costs_line(state) for state in self.states
+        )
+        return "\n".join(
+            f"""
+[{ll}|]""".split("\n")[1:]
+        )
 
-    def __make_choco_costs_matrix(self):        
-        lines = map(lambda state: self.__make_choco_costs_line(state), self.__states)
-        ll = ',\n'.join(map(lambda l: f"\t\t{l}",lines))
-        return '\n'.join(f"""
-{ll}""".split('\n')[1:])
-        
-        
-    def __make_mzn_port_line(self, port, places):
+    def __make_choco_costs_matrix(self):
+        ll = ",\n".join(
+            f"\t\t{line}"
+            for state in self.states
+            for line in self.__make_choco_costs_line(state)
+        )
+        return "\n".join(
+            f"""
+{ll}""".split("\n")[1:]
+        )
+
+    def __make_mzn_port_line(self, port: Port, places: Collection[State]):
         decl = f"array[1..seq_length+1] of var STATUS : {port}_status;"
-        disjunction = ' \/ '.join(map(lambda place: f"states[i] = {place}", places))
+        disjunction = " \/ ".join(f"states[i] = {place}" for place in places)
         constr = f"constraint forall (i in 1..seq_length+1) ({port}_status[i] = enabled <-> {disjunction});"
         return [decl, constr]
-        
-    def __make_choco_port_line(self, port, places):
-        decl = f"\t\tIntVar[] {port}_status = model.intVarArray(\"{port}_status\", seq_length + 1, 0, 1);"
+
+    def __make_choco_port_line(self, port: Port, places: Collection[State]):
+        decl = f'\t\tIntVar[] {port}_status = model.intVarArray("{port}_status", seq_length + 1, 0, 1);'
         forloop = "\t\tfor(int i = 0; i < seq_length + 1; i++) {"
-        bool_b0 = f"\t\t\tBoolVar b0 = model.arithm({port}_status[i], \"=\", enabled).reify();"
+        bool_b0 = (
+            f'\t\t\tBoolVar b0 = model.arithm({port}_status[i], "=", enabled).reify();'
+        )
         res = [decl, forloop, bool_b0]
         bool_var_names = []
         for place in places:
             bool_var_name = f"b_{port}_{place}"
             bool_var_names.append(bool_var_name)
-            res.append(f"\t\t\tBoolVar {bool_var_name} = model.arithm(states[i], \"=\", {place}).reify();")
+            res.append(
+                f'\t\t\tBoolVar {bool_var_name} = model.arithm(states[i], "=", {place}).reify();'
+            )
         bool_clause = f"\t\t\tmodel.addClausesBoolOrArrayEqVar(new BoolVar[]{{{','.join(bool_var_names)}}}, b0);"
         endfor = "\t\t}"
         return res + [bool_clause, endfor]
-    
-    def __make_mzn_ports_status_constraints(self):
-        lines = flatmap(lambda port: self.__make_mzn_port_line(port, self.__ports[port]), self.__ports.keys())
-        return '\n'.join(lines)
-    
-    def __make_choco_ports_status_constraints(self):
-        lines = flatmap(lambda port: self.__make_choco_port_line(port, self.__ports[port]), self.__ports.keys())
-        return '\n'.join(lines)
-    
-    def __make_mzn_port_constraint_line(self, constraint: PortConstraint):
+
+    def __make_mzn_ports_status_constraints(self) -> str:
+        return "\n".join(
+            line
+            for port in self.ports.keys()
+            for line in self.__make_mzn_port_line(port, self.ports[port])
+        )
+
+    def __make_choco_ports_status_constraints(self) -> str:
+        return "\n".join(
+            line
+            for port in self.ports.keys()
+            for line in self.__make_choco_port_line(port, self.ports[port])
+        )
+
+    def __make_mzn_port_constraint_line(self, constraint: PortConstraint) -> list[str]:
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
         count_name = f"count_{constraint.port}_status_{constraint.status}"
         if constraint.source:
             count_name = count_name + "_" + string_utils.clean(constraint.source)
         if constraint.final:
-            res.append(f"constraint {constraint.port}_status[seq_length+1] = {constraint.status}; {suffix}")
+            res.append(
+                f"constraint {constraint.port}_status[seq_length+1] = {constraint.status}; {suffix}"
+            )
         res.append(f"var int: {count_name}; {suffix}")
-        res.append(f"constraint {count_name} = sum(s in {constraint.port}_status) (s = {constraint.status}); {suffix}")
+        res.append(
+            f"constraint {count_name} = sum(s in {constraint.port}_status) (s = {constraint.status}); {suffix}"
+        )
         res.append(f"constraint {count_name} > 0; {suffix}")
         return res
-    
-    def __make_mzn_multiport_constraint_line(self, constraint: PortConstraint):
+
+    def __make_mzn_multiport_constraint_line(
+        self, constraint: MultiPortConstraint
+    ) -> list[str]:
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
-        count_name = f"count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        count_name = (
+            f"count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        )
         if constraint.source:
             count_name = count_name + "_" + string_utils.clean(constraint.source)
         if constraint.final:
             for port in constraint.ports:
-                res.append(f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}")
+                res.append(
+                    f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}"
+                )
         res.append(f"var int: {count_name}; {suffix}")
-        and_condition = ' /\ '.join(map(lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports))
-        res.append(f"constraint {count_name} = sum (i in 1..seq_length+1) ({and_condition});")
+        and_condition = " /\ ".join(
+            f"{port}_status[i] = {constraint.status}" for port in constraint.ports
+        )
+        res.append(
+            f"constraint {count_name} = sum (i in 1..seq_length+1) ({and_condition});"
+        )
         res.append(f"constraint {count_name} > 0; {suffix}")
         return res
-    
-    def __make_mzn_transition_constraint_line(self, constraint: TransitionConstraint):
+
+    def __make_mzn_transition_constraint_line(
+        self, constraint: TransitionConstraint
+    ) -> list[str]:
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         count_name = f"count_{constraint.transition}"
         if constraint.source:
@@ -537,55 +631,81 @@ class CostRegular(Model):
             arity = "> 0"
         cstr = f"constraint {count_name} {arity}; {suffix}"
         return [decl1, decl2, cstr]
-    
-    def __make_mzn_state_constraint_line(self, constraint: StateConstraint):
+
+    def __make_mzn_state_constraint_line(
+        self, constraint: StateConstraint
+    ) -> list[str]:
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         count_name = f"count_{constraint.state}"
         if constraint.source:
             count_name = count_name + "_" + string_utils.clean(constraint.source)
         res = []
         if constraint.final:
-            res.append(f"constraint states[seq_length+1] = {constraint.state}; {suffix}") 
+            res.append(
+                f"constraint states[seq_length+1] = {constraint.state}; {suffix}"
+            )
         res.append(f"var int: {count_name}; {suffix}")
-        res.append(f"constraint {count_name} = sum(s in states) (s = {constraint.state}); {suffix}")
+        res.append(
+            f"constraint {count_name} = sum(s in states) (s = {constraint.state}); {suffix}"
+        )
         res.append(f"constraint {count_name} > 0; {suffix}")
         return res
-    
+
     # ---------
-    
-    def __make_mzn_port_global_constraint_line(self, constraint: PortConstraint):
+
+    def __make_mzn_port_global_constraint_line(
+        self, constraint: PortConstraint
+    ) -> list[str]:
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
         count_name = f"count_{constraint.port}_status_{constraint.status}"
         if constraint.source:
             count_name = count_name + "_" + string_utils.clean(constraint.source)
         if constraint.final:
-            res.append(f"constraint {constraint.port}_status[seq_length+1] = {constraint.status}; {suffix}")
-        res.append(f"constraint count({constraint.port}_status, {constraint.status}) > 0; {suffix}")
+            res.append(
+                f"constraint {constraint.port}_status[seq_length+1] = {constraint.status}; {suffix}"
+            )
+        res.append(
+            f"constraint count({constraint.port}_status, {constraint.status}) > 0; {suffix}"
+        )
         return res
-    
-    def __make_mzn_multiport_global_constraint_line(self, constraint: PortConstraint):
+
+    def __make_mzn_multiport_global_constraint_line(
+        self, constraint: MultiPortConstraint
+    ) -> list[str]:
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         res = []
-        count_name = f"count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        count_name = (
+            f"count_multi_{''.join(constraint.ports)}_status_{constraint.status}"
+        )
         if constraint.source:
             count_name += f"_{string_utils.clean(constraint.source)}"
         if constraint.final:
             for port in constraint.ports:
-                res.append(f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}")
-        and_condition = ' /\ '.join(map(lambda port: f"{port}_status[i] = {constraint.status}", constraint.ports))
-        res.append(f"constraint count([({and_condition}) | i in 1..seq_length+1], true) > 0; {suffix}")
+                res.append(
+                    f"constraint {port}_status[seq_length+1] = {constraint.status}; {suffix}"
+                )
+        and_condition = " /\ ".join(
+            f"{port}_status[i] = {constraint.status}" for port in constraint.ports
+        )
+        res.append(
+            f"constraint count([({and_condition}) | i in 1..seq_length+1], true) > 0; {suffix}"
+        )
         return res
-    
-    def __make_mzn_transition_global_constraint_line(self, constraint: TransitionConstraint):
+
+    def __make_mzn_transition_global_constraint_line(
+        self, constraint: TransitionConstraint
+    ) -> list[str]:
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         if constraint.transition.startswith("wait"):
             arity = "= 1"
         else:
             arity = "> 0"
-        constr = f"constraint count(sequence, {constraint.transition}) {arity}; {suffix}"
+        constr = (
+            f"constraint count(sequence, {constraint.transition}) {arity}; {suffix}"
+        )
         return [constr]
-    
+
     def __make_mzn_state_global_constraint_line(self, constraint: StateConstraint):
         suffix = "% goal" if constraint.isGoal() else "% inferred"
         count_name = f"count_{constraint.state}"
@@ -593,80 +713,124 @@ class CostRegular(Model):
             count_name = count_name + "_" + string_utils.clean(constraint.source)
         res = []
         if constraint.final:
-            res.append(f"constraint states[seq_length+1] = {constraint.state}; {suffix}") 
+            res.append(
+                f"constraint states[seq_length+1] = {constraint.state}; {suffix}"
+            )
         res.append(f"constraint count (states, {constraint.state}) > 0; {suffix}")
         return res
-    
-    # ---------
-    
-    def __make_choco_port_constraint_line(self, constraint: PortConstraint):
-        suffix = "// goal" if constraint.isGoal() else "// inferred"
-        res = []
-        if constraint.final:
-            res.append(f"\t\tmodel.arithm({constraint.port}_status[seq_length], \"=\", {constraint.status}).post(); {suffix}")
-        res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
-        res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
-        res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
-        res.append("\n")
-        return res
-    
-    def __make_choco_multiport_constraint_line(self, constraint: PortConstraint):
-        suffix = "// goal" if constraint.isGoal() else "// inferred"
-        res = []
-        if constraint.final:
-            res.append(f"\t\tmodel.arithm({constraint.port}_status[seq_length], \"=\", {constraint.status}).post(); {suffix}")
-        res.append(f"\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar(\"count_{constraint.port}_{constraint.status}\", 0, seq_length); {suffix}")
-        res.append(f"\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.port}_{constraint.status}).post(); {suffix}")
-        res.append(f"\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, \">\", 0).post(); {suffix}")
-        res.append("\n")
-        return res
-    
-    def __make_choco_transition_constraint_line(self, constraint: TransitionConstraint):
-        suffix = "// goal" if constraint.isGoal() else "// inferred"
-        decl = f"\t\tIntVar count_{constraint.transition} = model.intVar(\"count_{constraint.transition}\", 0, seq_length); {suffix}"
-        model_sum = f"\t\tmodel.sum(Arrays.stream(sequence).map(s -> s.eq({constraint.transition}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.transition}).post(); {suffix}"
-        model_arith = f"\t\tmodel.arithm(count_{constraint.transition}, \">\", 0).post(); {suffix}"         
-        return [decl, model_sum, model_arith,"\n"]
-    
-    def __make_choco_state_constraint_line(self, constraint: StateConstraint):
-        suffix = "// goal" if constraint.isGoal() else "// inferred"
-        res = []
-        if constraint.final:
-            res.append(f"\t\tmodel.arithm(states[seq_length], \"=\", {constraint.state}).post(); {suffix}") 
-        res.append(f"\t\tIntVar count_{constraint.state} = model.intVar(\"count_{constraint.state}\", 0, seq_length); {suffix}")
-        res.append(f"\t\tmodel.sum(Arrays.stream(states).map(s -> s.eq({constraint.state}).boolVar()).toArray(BoolVar[]::new), \"=\", count_{constraint.state}).post(); {suffix}")
-        res.append(f"\t\tmodel.arithm(count_{constraint.state}, \">\", 0).post(); {suffix}")
-        res.append("\n")
-        return res
-    
-    def __make_mzn_constraint_line(self, constraint):
-        if constraint.isPortConstraint():
-            return self.__make_mzn_port_constraint_line(constraint)
-        if constraint.isStateConstraint():
-            return self.__make_mzn_state_constraint_line(constraint)
-        if constraint.isTransitionConstraint():
-            return self.__make_mzn_transition_constraint_line(constraint)
-        if constraint.isMultiPortConstraint():
-            return self.__make_mzn_multiport_constraint_line(constraint)
 
-    def __make_mzn_values_constraints_lines(self, constraints):
+    # ---------
+
+    def __make_choco_port_constraint_line(
+        self, constraint: PortConstraint
+    ) -> list[str]:
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        res = []
+        if constraint.final:
+            res.append(
+                f'\t\tmodel.arithm({constraint.port}_status[seq_length], "=", {constraint.status}).post(); {suffix}'
+            )
+        res.append(
+            f'\t\tIntVar count_{constraint.port}_{constraint.status} = model.intVar("count_{constraint.port}_{constraint.status}", 0, seq_length); {suffix}'
+        )
+        res.append(
+            f'\t\tmodel.sum(Arrays.stream({constraint.port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), "=", count_{constraint.port}_{constraint.status}).post(); {suffix}'
+        )
+        res.append(
+            f'\t\tmodel.arithm(count_{constraint.port}_{constraint.status}, ">", 0).post(); {suffix}'
+        )
+        res.append("\n")
+        return res
+
+    def __make_choco_multiport_constraint_line(
+        self, constraint: MultiPortConstraint
+    ) -> list[str]:
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        res = []
+        if constraint.final:
+            for port in constraint.ports:
+                res.append(
+                    f'\t\tmodel.arithm({port}_status[seq_length], "=", {constraint.status}).post(); {suffix}'
+                )
+
+        for port in constraint.ports:
+            res.append(
+                f'\t\tIntVar count_{port}_{constraint.status} = model.intVar("count_{port}_{constraint.status}", 0, seq_length); {suffix}'
+            )
+            res.append(
+                f'\t\tmodel.sum(Arrays.stream({port}_status).map(s -> s.eq({constraint.status}).boolVar()).toArray(BoolVar[]::new), "=", count_{port}_{constraint.status}).post(); {suffix}'
+            )
+            res.append(
+                f'\t\tmodel.arithm(count_{port}_{constraint.status}, ">", 0).post(); {suffix}'
+            )
+
+        res.append("\n")
+        return res
+
+    def __make_choco_transition_constraint_line(
+        self, constraint: TransitionConstraint
+    ) -> list[str]:
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        decl = f'\t\tIntVar count_{constraint.transition} = model.intVar("count_{constraint.transition}", 0, seq_length); {suffix}'
+        model_sum = f'\t\tmodel.sum(Arrays.stream(sequence).map(s -> s.eq({constraint.transition}).boolVar()).toArray(BoolVar[]::new), "=", count_{constraint.transition}).post(); {suffix}'
+        model_arith = (
+            f'\t\tmodel.arithm(count_{constraint.transition}, ">", 0).post(); {suffix}'
+        )
+        return [decl, model_sum, model_arith, "\n"]
+
+    def __make_choco_state_constraint_line(
+        self, constraint: StateConstraint
+    ) -> list[str]:
+        suffix = "// goal" if constraint.isGoal() else "// inferred"
+        res = []
+        if constraint.final:
+            res.append(
+                f'\t\tmodel.arithm(states[seq_length], "=", {constraint.state}).post(); {suffix}'
+            )
+        res.append(
+            f'\t\tIntVar count_{constraint.state} = model.intVar("count_{constraint.state}", 0, seq_length); {suffix}'
+        )
+        res.append(
+            f'\t\tmodel.sum(Arrays.stream(states).map(s -> s.eq({constraint.state}).boolVar()).toArray(BoolVar[]::new), "=", count_{constraint.state}).post(); {suffix}'
+        )
+        res.append(
+            f'\t\tmodel.arithm(count_{constraint.state}, ">", 0).post(); {suffix}'
+        )
+        res.append("\n")
+        return res
+
+    def __make_mzn_constraint_line(self, constraint: CRConstraint) -> list[str]:
+        if isinstance(constraint, PortConstraint):
+            return self.__make_mzn_port_constraint_line(constraint)
+        elif isinstance(constraint, StateConstraint):
+            return self.__make_mzn_state_constraint_line(constraint)
+        elif isinstance(constraint, TransitionConstraint):
+            return self.__make_mzn_transition_constraint_line(constraint)
+        elif isinstance(constraint, MultiPortConstraint):
+            return self.__make_mzn_multiport_constraint_line(constraint)
+        else:
+            return []
+
+    def __make_mzn_values_constraints_lines(
+        self, constraints: Collection[ValueConstraint | BinConstraint]
+    ) -> list[str]:
         mzn_lines = []
         var_names = set()
         # First, collect all var names (we support only int for this POC)
         # Then we declare all of them
         for c in constraints:
-            if c.isValueConstraint():
+            if isinstance(c, ValueConstraint):
                 var_names.add(c.name)
-            elif c.isBinConstraint():
+            elif isinstance(c, BinConstraint):
                 var_names.add(c.left)
                 var_names.add(c.right)
         for var in var_names:
             mzn_lines.append(f"var int: {var};")
 
         for c in constraints:
-            if c.isValueConstraint():
+            if isinstance(c, ValueConstraint):
                 mzn_lines.append(f"constraint {c.name} == {c.value};")
-            elif c.isBinConstraint():
+            elif isinstance(c, BinConstraint):
                 if c.transition is not None:
                     # If a transition is associated, constraint applies when the transition is adopted
                     # We iterate over the sequence length and imply the constraint if states[i] and sequence[i] matches
@@ -677,107 +841,126 @@ class CostRegular(Model):
                     )
         return mzn_lines
 
-
-    def __make_mzn_global_constraint_line(self, constraint):
-        if constraint.isPortConstraint():
+    def __make_mzn_global_constraint_line(self, constraint: CRConstraint) -> list[str]:
+        if isinstance(constraint, PortConstraint):
             return self.__make_mzn_port_global_constraint_line(constraint)
-        if constraint.isStateConstraint():
+        elif isinstance(constraint, StateConstraint):
             return self.__make_mzn_state_global_constraint_line(constraint)
-        if constraint.isTransitionConstraint():
+        elif isinstance(constraint, TransitionConstraint):
             return self.__make_mzn_transition_global_constraint_line(constraint)
-        if constraint.isMultiPortConstraint():
+        elif isinstance(constraint, MultiPortConstraint):
             return self.__make_mzn_multiport_global_constraint_line(constraint)
-    
-    def __make_choco_constraint_line(self, constraint):
-        if constraint.isPortConstraint():
+        else:
+            return []
+
+    def __make_choco_constraint_line(self, constraint: CRConstraint) -> list[str]:
+        if isinstance(constraint, PortConstraint):
             return self.__make_choco_port_constraint_line(constraint)
-        if constraint.isStateConstraint():
+        elif isinstance(constraint, StateConstraint):
             return self.__make_choco_state_constraint_line(constraint)
-        if constraint.isTransitionConstraint():
+        elif isinstance(constraint, TransitionConstraint):
             return self.__make_choco_transition_constraint_line(constraint)
-        if constraint.isMultiPortConstraint():
+        elif isinstance(constraint, MultiPortConstraint):
             return self.__make_choco_multiport_constraint_line(constraint)
-    
+        else:
+            return []
+
     def __make_mzn_goal_constraints(self):
-        set_of_constraints = set(self.__constraints)
-        state_and_transition_constraints = filter(lambda c: c.isStateConstraint() or c.isTransitionConstraint(), set_of_constraints)
-        lines = flatmap(lambda constraint: self.__make_mzn_constraint_line(constraint), state_and_transition_constraints)
-        val_and_bin_constraints = set(filter(lambda c: c.isValueConstraint() or c.isBinConstraint(), set_of_constraints))
-        lines = lines + self.__make_mzn_values_constraints_lines(val_and_bin_constraints)
+        lines = [
+            line
+            for constraint in self.constraints
+            for line in self.__make_mzn_constraint_line(constraint)
+            if isinstance(constraint, StateConstraint)
+            or isinstance(constraint, TransitionConstraint)
+        ]
+        val_and_bin_constraints: set[ValueConstraint | BinConstraint] = {
+            constraint
+            for constraint in self.constraints
+            if isinstance(constraint, ValueConstraint)
+            or isinstance(constraint, BinConstraint)
+        }
+        lines = lines + self.__make_mzn_values_constraints_lines(
+            val_and_bin_constraints
+        )
         self.make_json_model(print_model=True)
         # TODO remove above line
-        return '\n'.join(lines)
-    
+        return "\n".join(lines)
+
     def __make_mzn_goal_global_constraints(self):
-        set_of_constraints = set(self.__constraints)
-        state_and_transition_constraints = filter(lambda c: c.isStateConstraint() or c.isTransitionConstraint(), set_of_constraints)
-        lines = flatmap(lambda constraint: self.__make_mzn_global_constraint_line(constraint), state_and_transition_constraints)
-        val_and_bin_constraints = set(filter(lambda c: c.isValueConstraint() or c.isBinConstraint(), set_of_constraints))
-        lines = lines + self.__make_mzn_values_constraints_lines(val_and_bin_constraints)
+        lines = [
+            line
+            for constraint in self.constraints
+            for line in self.__make_mzn_global_constraint_line(constraint)
+            if isinstance(constraint, StateConstraint)
+            or isinstance(constraint, TransitionConstraint)
+        ]
+        val_and_bin_constraints: set[ValueConstraint | BinConstraint] = {
+            constraint
+            for constraint in self.constraints
+            if isinstance(constraint, ValueConstraint)
+            or isinstance(constraint, BinConstraint)
+        }
+        lines = lines + self.__make_mzn_values_constraints_lines(
+            val_and_bin_constraints
+        )
         self.make_json_model(print_model=True)
         # TODO remove above line
-        return '\n'.join(lines)
-    
+        return "\n".join(lines)
+
     def __make_choco_goal_constraints(self):
-        lines = flatmap(lambda constraint: self.__make_choco_constraint_line(constraint), self.__constraints)
-        return '\n'.join(lines)
-    
-    def make_json_model(self, print_model=True, write_file=True, filepath="model_component.json"):
-        bool2int = lambda b: 1 if b else 0
-        # State constraints format
-        state_constraints = filter(lambda c: c.isStateConstraint() , self.constraints)
-        json_state_constraints = list(map(lambda constraint: {"state": constraint.state, "isFinal": bool2int(constraint.final), "goal": bool2int(constraint.isGoal()), "source": constraint.source}, state_constraints))    
-        # Port constraints format
-        port_constraints = filter(lambda c: c.isPortConstraint() , self.constraints)
-        json_port_constraints = list(map(lambda constraint: {"port": constraint.port, "status": constraint.status,"isFinal": bool2int(constraint.final), "goal": bool2int(constraint.isGoal()), "source": constraint.source}, port_constraints))    
-        # Multiport constraints format
-        multiport_constraints = filter(lambda c: c.isMultiPortConstraint() , self.constraints)
-        json_multiport_constraints = list(map(lambda constraint: {"ports": constraint.ports, "status": constraint.status,"isFinal": bool2int(constraint.final), "goal": bool2int(constraint.isGoal()), "source": constraint.source}, multiport_constraints))    
-        # Transition constraints format
-        transition_constraints = filter(lambda c: c.isTransitionConstraint() , self.constraints)
-        json_transition_constraints = list(map(lambda constraint: {"transition": constraint.transition, "goal": bool2int(constraint.isGoal()), "source": constraint.source}, transition_constraints))  
-        # Value constraints format
-        value_constraints = filter(lambda c: c.isValueConstraint() , self.constraints)
-        json_value_constraints = list(map(lambda constraint: {"name": constraint.name, "value": constraint.value} ,value_constraints))
-        # Bin constraints format
-        def __make_json_bin_constraint(constraint):
-            res = {"left": constraint.left, "right": constraint.right, "comparator": constraint.comparator} 
-            if constraint.transition != None:
-                res["transition_source"] = constraint.transition[0]
-                res["transition_behavior"] = constraint.transition[1]
-            return res
-        bin_constraints = filter(lambda c: c.isBinConstraint() , self.constraints)
-        json_bin_constraints = list(map(
-            lambda constraint: __make_json_bin_constraint(constraint), bin_constraints))
+        return "\n".join(
+            line
+            for constraint in self.constraints
+            for line in self.__make_choco_constraint_line(constraint)
+        )
+
+    def make_json_model(
+        self,
+        *,
+        print_model: bool = True,
+        write_file: bool = True,
+        filepath: Path | str = "model_component.json",
+    ):
+        constraint_map = {
+            StateConstraint: "state_constraint",
+            PortConstraint: "port_constraint",
+            MultiPortConstraint: "multiport_constraint",
+            TransitionConstraint: "transition_constraint",
+            ValueConstraint: "value_constraint",
+            BinConstraint: "bin_constraint",
+        }
+
+        grouped_constraints = {v: [] for v in constraint_map.values()}
+        for constraint in self.constraints:
+            for cls, key in constraint_map.items():
+                if isinstance(constraint, cls):
+                    grouped_constraints[key].append(constraint.to_json())
+                    break
+
         content = {
-            "states": self.states,
-            "transitions": self.transitions,
+            "states": sorted(self.states),
+            "transitions": sorted(self.transitions),
             "automata": self.automata,
             "costs": self.costs,
             "init_state": self.init_state,
             "ports": self.ports,
-            "constraints":
-                {
-                    "state_constraint": json_state_constraints,
-                    "port_constraint": json_port_constraints,
-                    "multiport_constraint": json_multiport_constraints,
-                    "transition_constraint": json_transition_constraints,
-                    "value_constraint": json_value_constraints,
-                    "bin_constraint": json_bin_constraints
-                }
+            "constraints": grouped_constraints,
         }
         json_content = json.dumps(content)
         if print_model:
             print(json_content)
         if write_file:
-            with open(filepath, 'w') as f:
-                json.dump(content, f)
+            Path(filepath).write_text(json_content)
 
-    
-    def __make_choco_model(self, classname="TestModel"):
+    def __make_choco_model(self, classname: str = "TestModel"):
         # TODO safe remove
-        int_states = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.states)))
-        int_behaviors = '\n'.join(map(lambda p: "        int " + str(p[0]) +" = "+ str(p[1])+" ;" , indexify(self.transitions)))
+        int_states = "\n".join(
+            f"        int {state} = {i} ;" for i, state in sorted(self.states)
+        )
+        int_behaviors = "\n".join(
+            f"        int {transaction} = {i} ;"
+            for i, transaction in sorted(self.transitions)
+        )
         content = f"""
 package gossip;        
 
@@ -818,8 +1001,8 @@ public class {classname} {{
 
 
         // Captured variables
-        IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, {len(self.__transitions) - 1});
-        IntVar[] states = model.intVarArray("states", seq_length + 1, 0, {len(self.__states) - 1});
+        IntVar[] sequence = model.intVarArray("sequence", seq_length, 0, {len(self.transitions) - 1});
+        IntVar[] states = model.intVarArray("states", seq_length + 1, 0, {len(self.states) - 1});
         IntVar[] cost = model.intVarArray("cost", seq_length, 0, 1000000);
 
         for (int i = 0; i < seq_length; i++) {{
@@ -838,7 +1021,7 @@ public class {classname} {{
 {self.__make_choco_ports_status_constraints()}
     
         // Init state
-        model.arithm(states[0], "=", {self.__init_state}).post();
+        model.arithm(states[0], "=", {self.init_state}).post();
         
         // Reconfiguration goals as constraints
 {self.__make_choco_goal_constraints()}
@@ -861,24 +1044,25 @@ public class {classname} {{
 
 """
         return content
-    
+
     def __make_mzn_model(self, globalconstraint=True):
         nstate = len(self.states)
-        nwait = count(lambda b: b.startswith("wait"), self.transitions)
+        nwait = sum(b.startswith("wait") for b in self.transitions)
         nbhv = len(self.transitions) - nwait
-        seq_length = nbhv * nstate + nwait 
+        seq_length = nbhv * nstate + nwait
         if globalconstraint:
             goal_constraints = self.__make_mzn_goal_global_constraints()
         else:
             goal_constraints = self.__make_mzn_goal_constraints()
-        content = '\n'.join(f"""
+        content = "\n".join(
+            f"""
 include "count.mzn";
 include "regular.mzn";
                             
 int: seq_length = {seq_length};
 
-enum STATE = {{{','.join(self.states)}}};
-enum BEHAVIOR = {{{','.join(self.transitions)}}}; 
+enum STATE = {{{",".join(sorted(self.states))}}};
+enum BEHAVIOR = {{{",".join(sorted(self.transitions))}}}; 
 enum STATUS = {{enabled, disabled}};
 
 array[STATE, BEHAVIOR] of opt STATE: transitions = 
@@ -900,8 +1084,8 @@ constraint forall (i in 1..seq_length) (cost[i] = costs[states[i],sequence[i]]);
 {self.__make_mzn_ports_status_constraints()}
 
 % Init state
-constraint states[1]={self.__init_state};
-constraint regular(sequence, transitions, {self.__init_state}, {{{','.join(self.states)}}});
+constraint states[1]={self.init_state};
+constraint regular(sequence, transitions, {self.init_state}, {{{",".join(self.states)}}});
 
 % Reconfiguration goals as constraints
 {goal_constraints}
@@ -919,10 +1103,18 @@ solve
 :: int_search(reversed_cost, first_fail, indomain_min)
 minimize scost;
 
-""".split('\n')[1:])
+""".split("\n")[1:]
+        )
         return content
-    
-    def solve_minizinc(self, findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
+
+    def solve_minizinc(
+        self,
+        findmus=False,
+        write_file=False,
+        file_name="model.mzn",
+        print_model=False,
+        solve_with="chuffed",
+    ):
         wf = write_file if not findmus else True
         modelfile = file_name
         model = mznModel()
@@ -930,7 +1122,7 @@ minimize scost;
         if print_model:
             print(mzn_str_model)
         if wf:
-            with open(modelfile, 'w') as f:
+            with open(modelfile, "w") as f:
                 f.write(mzn_str_model)
                 f.close()
             model.add_file(modelfile)
@@ -944,9 +1136,15 @@ minimize scost;
         else:
             r = result.solution
             return CRSolution(r, sat=True)
-        
-    def solve_choco(self,findmus=False, write_file=False, filename="model_component.json", print_model=False):
-        #TODO modify planner-mus.jar to support new type of constraints. Also, catch result better, to get result if sat or not.
+
+    def solve_choco(
+        self,
+        findmus=False,
+        write_file=False,
+        filename="model_component.json",
+        print_model=False,
+    ):
+        # TODO modify planner-mus.jar to support new type of constraints. Also, catch result better, to get result if sat or not.
         # If sat : we get a solution (behaviors, states, and statuses of ports)
         # If unsat : we get set of MUS
         # TODO remove disjunction, we manage models mus or not.
@@ -967,129 +1165,207 @@ minimize scost;
             if print_model:
                 print(choco_str_model, flush=True)
             if wf:
-                with open(modelfile, 'w') as f:
+                with open(modelfile, "w") as f:
                     f.write(choco_str_model)
                     f.close()
             return None, None
-    
-    def solve(self, mode="minizinc", findmus=False, write_file=False, file_name="model.mzn", print_model=False, solve_with="chuffed"):
+
+    def solve(
+        self,
+        mode="minizinc",
+        findmus=False,
+        write_file=False,
+        file_name="model.mzn",
+        print_model=False,
+        solve_with="chuffed",
+    ) -> CRSolution:
         # print(f"Solve with: {mode}, findMus: {findmus}, solver: {solve_with}")
         if mode == "minizinc":
-            return self.solve_minizinc(findmus, write_file, file_name, print_model, solve_with)
-        if mode == "choco":
+            return self.solve_minizinc(
+                findmus, write_file, file_name, print_model, solve_with
+            )
+        elif mode == "choco":
             return self.solve_choco(findmus, write_file, file_name, print_model)
-        
-    
+
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
+
 class MultiCostRegular(Model):
-    
-    def __init__(self, models: dict[str, CostRegular], node):
+    def __init__(self, models: dict[ComponentName, CostRegular], node: Node):
         self._models = models
         self._node = node
-        self._solutions = {k: None for k in models.keys()}
-        self._port_status = {k: None for k in models.keys()}
-        self.__first_skip = {k: -1 for k in models.keys()}
+        self._solutions: dict[ComponentName, Any] = {k: None for k in models.keys()}
+        self._port_status: dict[
+            ComponentName, dict[Port, Sequence[PortStatus]] | None
+        ] = {k: None for k in models.keys()}
+        self.__first_skip: dict[ComponentName, int] = {k: -1 for k in models.keys()}
 
-
-    def solve(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
-        def process_model(key, model):
+    def solve(
+        self,
+        mode="minizinc",
+        print_model=False,
+        write_file=False,
+        step="flocal",
+        iteration=0,
+    ):
+        def process_model(key: ComponentName, model: CostRegular):
             try:
                 real_mode = "minizinc" if mode == "minizinc-test" else mode
-                solution = model.solve(real_mode, file_name=f"{key}.mzn", print_model=print_model, write_file=write_file)
-            
-                if mode not in ["minizinc-global", "minizinc-test"]:
+                solution = model.solve(
+                    real_mode,
+                    file_name=f"{key}.mzn",
+                    print_model=print_model,
+                    write_file=write_file,
+                )
+
+                if mode not in {"minizinc-global", "minizinc-test"}:
                     self._solutions[key] = solution
-                    self._port_status[key] = {port_name: solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+                    self._port_status[key] = {
+                        port_name: solution.get(f"{port_name}_status")
+                        for port_name in model.ports.keys()
+                    }
                     skip_value = solution.get("sequence")[-1]
-                    self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
+                    self.__first_skip[key] = indexOf(
+                        skip_value, solution.get("sequence")
+                    )
             except FindMUSException:
                 print(f"{key} 's model is unsat. Qx running", flush=True)
-                self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)            
+                self._solutions[key] = model.solve(
+                    mode="choco",
+                    file_name=f"{key}.json",
+                    findmus=True,
+                    print_model=False,
+                    write_file=False,
+                )
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {executor.submit(process_model, key, model): key for key, model in self._models.items()}
+            futures = {
+                executor.submit(process_model, key, model): key
+                for key, model in self._models.items()
+            }
             for future in concurrent.futures.as_completed(futures):
                 future.result()  # Wait for all threads to complete
         return self._solutions
 
-
-    def solve_timed(self, mode="minizinc", print_model=False, write_file=False, step="flocal", iteration=0):
+    def solve_timed(
+        self,
+        mode="minizinc",
+        print_model=False,
+        write_file=False,
+        step="flocal",
+        iteration=0,
+    ):
         start_times = {}
+
         def process_model(key, model):
             try:
                 real_mode = "minizinc" if mode == "minizinc-test" else mode
                 start_times[key] = time.time()
-                solution = model.solve(real_mode, file_name=f"{key}.mzn", print_model=print_model, write_file=write_file)
-                
+                solution = model.solve(
+                    real_mode,
+                    file_name=f"{key}.mzn",
+                    print_model=print_model,
+                    write_file=write_file,
+                )
+
                 if mode not in ["minizinc-global", "minizinc-test"]:
                     self._solutions[key] = solution
-                    self._port_status[key] = {port_name: solution.get(f"{port_name}_status") for port_name in model.ports.keys()}
+                    self._port_status[key] = {
+                        port_name: solution.get(f"{port_name}_status")
+                        for port_name in model.ports.keys()
+                    }
                     skip_value = solution.get("sequence")[-1]
-                    self.__first_skip[key] = indexOf(skip_value, solution.get("sequence"))
+                    self.__first_skip[key] = indexOf(
+                        skip_value, solution.get("sequence")
+                    )
                     end_time = time.time()
                     rstep = step
                 else:
                     rstep = step
             except FindMUSException:
-                self._solutions[key] = model.solve(mode="choco", file_name=f"{key}.json", findmus=True, print_model=False, write_file=False)
+                self._solutions[key] = model.solve(
+                    mode="choco",
+                    file_name=f"{key}.json",
+                    findmus=True,
+                    print_model=False,
+                    write_file=False,
+                )
                 rstep = "funsat"
-            
+
             cmp_time = time.time() - start_times[key]
             print(f"{key}|{rstep}|{iteration}|{cmp_time}", flush=True)
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {executor.submit(process_model, key, model): key for key, model in self._models.items()}
+            futures = {
+                executor.submit(process_model, key, model): key
+                for key, model in self._models.items()
+            }
             for future in concurrent.futures.as_completed(futures):
                 future.result()  # Wait for all threads to complete
 
         return self._solutions
 
-
-    def get_constraints(self):
-        constraints = {}
-        for cmp in self.get_components():
-            constraints[cmp] = self.get_model(cmp).constraints
-        return constraints
+    def get_constraints(self) -> dict[ComponentName, Collection[CRConstraint]]:
+        return {
+            component: self.get_model(component).constraints
+            for component in self.get_components()
+        }
 
     def get_node(self):
         return self._node
 
-    def get_components(self):
-        return list(self._solutions.keys())
+    def get_components(self) -> list[ComponentName]:
+        return [ComponentName(key) for key in self._solutions.keys()]
 
-    def get_solution(self, key):
+    def get_solution(self, key: ComponentName):
         return self._solutions[key]
-    
-    def get_port_status(self, component, port):
-        return self._port_status[component][port][:self.__first_skip[component]+1]
-    
-    def get_port_statuses(self, component):
-        result = {}
-        for port in self._port_status[component].keys():
-            result[port] = self._port_status[component][port][:self.__first_skip[component]+1]
-        return result
-    
-    def get_sequence(self, component):
+
+    def get_port_status(
+        self, component: ComponentName, port: Port
+    ) -> Sequence[PortStatus]:
+        return self._port_status[component][port][: self.__first_skip[component] + 1]
+
+    def get_port_statuses(
+        self, component: ComponentName
+    ) -> dict[Port, Sequence[PortStatus]]:
+        return {
+            port: self.get_port_status(component, port)
+            for port in self._port_status[component].keys()
+        }
+
+    def get_sequence(self, component: ComponentName) -> Sequence[Transition]:
         try:
-            return self._solutions[component].get("sequence")[:self.__first_skip[component]]
+            return self._solutions[component].get("sequence")[
+                : self.__first_skip[component]
+            ]
         except:
             return []
-        
-    def get_conf_values(self, component):
+
+    def get_conf_values(self, component: ComponentName):
         try:
             res = {}
-            for confname in self.get_model[component].get_conf_names():
-                res[confname] = self._solutions[component].get(confname)
+            for conf_name in self.get_model(component).get_conf_names():
+                res[conf_name] = self._solutions[component].get(conf_name)
             return res
         except:
             return {}
-    
-    def get_states(self, component):
-        return self._solutions[component].get("states")[:self.__first_skip[component]+1]
-    
-    def add_transition(self, component, label, _from, _to, ):
+
+    def get_states(self, component: ComponentName) -> Sequence[State]:
+        return self._solutions[component].get("states")[
+            : self.__first_skip[component] + 1
+        ]
+
+    def add_transition(
+        self, component: ComponentName, label: Transition, _from: State, _to: State
+    ) -> None:
         self._models[component].add_transition(label, _from, _to)
-    
-    def add_constraint(self, component, constraint):
+
+    def add_constraint(
+        self, component: ComponentName, constraint: CRConstraint
+    ) -> None:
+        print(f"{component}: ADD CONSTRAINT {constraint}", flush=True)
         self._models[component].add_constraint(constraint)
-        
-    def get_model(self, key):
+
+    def get_model(self, key: ComponentName) -> CostRegular:
         return self._models[key]

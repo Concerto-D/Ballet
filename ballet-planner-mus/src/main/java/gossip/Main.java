@@ -4,9 +4,11 @@ import gossip.json.CostRegularModel;
 import gossip.json.Json2Model;
 import gossip.json.Model2Choco;
 import org.chocosolver.solver.Model;
+import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.search.strategy.Search;
+import org.chocosolver.solver.variables.IntVar;
 
 import java.util.Arrays;
 import java.util.List;
@@ -14,29 +16,42 @@ import java.util.Map;
 
 public class Main {
 
+    public static String prettyPrint(Model choco_model){
+        System.out.println(
+                Arrays.toString( (IntVar[]) choco_model.getHook("sequence"))
+        );
+        return ""; // TODO
+    }
+
     public static void main(String[] args) {
         String filepath;
-        if (args.length == 0) {
-            throw new IllegalArgumentException("No filepath argument provided.");
-        } else {
-            filepath = args[0];
-        }
+        filepath = "/Users/jolan/Projets/Ballet/ballet-planner-mus/src/main/resources/model.json";
+//        if (args.length == 0) {
+//            throw new IllegalArgumentException("No filepath argument provided.");
+//        } else {
+//            filepath = args[0];
+//        }
 
         CostRegularModel cr_model = Json2Model.readJsonFile(filepath);
-        Model choco_model = Model2Choco.toChocoModel(cr_model);
-
+        Model choco_model = Model2Choco.toChocoModel(cr_model, true);
 
         Solver solver = choco_model.getSolver();
-        solver.reset();
         solver.setSearch(Search.inputOrderLBSearch(choco_model.retrieveIntVars(true)));
-        List<Constraint> mus = solver.findMinimumConflictingSet(Arrays.asList(choco_model.getCstrs()));
-        @SuppressWarnings("unchecked")
-        Map<Object, List<String>> tracker = (Map<Object, List<String>>) choco_model.getHook("tracker");
-        mus.forEach(c -> {
-            if (tracker.containsKey(c)) {
-                System.out.println(tracker.get(c));
-            }
-        });
-//        }
+        if (solver.solve()){
+            System.out.println("Solution");
+            prettyPrint(choco_model);
+        }else{
+            choco_model = Model2Choco.toChocoModel(cr_model, false);
+            solver = choco_model.getSolver();
+            solver.setSearch(Search.inputOrderLBSearch(choco_model.retrieveIntVars(true)));
+            List<Constraint> mus = solver.findMinimumConflictingSet(Arrays.asList(choco_model.getCstrs()));
+            @SuppressWarnings("unchecked")
+            Map<Object, List<String>> tracker = (Map<Object, List<String>>) choco_model.getHook("tracker");
+            mus.forEach(c -> {
+                if (tracker.containsKey(c)) {
+                    System.out.println(tracker.get(c));
+                }
+            });
+        }
     }
 }

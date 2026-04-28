@@ -1,5 +1,7 @@
 package gossip.json;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.util.List;
 import java.util.Map;
 
@@ -70,8 +72,12 @@ public class CostRegularModel {
         return constraints.getPort_constraint();
     }
 
-    public List<MultiportConstraint> getMultiPortConstraints() {
-        return constraints.getMultiPort_constraint();
+    public List<ValueConstraint> getValueConstraints() {
+        return constraints.getValue_constraint();
+    }
+
+    public List<BinConstraint> getBinConstraints() {
+        return constraints.getBin_constraint();
     }
 
     public List<StateConstraint> getStateConstraints() {
@@ -104,22 +110,15 @@ public class CostRegularModel {
         private List<PortConstraint> port_constraint;
         private List<MultiportConstraint> multiport_constraint;
         private List<TransitionConstraint> transition_constraint;
+        private List<ValueConstraint> value_constraint;
+        private List<BinConstraint> bin_constraint;
 
-        // Getters and Setters
         public List<StateConstraint> getState_constraint() {
             return state_constraint;
         }
 
         public void setState_constraint(List<StateConstraint> state_constraint) {
             this.state_constraint = state_constraint;
-        }
-
-        public List<MultiportConstraint> getMultiPort_constraint() {
-            return multiport_constraint;
-        }
-
-        public void setMultiport_constraint(List<MultiportConstraint> multiport_constraint) {
-            this.multiport_constraint = multiport_constraint;
         }
 
         public List<PortConstraint> getPort_constraint() {
@@ -130,6 +129,14 @@ public class CostRegularModel {
             this.port_constraint = port_constraint;
         }
 
+        public List<MultiportConstraint> getMultiport_constraint() {
+            return multiport_constraint;
+        }
+
+        public void setMultiport_constraint(List<MultiportConstraint> multiport_constraint) {
+            this.multiport_constraint = multiport_constraint;
+        }
+
         public List<TransitionConstraint> getTransition_constraint() {
             return transition_constraint;
         }
@@ -138,12 +145,31 @@ public class CostRegularModel {
             this.transition_constraint = transition_constraint;
         }
 
+        public List<ValueConstraint> getValue_constraint() {
+            return value_constraint;
+        }
+
+        public void setValue_constraint(List<ValueConstraint> value_constraint) {
+            this.value_constraint = value_constraint;
+        }
+
+        public List<BinConstraint> getBin_constraint() {
+            return bin_constraint;
+        }
+
+        public void setBin_constraint(List<BinConstraint> bin_constraint) {
+            this.bin_constraint = bin_constraint;
+        }
+
         @Override
         public String toString() {
             return "Constraints{" +
                     "state_constraint=" + state_constraint +
                     ", port_constraint=" + port_constraint +
+                    ", multiport_constraint=" + multiport_constraint +
                     ", transition_constraint=" + transition_constraint +
+                    ", value_constraint=" + value_constraint +
+                    ", bin_constraint=" + bin_constraint +
                     '}';
         }
     }
@@ -306,6 +332,94 @@ public class CostRegularModel {
                     ", status='" + status + '\'' +
                     ", final=" + isFinal +
                     ", goal=" + goal +
+                    '}';
+        }
+    }
+
+    public static class ValueConstraint {
+        private String name;
+        private int value;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public int getValue() {
+            return value;
+        }
+
+        public void setValue(int value) {
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return "ValueConstraint{" +
+                    "name='" + name + '\'' +
+                    ", value=" + value +
+                    '}';
+        }
+    }
+
+    public static class BinConstraint{
+        private String left;
+        private String right;
+        private String comparator;
+        private String transition_source;
+        private String transition_behavior;
+
+        public String getLeft() {
+            return left;
+        }
+
+        public void setLeft(String left) {
+            this.left = left;
+        }
+
+        public String getRight() {
+            return right;
+        }
+
+        public void setRight(String right) {
+            this.right = right;
+        }
+
+        public String getComparator() {
+            return comparator;
+        }
+
+        public void setComparator(String comparator) {
+            this.comparator = comparator;
+        }
+
+        public String getTransition_source() {
+            return transition_source;
+        }
+
+        public void setTransition_source(String transition_source) {
+            this.transition_source = transition_source;
+        }
+
+        public String getTransition_behavior() {
+            return transition_behavior;
+        }
+
+        public void setTransition_behavior(String transition_behavior) {
+            this.transition_behavior = transition_behavior;
+        }
+
+        @Override
+        public String toString() {
+            return "BinConstraint{" +
+                    "left='" + left + '\'' +
+                    ", right='" + right + '\'' +
+                    ", comparator='" + comparator + '\'' +
+                    ", transition_source='" + transition_source + '\'' +
+                    ", transition_behavior='" + transition_behavior + '\'' +
                     '}';
         }
     }

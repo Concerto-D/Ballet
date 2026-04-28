@@ -1,13 +1,11 @@
 package gossip.json;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.chocosolver.solver.Model;
+import org.chocosolver.solver.SettingsBuilder;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
@@ -68,9 +66,8 @@ public class Model2Choco {
         tracker.put(cstr, cause);
     }
 
-    public static Model toChocoModel(CostRegularModel cr_model) {
-
-        Model model = new Model();
+    public static Model toChocoModel(CostRegularModel cr_model, boolean lcg) {
+        Model model = new Model(SettingsBuilder.init().setLCG(lcg));
         Map<Object, String> tracker = new HashMap<>();
         // STATE
         int seq_length = cr_model.getStates().size() * cr_model.getTransitions().size();
@@ -194,43 +191,73 @@ public class Model2Choco {
             c1.post();
         }
 
-        for (CostRegularModel.MultiportConstraint constraint: cr_model.getMultiPortConstraints()){
-            String str_ports = "["+String.join("%", constraint.getPorts())+"]" ;
-            String tracker_constraint = "multiport("+str_ports+","+constraint.getStatus()+","+constraint.isFinal()+","+constraint.getGoal()+","+constraint.getSource()+")";
-            String name_intvar = "count_" + String.join("_", constraint.getPorts()) + "_" + constraint.getStatus();
-            IntVar count_multiport = model.intVar(name_intvar, 0, seq_length+1);
+        model.addHook("places", states);
+        model.addHook("sequence", sequence);
+        model.addHook("tracker", tracker);
 
-            IntVar[] count_wanted_status = new IntVar[seq_length];
-            int wanted_status = status_as_int.get(constraint.getStatus());
-            for (int i = 0; i < seq_length; i++) {
-                String name_count_wanted = "count_" + String.join("_", constraint.getPorts()) + "_" + constraint.getStatus() + "i";
-                List<BoolVar> tmp_list = new ArrayList<>();
-                for (String port: constraint.getPorts()){
-                    BoolVar[] port_status = (BoolVar[]) model.getHook(port +"_status");
-                    tmp_list.add(port_status[i]);
-                }
-                // tmp_list at this point is a view of each port_status for a given i
-                count_wanted_status[i] = model.intVar(name_count_wanted, 0, tmp_list.size());
-                Constraint c0 = model.count(wanted_status, tmp_list.toArray(new IntVar[0]), count_wanted_status[i] );
-                addTracker(c0, tracker_constraint, tracker);
-                c0.post();
-            }
-            // count_multiport : number of times count_wanted_status respects "all equals to wanted_status"
-            Constraint c1 = model.count(constraint.getPorts().size(), count_wanted_status, count_multiport);
+        // Value and Bin constraints -> get all config names
+        Set<String> names_of_config = new HashSet<>();
+        for (CostRegularModel.ValueConstraint constraint: cr_model.getValueConstraints()) {
+            names_of_config.add(constraint.getName());
+        }
+        for (CostRegularModel.BinConstraint constraint: cr_model.getBinConstraints()) {
+            names_of_config.add(constraint.getLeft());
+            names_of_config.add(constraint.getRight());
+        }
+        for (String name: names_of_config) {
+            IntVar config = model.intVar(name, 0, maxInt);
+            model.addHook(name, config);
+        }
+
+        // Value constraints
+        for (CostRegularModel.ValueConstraint constraint: cr_model.getValueConstraints()) {
+            String tracker_constraint = "value("+constraint.getName()+","+constraint.getValue()+")";
+            IntVar config = (IntVar) model.getHook(constraint.getName());
+            Constraint c1 = model.arithm(config, "=", constraint.getValue());
             addTracker(c1, tracker_constraint, tracker);
             c1.post();
-            Constraint c2 = model.arithm(count_multiport, ">", 0);
-            addTracker(c2, tracker_constraint, tracker);
-            c2.post();
+        }
+        for (CostRegularModel.BinConstraint constraint: cr_model.getBinConstraints()) {
+            String tracker_constraint = "bin("+constraint.getLeft()+","+constraint.getComparator()+","+
+                    constraint.getRight()+","+constraint.getTransition_source()+","+constraint.getTransition_behavior()+")";
+            String str_comparator = constraint.getComparator().equals("==") ? "=" : constraint.getComparator();
+
+            Constraint left_comp_right = model.arithm(
+                    (IntVar) model.getHook(constraint.getLeft()),
+                    str_comparator,
+                    (IntVar) model.getHook(constraint.getRight())
+            );
+
+            IntVar result = model.intVar(0, seq_length);
+            Constraint c0 = model.sum(
+                    IntStream.range(0, seq_length).mapToObj(
+                            i -> model.and(
+                                    model.arithm(states[i], "=", states_as_int.get(constraint.getTransition_source())), // get state[i]
+                                    model.arithm(sequence[i], "=", behaviors_as_int.get(constraint.getTransition_behavior())) // get sequence[i]
+                            ).reify()
+                    ).toArray(BoolVar[]::new), "=", result
+            );
+            Constraint c1 = result.ge(1).imp(left_comp_right.reify()).decompose();
+            addTracker(c0, tracker_constraint, tracker);
+            addTracker(c1, tracker_constraint, tracker);
+            c0.post();
+            c1.post();
+            /*
+            * constraint forall(i in 1..seq_length)
+            *   ((states[i] == getTransition_source() /\ sequence[i] == getTransition_behavior()) ->
+            *       (left comp right));
+            * */
+
+
+//            Constraint c1 = model.arithm(config, "=", constraint.getValue());
+//            addTracker(c1, tracker_constraint, tracker);
+//            c1.post();
         }
 
         IntVar scost = model.intVar("scost", 0, maxInt);
         model.sum(cost, "=", scost).post();
         // Hooks
         model.addHook("objective", scost);
-        model.addHook("places", states);
-        model.addHook("sequence", sequence);
-        model.addHook("tracker", tracker);
         return model;
     }
 }

@@ -23,7 +23,7 @@ provider.set_name("provider")
 user = SimpleUser()
 user.set_name("user")
 
-connections = []
+connections = [('provider', 'service', 'user', 'service')]
 active = {
     provider: 'uninstalled',
     user: 'uninstalled',

@@ -890,15 +890,13 @@ class CostRegular(Model):
         lines = [
             line
             for constraint in self.constraints
+            if not isinstance(constraint, (ValueConstraint, BinConstraint))
             for line in self.__make_mzn_global_constraint_line(constraint)
-            if isinstance(constraint, StateConstraint)
-            or isinstance(constraint, TransitionConstraint)
         ]
         val_and_bin_constraints: set[ValueConstraint | BinConstraint] = {
             constraint
             for constraint in self.constraints
-            if isinstance(constraint, ValueConstraint)
-            or isinstance(constraint, BinConstraint)
+            if isinstance(constraint, (ValueConstraint, BinConstraint))
         }
         lines = lines + self.__make_mzn_values_constraints_lines(
             val_and_bin_constraints
@@ -1364,8 +1362,8 @@ class MultiCostRegular(Model):
     def add_constraint(
         self, component: ComponentName, constraint: CRConstraint
     ) -> None:
-        print(f"{component}: ADD CONSTRAINT {constraint}", flush=True)
         self._models[component].add_constraint(constraint)
+        print(f"{component}: ADD CONSTRAINT {constraint}", flush=True)
 
     def get_model(self, key: ComponentName) -> CostRegular:
         return self._models[key]

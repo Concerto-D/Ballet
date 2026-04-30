@@ -67,11 +67,15 @@ class ConstraintPortMessage(ConstraintMessage):
     passed_by: set[ComponentName]
     final: bool = False
 
+    def __post_init__(self):
+        if self.behavior == "" or self.behavior == "None":
+            self.behavior = None
+
     def has_to_wait(self):
         return not self.behavior == ""
 
     def __str__(self):
-        str_passed_by = f"[{','.join(self.passed_by)}]"
+        str_passed_by = f"[{','.join(sorted(self.passed_by))}]"
         return (
             f"(from:{self.source}, to:{self.target}, port:{self.port}, status:{self.status}, bhv:{self.behavior}, passedby: {str_passed_by},"
             + f"final:{self.final})"
@@ -798,11 +802,12 @@ class CostRegularNode(Node):
             print(f"\t- {comp_name}:", flush=True)
 
             for message in self.__out_message[comp_name].keys():
-                msg = self.__out_message[comp_name][message]
-                if msg is None or not isinstance(msg, Acknowledgement):
-                    continue
+                text = f"\t\t* {message}"
+                ack: Acknowledgement = self.__out_message[comp_name][message]
+                if ack is not None:
+                    text += f' ack={ack.is_success()}'
 
-                print(f"\t\t* {msg}", flush=True)
+                print(text, flush=True)
 
         print("IN_MESSAGES:", flush=True)
         for comp_name in self.__in_message.keys():
@@ -874,9 +879,8 @@ class CostRegularNode(Node):
             comp_name = ComponentName(component.name)
             acks = self._p2p_service.get_acks(comp_name)
             for ack in acks:
-                for message in self.__out_message[comp_name].keys():
-                    if message == ack.constraint:
-                        self.__out_message[comp_name][message] = ack
+                if ack.constraint in self.__out_message[comp_name]:
+                    self.__out_message[comp_name][ack.constraint] = ack
 
     def remove_deplicata(self, out_messages):
         result = set()
@@ -1558,6 +1562,7 @@ def cr_enrich(model: MultiCostRegular, messages: list[ConstraintMessage]):
                 new_constraints.add(wait_constraint)
 
         elif isinstance(message, ConstraintValueMessage):
+            # FIXME: Add source
             msg_source = f"value({message.source}_9_{message.target}_9_{message.confname}_9_{message.confvalue})"
             value_constraint = ValueConstraint(message.confname, message.confvalue)
             node.add_origin_of_constraint(value_constraint, message)

@@ -230,7 +230,7 @@ def gossip(
                                 print(f"SEND ACK {ack}")
                         node.send_acks(target, acks)
                         is_unsat = True
-                elif out_messages != []:
+                elif out_messages:
                     all_acked, has_fail_ack = check_global_acks(node, roots)
                     if all_acked:
                         break
